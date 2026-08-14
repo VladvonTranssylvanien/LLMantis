@@ -1,0 +1,19 @@
+# Never commit secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Database
+*.db
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
