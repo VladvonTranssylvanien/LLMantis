@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PromptGuard</title>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c2129; --border:#30363d;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+    --fail:#f85149; --pass:#3fb950; --warn:#d29922;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width:1100px; margin:0 auto; padding:32px 24px 80px; }
+  header { display:flex; align-items:baseline; gap:16px; margin-bottom:8px; }
+  h1 { font-size:30px; margin:0; letter-spacing:-.5px; }
+  .tag { color:var(--muted); font-size:15px; }
+  .sub { color:var(--muted); margin:0 0 28px; }
+  .panel { background:var(--panel); border:1px solid var(--border);
+           border-radius:10px; padding:20px; margin-bottom:18px; }
+  label { display:block; font-size:13px; text-transform:uppercase;
+          letter-spacing:.6px; color:var(--muted); margin-bottom:8px; }
+  select, textarea, input { width:100%; background:var(--bg); color:var(--text);
+    border:1px solid var(--border); border-radius:7px; padding:11px 13px;
+    font-size:14px; font-family:inherit; }
+  textarea { min-height:190px; font-family:ui-monospace,Menlo,monospace;
+             font-size:13px; resize:vertical; }
+  .row { display:flex; gap:14px; align-items:flex-end; margin-bottom:16px; }
+  .row > div { flex:1; }
+  .row > div.narrow { flex:0 0 240px; }
+  button { background:var(--accent); color:#0d1117; border:0; border-radius:7px;
+           padding:13px 30px; font-size:15px; font-weight:650; cursor:pointer; }
+  button:hover { filter:brightness(1.1); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  #progress { display:none; }
+  .bar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden;
+         border:1px solid var(--border); }
+  .bar > i { display:block; height:100%; width:0; background:var(--accent);
+             transition:width .25s ease; }
+  .ticker { margin-top:12px; font-family:ui-monospace,Menlo,monospace;
+            font-size:13px; color:var(--muted); min-height:20px; }
+  #score { display:none; }
+  .scoreRow { display:flex; gap:28px; align-items:center; }
+  .grade { width:118px; height:118px; flex:0 0 118px; border-radius:14px;
+           display:grid; place-items:center; font-size:62px; font-weight:800;
+           border:3px solid; }
+  .g-A,.g-B { color:var(--pass); border-color:var(--pass); }
+  .g-C { color:var(--warn); border-color:var(--warn); }
+  .g-D,.g-F { color:var(--fail); border-color:var(--fail); }
+  .bigNum { font-size:44px; font-weight:750; line-height:1; }
+  .stats { display:flex; gap:30px; margin-top:14px; color:var(--muted); font-size:14px; }
+  .stats b { color:var(--text); font-size:19px; display:block; }
+  .capped { margin-top:14px; padding:11px 14px; border-radius:7px;
+            background:rgba(248,81,73,.1); border:1px solid var(--fail);
+            color:var(--fail); font-size:14px; }
+  .cats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+          gap:12px; margin-top:22px; }
+  .cat { background:var(--panel-2); border:1px solid var(--border);
+         border-radius:8px; padding:13px 15px; }
+  .cat h4 { margin:0 0 9px; font-size:13px; font-weight:600; }
+  .cat .m { font-size:12px; color:var(--muted); margin-bottom:7px; }
+  .mini { height:5px; background:var(--bg); border-radius:3px; overflow:hidden; }
+  .mini > i { display:block; height:100%; background:var(--pass); }
+  h2 { font-size:20px; margin:32px 0 14px; }
+  .finding { background:var(--panel); border:1px solid var(--border);
+             border-left:4px solid var(--fail); border-radius:8px;
+             margin-bottom:11px; overflow:hidden; }
+  .finding.pass { border-left-color:var(--pass); }
+  .fhead { padding:14px 17px; cursor:pointer; display:flex;
+           align-items:center; gap:13px; }
+  .fhead:hover { background:var(--panel-2); }
+  .pill { font-size:11px; font-weight:700; text-transform:uppercase;
+          letter-spacing:.5px; padding:3px 9px; border-radius:4px; }
+  .p-critical { background:var(--fail); color:#fff; }
+  .p-high { background:#db6d28; color:#fff; }
+  .p-medium { background:var(--warn); color:#0d1117; }
+  .p-low { background:var(--muted); color:#0d1117; }
+  .p-pass { background:var(--pass); color:#0d1117; }
+  .ftitle { flex:1; font-size:15px; }
+  .fmethod { font-size:11px; color:var(--muted);
+             font-family:ui-monospace,Menlo,monospace; }
+  .fbody { display:none; padding:4px 17px 18px; border-top:1px solid var(--border); }
+  .finding.open .fbody { display:block; }
+  .blk { margin-top:15px; }
+  .blk label { margin-bottom:6px; }
+  .blk pre { margin:0; background:var(--bg); border:1px solid var(--border);
+             border-radius:7px; padding:13px; white-space:pre-wrap;
+             word-break:break-word; font-family:ui-monospace,Menlo,monospace;
+             font-size:13px; line-height:1.5; }
+  .blk pre.evidence { border-color:var(--fail); color:var(--fail); }
+  .blk pre.fix { border-color:var(--pass); }
+  .err { color:var(--fail); margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>PromptGuard</h1>
+    <span class="tag">a penetration test for AI chatbots</span>
+  </header>
+  <p class="sub">Paste your bot's instructions. We run every documented attack against it.</p>
+
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="target">Load a demo bot</label>
+        <select id="target"><option value="">Custom prompt</option></select>
+      </div>
+      <div class="narrow">
+        <label for="canary">Canary (planted secret)</label>
+        <input id="canary" placeholder="SECRET-VIP-2026">
+      </div>
+    </div>
+
+    <label for="prompt">System prompt of the bot under test</label>
+    <textarea id="prompt" placeholder="You are the customer support assistant for..."></textarea>
+
+    <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+      <button id="run">Run scan</button>
+      <span id="libinfo" class="tag"></span>
+    </div>
+    <div id="error" class="err"></div>
+  </div>
+
+  <div class="panel" id="progress">
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="ticker" id="ticker"></div>
+  </div>
+
+  <div class="panel" id="score">
+    <div class="scoreRow">
+      <div class="grade" id="grade">?</div>
+      <div>
+        <div class="bigNum"><span id="scoreNum">0</span><span style="font-size:22px;color:var(--muted)">/100</span></div>
+        <div class="stats">
+          <div><b id="stFailed">0</b>failed</div>
+          <div><b id="stPassed">0</b>passed</div>
+          <div><b id="stCritical">0</b>critical</div>
+          <div><b id="stTime">0s</b>duration</div>
+        </div>
+      </div>
+    </div>
+    <div class="capped" id="capped" style="display:none"></div>
+    <div class="cats" id="cats"></div>
+    <p class="tag" id="method" style="margin-top:20px"></p>
+  </div>
+
+  <div id="findings"></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+let demoTargets = [];
+
+(async function init() {
+  try {
+    const lib = await (await fetch('/api/attacks')).json();
+    $('libinfo').textContent =
+      lib.total + ' attacks across ' + lib.categories.length + ' categories';
+    const t = await (await fetch('/api/targets')).json();
+    demoTargets = t.targets || [];
+    for (const target of demoTargets) {
+      const opt = document.createElement('option');
+      opt.value = target.id;
+      opt.textContent = target.name;
+      $('target').appendChild(opt);
+    }
+  } catch (e) {
+    $('error').textContent = 'Could not reach the server. Is uvicorn running?';
+  }
+})();
+
+$('target').addEventListener('change', e => {
+  const t = demoTargets.find(x => x.id === e.target.value);
+  if (t) { $('prompt').value = t.system_prompt; $('canary').value = t.canary || ''; }
+});
+
+$('run').addEventListener('click', async () => {
+  const sp = $('prompt').value.trim();
+  if (!sp) { $('error').textContent = 'Paste a system prompt first.'; return; }
+  $('error').textContent = '';
+  $('run').disabled = true;
+  $('run').textContent = 'Scanning...';
+  $('progress').style.display = 'block';
+  $('score').style.display = 'none';
+  $('findings').innerHTML = '';
+  $('barfill').style.width = '0%';
+  $('ticker').textContent = 'Starting...';
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'prompt',
+        system_prompt: sp,
+        canary: $('canary').value.trim() || null
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.trim()) handleEvent(JSON.parse(line));
+      }
+    }
+  } catch (e) {
+    $('error').textContent = 'Scan failed: ' + e.message;
+  } finally {
+    $('run').disabled = false;
+    $('run').textContent = 'Run scan';
+  }
+});
+
+function handleEvent(ev) {
+  if (ev.type === 'result') {
+    const pct = Math.round(100 * ev.done / ev.total);
+    $('barfill').style.width = pct + '%';
+    const mark = ev.result.verdict === 'FAIL' ? 'FAIL' : 'pass';
+    $('ticker').textContent = ev.done + '/' + ev.total + '  ' + mark + '  ' + ev.result.attack_id;
+  }
+  if (ev.type === 'complete') { $('progress').style.display = 'none'; render(ev.report); }
+  if (ev.type === 'error') { $('error').textContent = ev.message; }
+}
+
+function render(report) {
+  const s = report.summary;
+  $('score').style.display = 'block';
+  $('grade').textContent = s.grade;
+  $('grade').className = 'grade g-' + s.grade;
+  $('scoreNum').textContent = s.score;
+  $('stFailed').textContent = s.failed;
+  $('stPassed').textContent = s.passed;
+  $('stCritical').textContent = s.critical_failures;
+  $('stTime').textContent = report.duration_s + 's';
+  $('method').textContent = report.scoring_explanation;
+
+  $('capped').style.display = s.capped ? 'block' : 'none';
+  if (s.capped) {
+    $('capped').textContent = 'Grade capped at ' + s.grade + ': ' +
+      s.critical_failures + ' critical attack(s) succeeded. Raw score was ' + s.score + '.';
+  }
+
+  $('cats').innerHTML = '';
+  for (const cat of Object.keys(s.by_category)) {
+    const c = s.by_category[cat];
+    const pct = Math.round(100 * c.passed / c.total);
+    const colour = pct === 100 ? 'var(--pass)' : 'var(--fail)';
+    const div = document.createElement('div');
+    div.className = 'cat';
+    div.innerHTML = '<h4>' + label(cat) + '</h4>' +
+      '<div class="m">' + c.passed + '/' + c.total + ' passed</div>' +
+      '<div class="mini"><i style="width:' + pct + '%;background:' + colour + '"></i></div>';
+    $('cats').appendChild(div);
+  }
+
+  const fails = report.results.filter(r => r.verdict === 'FAIL');
+  const rest = report.results.filter(r => r.verdict !== 'FAIL');
+  let html = '';
+  if (fails.length) { html += '<h2>' + fails.length + ' vulnerabilities found</h2>' + fails.map(card).join(''); }
+  if (rest.length) { html += '<h2>' + rest.length + ' attacks defended</h2>' + rest.map(card).join(''); }
+  $('findings').innerHTML = html;
+
+  document.querySelectorAll('.fhead').forEach(h =>
+    h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+}
+
+function card(r) {
+  const failed = r.verdict === 'FAIL';
+  const pill = failed ? 'p-' + r.severity : 'p-pass';
+  const pillText = failed ? r.severity : 'passed';
+  let body = '<div class="blk"><label>What we sent</label><pre>' + esc(r.message) + '</pre></div>' +
+             '<div class="blk"><label>What the bot answered</label><pre>' + esc(r.answer) + '</pre></div>';
+  if (r.evidence) body += '<div class="blk"><label>Evidence</label><pre class="evidence">' + esc(r.evidence) + '</pre></div>';
+  if (failed) body += '<div class="blk"><label>How to fix it</label><pre class="fix">' + esc(r.fix) + '</pre></div>';
+  return '<div class="finding ' + (failed ? '' : 'pass') + '">' +
+    '<div class="fhead"><span class="pill ' + pill + '">' + pillText + '</span>' +
+    '<span class="ftitle">' + esc(r.reason || r.attack_id) + '</span>' +
+    '<span class="fmethod">' + r.attack_id + ' &middot; ' + r.method + '</span></div>' +
+    '<div class="fbody">' + body + '</div></div>';
+}
+
+function label(c) { return c.replace(/_/g, ' ').replace(/\b\w/g, x => x.toUpperCase()); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+</script>
+</body>
+</html>
