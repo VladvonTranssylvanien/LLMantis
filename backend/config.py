@@ -49,6 +49,10 @@ DEMO_DIR = ROOT / "demo"
 FRONTEND_DIR = ROOT / "frontend"
 
 
+# --- Database ----------------------------------------------------------------
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis")
+
+
 def summary() -> str:
     """Human-readable config dump, used by selfcheck and on server startup."""
     key_state = "set" if ANTHROPIC_API_KEY else "not set"
