@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140" width="240" height="140" role="img" aria-label="LLMantis">
+  <title>LLMantis — dark theme lockup</title>
+  <!-- For dark surfaces (PLAYBOOK.md §3 --bg #0A0A0B). Transparent background by design. -->
+  <g transform="translate(75 8.2) scale(0.9)">
+    <g fill="#7BE33F">
+      <path fill-rule="evenodd" d="
+        M 50 29
+        C 44 27, 30 26, 18 27
+        C 12 27.5, 9 31, 10 37
+        C 12 51, 22 68, 34 78
+        C 38 82, 44 86, 50 87
+        C 56 86, 62 82, 66 78
+        C 78 68, 88 51, 90 37
+        C 91 31, 88 27.5, 82 27
+        C 70 26, 56 27, 50 29
+        Z
+        M 18.5 31.28 a 14 8.5  50 1 0 18  21.44 a 14 8.5  50 1 0 -18 -21.44 Z
+        M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18  21.44 Z
+      "/>
+      <path d="M 44 31 C 36 22, 24 12, 6 2 C 21 13, 34 24, 46.5 34.5 Z"/>
+      <path d="M 56 31 C 64 22, 76 12, 94 2 C 79 13, 66 24, 53.5 34.5 Z"/>
+    </g>
+  </g>
+  <!-- NOT PRODUCTION: live <text>. Must be converted to outlines once the typeface is chosen. -->
+  <text x="120" y="124" text-anchor="middle" fill="#E8E8EA"
+        font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="32" font-weight="600" letter-spacing="1.5">LLMantis</text>
+</svg>
