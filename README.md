@@ -81,14 +81,13 @@ accurate on real answers.
 
 See `SETUP.md` for the full walkthrough. The short version:
 
-> The repository is still named `promptguard` on GitHub. The URL below is the
-> one that works today. Once it is renamed to `llmantis`, GitHub keeps a
-> redirect, so an existing clone keeps working and this block gets updated then
-> — not before, or the command breaks for everyone.
+> Renamed from `promptguard` on 15.08.2026. GitHub keeps a redirect, so an
+> existing clone keeps working — but point it at the new name anyway:
+> `git remote set-url origin git@github.com:VladvonTranssylvanien/LLMantis.git`
 
 ```bash
-git clone git@github.com:VladvonTranssylvanien/promptguard.git
-cd promptguard
+git clone git@github.com:VladvonTranssylvanien/LLMantis.git
+cd LLMantis
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -158,7 +157,7 @@ inflate any bot to an A while it still leaks customer data.
 
 ## Project structure
 
-    promptguard/
+    LLMantis/
       attacks/
         attacks.yaml     the attack library - DATA, not code
       demo/
@@ -254,7 +253,7 @@ Rebase instead of merge, so history stays readable with four people:
 
 Daily:
 
-    cd promptguard
+    cd LLMantis
     source venv/bin/activate
     git pull
     pip install -r requirements.txt

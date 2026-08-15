@@ -175,10 +175,47 @@ have even seen it.
 
 purple-blue hero gradient · three identical icon cards in a row · perfectly
 centred hero · emoji as UI icons · undraw/storyset illustrations ·
-"Empower your workflow" · glassmorphism · perfect symmetry in every section.
+"Empower your workflow" · **decorative glassmorphism** · perfect symmetry in
+every section.
 
 **Instead:** real screenshots of attack conversations, concrete numbers, legal
 citations, asymmetry, sections of differing heights.
+
+### 🪟 Glass: the one allowed use
+
+The line above bans glass as a **style**. It does not ban the **material**.
+
+| ❌ Forbidden — decoration | ✅ Allowed — material |
+|---|---|
+| Frosted panels floating over coloured blurred blobs | Translucency only on chrome that **overlays content**: sticky header, the live feed |
+| Gradient borders in a second and third hue | Hairline border, `rgba(255,255,255,.09)` |
+| Neon glow around the panel | No glow. An inset top hairline is the only highlight |
+| Everything on the page translucent | Content panels are **opaque** `--surface` |
+
+The test: **is there content scrolling behind it?** If yes, the material shows
+depth and earns its place. If no, it is decoration — use `--surface`.
+
+Implementation, all four parts required:
+
+```css
+background: rgba(18, 19, 22, .72);          /* tinted toward --surface, not neutral */
+backdrop-filter: blur(30px) saturate(180%); /* saturate is what stops it looking grey */
+border: 1px solid rgba(255,255,255,.09);
+box-shadow: inset 0 1px 0 rgba(255,255,255,.07),  /* light on the top edge */
+            0 8px 32px -8px rgba(0,0,0,.7);
+```
+
+⚠️ **Always pair it with a fallback.** Without this, a browser that does not
+support `backdrop-filter` renders a see-through panel and the text behind it
+shows through the text on top of it:
+
+```css
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: #16171B; }
+}
+```
+
+Reference implementation: `frontend/index.html`, class `.glass`.
 
 ## 4. Product architecture
 
