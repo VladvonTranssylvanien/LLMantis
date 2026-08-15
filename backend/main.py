@@ -185,6 +185,65 @@ async def list_targets():
     return {"targets": _load_demo_targets()}
 
 
+@app.get("/api/scans")
+async def list_scans(db: Session = Depends(lambda: SessionLocal())):
+    """List all scans, most recent first."""
+    scans = db.query(DBScan).order_by(DBScan.created_at.desc()).limit(100).all()
+    return {
+        "total": len(scans),
+        "scans": [
+            {
+                "id": str(scan.id),
+                "score": scan.score,
+                "grade": scan.grade,
+                "duration_s": scan.duration_s,
+                "error_rate": scan.error_rate,
+                "created_at": scan.created_at.isoformat(),
+            }
+            for scan in scans
+        ]
+    }
+
+
+@app.get("/api/scans/{scan_id}")
+async def get_scan(scan_id: str, db: Session = Depends(lambda: SessionLocal())):
+    """Get a specific scan with all its results."""
+    try:
+        from uuid import UUID
+        scan_uuid = UUID(scan_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid scan_id format")
+
+    scan = db.query(DBScan).filter_by(id=scan_uuid).first()
+    if not scan:
+        raise HTTPException(404, f"Scan {scan_id} not found")
+
+    results = db.query(DBResult).filter_by(scan_id=scan_uuid).all()
+
+    return {
+        "scan": {
+            "id": str(scan.id),
+            "score": scan.score,
+            "grade": scan.grade,
+            "duration_s": scan.duration_s,
+            "error_rate": scan.error_rate,
+            "created_at": scan.created_at.isoformat(),
+        },
+        "results": [
+            {
+                "id": str(r.id),
+                "attack_id": r.attack_id,
+                "verdict": r.verdict,
+                "confidence": r.confidence,
+                "evidence": r.evidence,
+                "method": r.method,
+                "duration_ms": r.duration_ms,
+            }
+            for r in results
+        ]
+    }
+
+
 @app.post("/api/scan")
 async def scan(request: ScanRequest):
     """
