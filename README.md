@@ -1,4 +1,4 @@
-# PromptGuard
+# LLMantis
 
 A penetration test for AI chatbots.
 
@@ -8,6 +8,42 @@ judge each answer, and return a risk score with concrete fixes.
 **The thesis:** an LLM app's vulnerability doesn't live in the code. It lives in
 the text. A static code analyser will never find that your bot hands over its
 instructions if you ask nicely.
+
+We are **black box**. We never read your source code, never connect to your
+repository, and never show code in a report. We test behaviour.
+
+---
+
+## ⚠️ Scope of use
+
+LLMantis tests **only** AI systems the user owns.
+Active testing requires **verified ownership** of the target.
+All attacks are publicly documented techniques from the **OWASP Top 10 for LLM**.
+
+The free Art.-50-Check is passive: a single GET of a public page. It sends the
+bot no messages and requires no permission.
+
+---
+
+## Two layers
+
+| Layer | What it does | Permission | Purpose |
+|---|---|---|---|
+| **Art.-50-Check** | Passive: is there a chat widget, and does it disclose that it is AI (Art. 50(1) EU AI Act)? | none needed | free, lead funnel |
+| **Red Team** | Active: 75+ attacks across 5 OWASP LLM categories | **ownership verification required** | paid |
+
+---
+
+## What we do not claim
+
+LLMantis produces a **Prüfbericht** (test report) — documented evidence that a
+system was tested. It is **not** a certification and **not** legal advice.
+Under the EU AI Act, conformity certificates are issued only by notified bodies
+and only for high-risk systems.
+
+Never write "certified", "zertifiziert", "AI-Act-compliant" or "DSGVO-konform"
+in UI text, comments, variable names, documentation or commit messages. In
+Germany that is a § 5 UWG problem, not a wording preference. See `PLAYBOOK.md`.
 
 ---
 
@@ -44,6 +80,11 @@ accurate on real answers.
 ## Setup
 
 See `SETUP.md` for the full walkthrough. The short version:
+
+> The repository is still named `promptguard` on GitHub. The URL below is the
+> one that works today. Once it is renamed to `llmantis`, GitHub keeps a
+> redirect, so an existing clone keeps working and this block gets updated then
+> — not before, or the command breaks for everyone.
 
 ```bash
 git clone git@github.com:VladvonTranssylvanien/promptguard.git
@@ -226,3 +267,41 @@ Daily:
 
 We are building a security product. Leaking our own key would be the one
 mistake nobody lets us forget.
+
+---
+
+## The documents everyone follows
+
+| File | What it is |
+|---|---|
+| `PLAYBOOK.md` | every rule: stack, design system, legal limits, method |
+| `PROJECT-STATE.md` | every decision already made, and the current state |
+| `docs/VLAD-IMPLEMENTATION-PLAN.md` | engine roadmap, P0 first |
+| `docs/GREGOR-TARGET-LAB.md` | target lab and judge calibration |
+| `docs/KWABENA-GRC-BRIEF.md` | GRC, legal hooks, disclaimers |
+| `Brand/` | the mark. See `PLAYBOOK.md` §3 before using it |
+
+Working language of this repository is **English** — code, comments, commits,
+documentation and UI strings.
+
+## Team
+
+| Role | Owns |
+|---|---|
+| Bogdan | coordination, design, positioning |
+| Vlad | engine, API, database |
+| Gregor | target lab, calibration |
+| Kwabena | GRC, legal hooks, disclaimers |
+
+## Licence
+
+Copyright (C) 2026 LLMantis contributors.
+
+Licensed under the **GNU Affero General Public License v3.0** — see `LICENSE`.
+
+AGPL rather than MIT for one reason: this repository is public, and the product
+is sold as a hosted service. Under AGPL a competitor who takes this code and
+runs it as a service must publish their changes. Under MIT they would not.
+
+The copyright holder becomes the company once the Gewerbe is registered.
+Until then it is the contributors, jointly.

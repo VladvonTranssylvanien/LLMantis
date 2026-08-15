@@ -1,12 +1,25 @@
 # Never commit secrets
 .env
+.env.*
+!.env.example
 *.key
+*.pem
+credentials.json
+secrets.yaml
+
+# Scan output: customer system prompts and full transcripts.
+# These are customer trade secrets. They never reach version control.
+results/
+scans/
+*.scan.json
 
 # Python
 __pycache__/
 *.pyc
 venv/
 .venv/
+.pytest_cache/
+.mypy_cache/
 
 # Database
 *.db
@@ -17,3 +30,7 @@ venv/
 # Editors
 .vscode/
 .idea/
+
+# Brand: unlicensed reference art.
+# The shipped mark is original geometry and does not depend on it.
+Brand/Screenshot*.png
