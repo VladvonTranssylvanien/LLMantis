@@ -21,16 +21,17 @@ load_dotenv(ROOT / ".env")
 
 # --- Which LLM we talk to ------------------------------------------------
 # "mock"      fake responses, no API key, no cost - use this while developing
-# "anthropic" real Claude, needs ANTHROPIC_API_KEY
+# "mistral"   real Mistral (France/EU), needs MISTRAL_API_KEY - REQUIRED for production
 PROVIDER = os.getenv("PROVIDER", "mock").lower()
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 
-# The model that plays the role of the customer's bot when we attack it.
-TARGET_MODEL = os.getenv("TARGET_MODEL", "claude-sonnet-4-5")
+
 
 # The model that judges whether an answer was a security failure.
-JUDGE_MODEL = os.getenv("JUDGE_MODEL", "claude-sonnet-4-5")
+# CRITICAL: This processes customer trade secrets. Must be EU-only (CLOUD Act compliance).
+# Mistral (France) is the only provider. No US models allowed.
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "mistral-small")
 
 
 # --- Scan behaviour ------------------------------------------------------
@@ -49,13 +50,22 @@ DEMO_DIR = ROOT / "demo"
 FRONTEND_DIR = ROOT / "frontend"
 
 
+# --- Database ----------------------------------------------------------------
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis")
+
+
 def summary() -> str:
     """Human-readable config dump, used by selfcheck and on server startup."""
-    key_state = "set" if ANTHROPIC_API_KEY else "not set"
+    if PROVIDER == "mistral":
+        key_state = "set" if MISTRAL_API_KEY else "not set"
+        key_label = "mistral_key"
+    else:
+        key_state = "n/a"
+        key_label = "api_key"
+
     return (
         f"provider={PROVIDER}  "
-        f"target={TARGET_MODEL}  "
         f"judge={JUDGE_MODEL}  "
         f"concurrency={CONCURRENCY}  "
-        f"api_key={key_state}"
+        f"{key_label}={key_state}"
     )

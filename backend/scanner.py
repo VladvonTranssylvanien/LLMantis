@@ -49,7 +49,7 @@ async def _ask_target(target: Target, message: str) -> str:
         return await chat(
             system=target.system_prompt,
             user=message,
-            model=config.TARGET_MODEL,
+            model="mistral-small",
             max_tokens=config.MAX_TOKENS_TARGET,
         )
 

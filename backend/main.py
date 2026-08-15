@@ -19,16 +19,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime
+from uuid import uuid4
 
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from . import config
 from .attacks import load_library, reload_library
 from .scanner import Target, detect_canary, run_scan
+from .database import SessionLocal
+from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
 
@@ -53,6 +58,79 @@ def _load_demo_targets() -> list[dict]:
         return []
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return raw.get("targets", [])
+
+
+def _get_or_create_org(db: Session) -> Organization:
+    """Get the default anonymous organization for MVP, or create it."""
+    org = db.query(Organization).filter_by(domain="demo.local").first()
+    if not org:
+        org = Organization(
+            id=uuid4(),
+            name="Demo Organization",
+            domain="demo.local",
+            created_at=datetime.utcnow()
+        )
+        db.add(org)
+        db.commit()
+        db.refresh(org)
+    return org
+
+
+async def _save_scan_to_db(db: Session, report: dict, target_mode: str, duration_s: float):
+    """Save scan results to the database."""
+    try:
+        # Get or create the demo organization
+        org = _get_or_create_org(db)
+
+        # Create a Target record
+        db_target = DBTarget(
+            id=uuid4(),
+            org_id=org.id,
+            name="Anonymous Target",
+            system_prompt="",  # Will be filled by customer later
+            canary=None,
+            created_at=datetime.utcnow()
+        )
+        db.add(db_target)
+        db.flush()  # Flush to get the target ID
+
+        # Create a Scan record
+        summary = report.get("summary", {})
+        db_scan = DBScan(
+            id=uuid4(),
+            target_id=db_target.id,
+            org_id=org.id,
+            duration_s=duration_s,
+            grade=summary.get("grade"),
+            score=summary.get("score"),
+            error_rate=report.get("error_rate", 0),
+            created_at=datetime.utcnow()
+        )
+        db.add(db_scan)
+        db.flush()  # Flush to get the scan ID
+
+        # Create Result records for each attack result
+        for result in report.get("results", []):
+            db_result = DBResult(
+                id=uuid4(),
+                scan_id=db_scan.id,
+                attack_id=result.get("attack_id", ""),
+                verdict=result.get("verdict", "ERROR"),
+                confidence=result.get("confidence", "likely"),
+                evidence=result.get("evidence", ""),
+                method=result.get("method", "unknown"),
+                duration_ms=result.get("duration_ms", 0),
+                created_at=datetime.utcnow()
+            )
+            db.add(db_result)
+
+        db.commit()
+        return db_scan.id
+    except Exception as e:
+        db.rollback()
+        # Log the error but don't fail the scan - database save is best-effort
+        print(f"ERROR: Failed to save scan to database: {e}")
+        return None
 
 
 # ------------------------------------------------------------------- API routes
@@ -115,7 +193,7 @@ async def scan(request: ScanRequest):
     Event types sent:
         {"type": "start",    "total": 21}
         {"type": "result",   "done": 3, "total": 21, "result": {...}}
-        {"type": "complete", "report": {...}}
+        {"type": "complete", "report": {...}, "scan_id": "..."}
         {"type": "error",    "message": "..."}
     """
     if request.mode == "prompt" and not request.system_prompt.strip():
@@ -137,6 +215,7 @@ async def scan(request: ScanRequest):
 
     # The scan pushes results into this queue; the response reads from it.
     queue: asyncio.Queue = asyncio.Queue()
+    report_holder = {}  # Temporary storage for the report
 
     async def on_result(result, done, total):
         await queue.put({"type": "result", "done": done, "total": total, "result": result})
@@ -144,6 +223,7 @@ async def scan(request: ScanRequest):
     async def worker():
         try:
             report = await run_scan(target, request.categories, on_result)
+            report_holder["report"] = report
             await queue.put({"type": "complete", "report": report})
         except Exception as e:
             await queue.put({"type": "error", "message": str(e)})
@@ -167,6 +247,15 @@ async def scan(request: ScanRequest):
         finally:
             if not task.done():
                 task.cancel()
+
+            # After streaming is complete, save to database
+            if "report" in report_holder:
+                db = SessionLocal()
+                try:
+                    report = report_holder["report"]
+                    await _save_scan_to_db(db, report, request.mode, report.get("duration_s", 0))
+                finally:
+                    db.close()
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
