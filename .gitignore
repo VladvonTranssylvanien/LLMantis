@@ -31,9 +31,18 @@ venv/
 .vscode/
 .idea/
 
-# Brand: unlicensed reference art.
-# The shipped mark is original geometry and does not depend on it.
+# --- Brand source material: local only, never committed --------------------
+#
+# This repository is public. Everything below is licensed stock, or derived
+# from it, and the licence forbids sub-licensing and inclusion in an online
+# archive. The shipped mark is original geometry and depends on none of it.
+#
+# The app loads brand assets only from frontend/assets/brand/. Nothing in a
+# build may reference Brand/ at all.
 Brand/Screenshot*.png
+Brand/mantis-transparent-background/
+Brand/LLMantis/
+Brand/*.zip
 
 # tool output
 art50-results.csv
