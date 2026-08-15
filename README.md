@@ -275,6 +275,9 @@ mistake nobody lets us forget.
 |---|---|
 | `PLAYBOOK.md` | every rule: stack, design system, legal limits, method |
 | `PROJECT-STATE.md` | every decision already made, and the current state |
+| **`docs/TASK-VLAD.md`** | **Vlad — start here** |
+| **`docs/TASK-GREGOR.md`** | **Gregor — start here** |
+| **`docs/TASK-KWABENA.md`** | **Kwabena — start here** |
 | `docs/VLAD-IMPLEMENTATION-PLAN.md` | engine roadmap, P0 first |
 | `docs/GREGOR-TARGET-LAB.md` | target lab and judge calibration |
 | `docs/KWABENA-GRC-BRIEF.md` | GRC, legal hooks, disclaimers |
