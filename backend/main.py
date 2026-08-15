@@ -34,6 +34,7 @@ from .attacks import load_library, reload_library
 from .scanner import Target, detect_canary, run_scan
 from .database import SessionLocal
 from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
+from .art50check import check_art50
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
 
@@ -183,6 +184,27 @@ async def reload_attacks():
 @app.get("/api/targets")
 async def list_targets():
     return {"targets": _load_demo_targets()}
+
+
+@app.post("/api/art50check")
+async def art50_check(request: ScanRequest):
+    """
+    Passive Art. 50 AI Act compliance check.
+
+    Checks if a website's chatbot discloses that it is AI (Art. 50(1) AI Act).
+    No active attacks — just visits the page and looks at the widget.
+
+    Returns findings about:
+        - Widget detection
+        - AI disclosure
+        - Privacy link
+        - Impressum (§ 5 DDG)
+    """
+    if not request.api_url.strip():
+        raise HTTPException(400, "api_url (the website URL) is required")
+
+    result = await check_art50(request.api_url)
+    return result.dict()
 
 
 @app.get("/api/scans")
