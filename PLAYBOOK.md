@@ -7,6 +7,13 @@
 > Version 1.0 · 15.08.2026 · Document owner: Bogdan
 > **Working language of this project is English** — code, comments, commits, docs, UI.
 
+> **Documented exception (15.08.2026):** customer-facing **marketing copy is
+> German** — `frontend/landing.html`, `impressum.html`, `datenschutz.html`. The
+> buyer is a German compliance manager and every proof point is a German or EU
+> norm. Code, comments, commits, docs, the app UI and the Prüfbericht body stay
+> English. Landing copy lives in one `S` object at the top of the file, so a
+> language swap is that object and nothing else. Do not silently revert this.
+
 ---
 
 # PART I — PROJECT PASSPORT
@@ -125,14 +132,21 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 --medium:    #FFC53D;   --low:       #6EA8FE;   --info:    #8A8F98;
 
 /* light surfaces only — printed Prüfbericht, PDF export, email */
---accent-on-light: #3E8F14;
+--accent-on-light: #357C11;
 ```
 
 - Dark theme by default, **one** accent colour
 - `--accent` is a **dark-ground colour**. Measured against white it is
-  **1.63 : 1** — below the 3 : 1 a graphic needs to be perceivable. Anything on a
-  light ground (PDF report, invoice, email) uses `--accent-on-light` (**4.08 : 1**).
+  **1.63 : 1**. Anything on a light ground (Prüfbericht, invoice, email) uses
+  `--accent-on-light` `#357C11` — **5.19 : 1**, which clears AA for small text.
+  The earlier `#3E8F14` measured **4.08 : 1** and failed AA; it is not to come back.
   Never place `#7BE33F` on white.
+- The **favicon** uses `#4A991E`, neither of the above: a browser tab ground may be
+  white or dark, and that value measures **5.28 : 1** on `#0F1114` and **3.58 : 1**
+  on white. The accent is 1.63 : 1 on white and disappears in a light tab.
+- Severity on a light ground is darkened for AA: `--high #B14E0C` (5.30 : 1),
+  `--medium #8A6800` (5.17 : 1), `--critical #B3261E` (6.54 : 1), `--low #27548F`
+  (7.63 : 1). The dark-ground values are unchanged.
 - Fonts: **Inter** (UI) + **JetBrains Mono** (prompts, evidence, terminal) — both self-hosted
 - Motion: **200–300 ms**, `cubic-bezier(0.16, 1, 0.3, 1)`, 60 ms stagger
 - **Mandatory** `@media (prefers-reduced-motion: reduce)`
@@ -146,6 +160,10 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 | `llmantis-favicon.svg` | **below 32 px**: head only. The antennae fall under 1 px and turn to mush |
 | `llmantis-lockup-dark.svg` | mark + wordmark, dark ground |
 | `llmantis-lockup-light.svg` | mark + wordmark, light ground |
+
+**The app loads brand assets only from `frontend/assets/brand/`.** `Brand/` is the
+source folder and nothing in a build may reference it — swapping the mark is one
+folder, not a grep. Everything under `Brand/` that is not ours is gitignored.
 
 The mark is original geometry, drawn for this project — nothing was traced from
 stock art. The eyes are knocked out with `fill-rule="evenodd"`, so the ground

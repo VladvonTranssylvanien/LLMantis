@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 20 84 84" width="32" height="32" role="img" aria-label="LLMantis">
+  <title>LLMantis</title>
+  <!-- #4A991E, not the #7BE33F accent: a tab ground may be white or dark.
+       Measured 5.28:1 on #0F1114 and 3.58:1 on #FFFFFF; the accent is 1.63:1 on white. -->
+  <!-- Favicon / small-size variant: head only, antennae dropped (they vanish below ~32px)
+       and the head cropped tight so it fills the square. -->
+  <path fill="#4A991E" fill-rule="evenodd" d="
+    M 50 29
+    C 44 27, 30 26, 18 27
+    C 12 27.5, 9 31, 10 37
+    C 12 51, 22 68, 34 78
+    C 38 82, 44 86, 50 87
+    C 56 86, 62 82, 66 78
+    C 78 68, 88 51, 90 37
+    C 91 31, 88 27.5, 82 27
+    C 70 26, 56 27, 50 29
+    Z
+    M 18.5 31.28 a 14 8.5  50 1 0 18  21.44 a 14 8.5  50 1 0 -18 -21.44 Z
+    M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18  21.44 Z
+  "/>
+</svg>

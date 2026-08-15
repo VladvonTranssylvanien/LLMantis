@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impressum — LLMantis</title>
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/assets/base.css">
+<style>
+  body { background: var(--bg); color: var(--text); line-height: 1.65; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 40px clamp(16px,4vw,40px) 96px; }
+  a { color: var(--accent); }
+  .todo {
+    border: 1px solid var(--medium); background: rgba(255,197,61,.09);
+    border-radius: var(--r); padding: 16px 18px; margin-bottom: 34px; font-size: 14px;
+  }
+  .todo b { color: var(--medium); }
+  h1 { font-size: 28px; margin-bottom: 8px; }
+  h2 { font-size: 17px; margin: 30px 0 8px; }
+  p { margin: 0 0 12px; }
+  .tok { font-family: var(--mono); font-size: .92em; background: var(--surface-2);
+         border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+  .back { font-size: 14px; color: var(--muted); text-decoration: none; display: inline-block; margin-bottom: 26px; }
+  .back:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/static/landing.html">&larr; <span lang="de">Startseite</span></a>
+
+  <div class="todo" lang="en">
+    <b>TODO — not legally reviewed.</b> This page is a structural placeholder.
+    Every <span class="tok">{{TOKEN}}</span> below must be filled with real
+    registration data, and the wording must be confirmed by Kwabena before this
+    site goes public. A German commercial site without a valid Impressum is
+    <span lang="de">abmahnfähig</span> under &sect; 5 DDG.
+    <!-- REVIEW: Kwabena -->
+  </div>
+
+  <h1>Impressum</h1>
+  <p class="muted" style="color:var(--muted)">
+    <span lang="en">Information under</span> &sect; 5 DDG
+    <!-- REVIEW: Kwabena -->
+  </p>
+
+  <h2>Diensteanbieter</h2>
+  <p>
+    <span class="tok">{{LEGAL_NAME}}</span><br>
+    <span class="tok">{{STREET}}</span><br>
+    <span class="tok">{{POSTCODE}} {{CITY}}</span><br>
+    <span class="tok">{{COUNTRY}}</span>
+  </p>
+
+  <h2>Vertreten durch</h2>
+  <p><span class="tok">{{REPRESENTATIVE}}</span></p>
+
+  <h2>Kontakt</h2>
+  <p>
+    E-Mail: <span class="tok">{{CONTACT_EMAIL}}</span><br>
+    Telefon: <span class="tok">{{PHONE}}</span>
+  </p>
+
+  <h2>Registereintrag</h2>
+  <p>
+    <span class="tok">{{REGISTER_COURT}}</span><br>
+    <span class="tok">{{REGISTER_NUMBER}}</span>
+  </p>
+
+  <h2>Umsatzsteuer-Identifikationsnummer</h2>
+  <p>
+    <span lang="en">Under</span> &sect; 27 a UStG:
+    <span class="tok">{{VAT_ID}}</span>
+    <!-- REVIEW: Kwabena -->
+  </p>
+
+  <h2>Redaktionell verantwortlich</h2>
+  <p><span class="tok">{{RESPONSIBLE_PERSON}}</span></p>
+
+  <h2><span lang="en">EU dispute resolution</span></h2>
+  <p><span class="tok">{{ODR_STATEMENT}}</span>
+    <!-- REVIEW: Kwabena -->
+  </p>
+</div>
+</body>
+</html>
