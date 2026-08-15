@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLMantis — Wissen, was Ihr Chatbot wirklich sagt</title>
+<meta name="description" content="LLMantis prüft KI-Chatbots gegen dokumentierte Angriffstechniken aus der OWASP Top 10 für LLM. Jeder Befund mit wörtlichem Beleg.">
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/assets/brand/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="/static/assets/base.css">
+<style>
+/* ===========================================================================
+   LLMantis — Landing (Deutsch)
+   Tokens und Schriften: assets/base.css. Keine Farbliterale hier.
+   Kein CDN, keine externe Schrift, kein externes Skript, kein Tracking.
+   =========================================================================== */
+
+html { scroll-behavior: smooth; }
+/* The sticky bar must not cover an anchor target when jumping to a section. */
+:target, section[id] { scroll-margin-top: 84px; }
+
+body {
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(1000px 700px at 10% -10%, var(--bloom-warm), transparent 62%),
+    radial-gradient(900px 800px at 100% 6%, var(--bloom-cool), transparent 62%),
+    radial-gradient(700px 600px at 55% 108%, rgba(123, 227, 63, .06), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto, auto;
+  background-attachment: fixed;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.62;
+  min-height: 100vh;
+}
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  opacity: .15; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+a { color: inherit; }
+
+/* ------------------------------------------------------------------ header */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px clamp(16px, 4vw, 44px);
+  border-width: 0 0 1px 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 27px; height: 27px; display: block; }
+.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.brand .name .ll { color: var(--accent); }
+
+.nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.nav a.link {
+  color: var(--muted); text-decoration: none; font-size: 14.5px;
+  padding: 7px 12px; border-radius: 7px;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.nav a.link:hover { color: var(--text); background: var(--surface-2); }
+.nav a.link[aria-current="true"] { color: var(--accent); background: var(--surface-2); }
+.nav .btn { margin-left: 8px; }
+
+.menu-btn {
+  display: none; margin-left: auto; background: transparent; border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit;
+}
+@media (max-width: 860px) {
+  .menu-btn { display: block; }
+  .nav {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 10px clamp(16px, 4vw, 44px) 16px;
+    background: var(--glass-fallback); border-bottom: 1px solid var(--border);
+  }
+  .nav.open { display: flex; }
+  .nav a.link { padding: 11px 12px; font-size: 16px; }
+  .nav .btn { margin: 8px 0 0; text-align: center; }
+}
+
+main { position: relative; z-index: 2; }
+section { max-width: 1080px; margin: 0 auto; padding: clamp(52px, 8vw, 96px) clamp(16px, 4vw, 44px); }
+
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 16px;
+}
+.h2 { font-size: clamp(24px, 3.6vw, 34px); }
+.lead { color: var(--muted); max-width: 62ch; margin: 14px 0 0; }
+
+/* -------------------------------------------------------------------- hero */
+.hero {
+  display: grid; grid-template-columns: 1.05fr .95fr;
+  gap: clamp(24px, 5vw, 52px); align-items: center;
+  padding-bottom: clamp(20px, 3vw, 40px);
+}
+.hero .netwrap { margin: -6% -4% -10% 0; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero .netwrap { margin: 0; } }
+.hero h1 { font-size: clamp(32px, 5.4vw, 56px); line-height: 1.04; }
+.hero .slogan {
+  font-size: clamp(17px, 2vw, 20px); color: var(--accent);
+  margin: 14px 0 0; font-weight: 500;
+}
+.hero p.sub { color: var(--muted); font-size: clamp(16px, 2vw, 18px); max-width: 52ch; margin: 16px 0 0; }
+.hero .cta { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+.hero .under { margin-top: 16px; font-size: 13.5px; color: var(--muted); }
+#net { width: 100%; height: auto; display: block; }
+
+/* ------------------------------------------------------- pipeline diagram */
+.pipe-shell {
+  border-radius: 14px; overflow: hidden; margin-top: 30px;
+  background: rgba(13, 15, 18, .8);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine), 0 24px 60px -24px rgba(0,0,0,.9);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+.pipe-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px; border-bottom: 1px solid var(--glass-border);
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+}
+.pipe-bar .count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.pipe-bar button {
+  font: inherit; font-family: var(--mono); font-size: 11.5px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 4px 11px;
+}
+.pipe-bar button:hover { border-color: var(--accent); color: var(--accent); }
+.pipe-wrap { overflow-x: auto; }
+#pipe { display: block; width: 100%; min-width: 660px; height: auto; }
+.pipe-caption {
+  padding: 12px 16px 15px; font-size: 12.5px; color: var(--muted);
+  border-top: 1px solid var(--glass-border);
+}
+.pipe-caption b { color: var(--medium); }
+
+/* ------------------------------------------------------------------- grid */
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 34px; }
+@media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 24px; }
+.card.tall { padding-bottom: 42px; }
+.card h3 { font-size: 18px; margin-bottom: 8px; }
+.card .tagline {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 11px;
+}
+.card p { color: var(--muted); font-size: 14.5px; margin: 0; }
+
+/* -------------------------------------------------------------------- GRC */
+.facts { display: flex; flex-direction: column; gap: 0; margin-top: 32px; }
+.fact {
+  display: grid; grid-template-columns: auto 1fr; gap: 0 18px;
+  padding: 22px 0; border-bottom: 1px solid var(--border);
+}
+.fact:last-child { border-bottom: 0; }
+.fact .n {
+  font-family: var(--mono); font-size: 12px; color: var(--accent);
+  border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px;
+  height: fit-content;
+}
+.fact h3 { font-size: 17px; margin-bottom: 7px; }
+.fact p { color: var(--muted); margin: 0 0 8px; max-width: 66ch; font-size: 15px; }
+.fact .src {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted); opacity: .8;
+}
+.frame {
+  margin-top: 34px; border-left: 2px solid var(--accent); padding: 6px 0 6px 20px;
+  max-width: 64ch;
+}
+.frame b { color: var(--text); }
+.frame p { color: var(--muted); margin: 0; }
+
+/* ---------------------------------------------------------------- pricing */
+.plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 34px; }
+@media (max-width: 900px) { .plans { grid-template-columns: 1fr; } }
+.plan {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 13px; padding: 24px; display: flex; flex-direction: column;
+}
+.plan.featured { border-color: var(--accent); }
+.plan .pname { font-size: 17px; font-weight: 600; }
+.plan .price { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 2px; }
+.plan .price small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.plan .vat { font-size: 12px; color: var(--muted); }
+.plan ul { list-style: none; padding: 0; margin: 18px 0 0; display: flex; flex-direction: column; gap: 9px; }
+.plan li { font-size: 14.5px; color: var(--muted); padding-left: 20px; position: relative; }
+.plan li::before {
+  content: '·'; position: absolute; left: 6px; color: var(--accent); font-weight: 700;
+}
+.plan li.req { color: var(--text); }
+.plan li.req::before { content: '!'; color: var(--medium); font-size: 12px; top: 1px; }
+.plan li.cannot { color: var(--muted); }
+.plan li.cannot::before { content: '×'; color: var(--muted); font-size: 12px; }
+.plan .foot { margin-top: auto; padding-top: 22px; }
+.plan .foot .btn { width: 100%; text-align: center; }
+
+.services { margin-top: 22px; border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+.service { padding: 22px 24px; border-bottom: 1px solid var(--border); }
+.service:last-child { border-bottom: 0; }
+.service .head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.service h3 { font-size: 17px; }
+.service .onreq {
+  font-family: var(--mono); font-size: 11.5px; color: var(--accent);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px;
+}
+.service p { color: var(--muted); font-size: 14.5px; margin: 9px 0 0; max-width: 66ch; }
+.service .mail { margin-top: 12px; display: inline-block; font-size: 14px; color: var(--accent); }
+
+/* ------------------------------------------------------------------ about */
+.team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 30px; }
+@media (max-width: 820px) { .team { grid-template-columns: 1fr 1fr; } }
+.member { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.member .who { font-weight: 600; font-size: 15px; }
+.member .role { color: var(--muted); font-size: 13.5px; margin-top: 4px; }
+
+footer.site { border-top: 1px solid var(--border); position: relative; z-index: 2; }
+footer.site .in {
+  max-width: 1080px; margin: 0 auto; padding: 32px clamp(16px, 4vw, 44px);
+  display: flex; gap: 10px 22px; flex-wrap: wrap; align-items: center;
+  color: var(--muted); font-size: 13.5px;
+}
+footer.site .slog { width: 100%; color: var(--text); font-size: 15px; margin-bottom: 6px; }
+footer.site a { color: var(--muted); }
+footer.site .sp { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<header class="topbar glass">
+  <a class="brand" href="#top">
+    <img src="/static/assets/brand/mark.svg" alt="" width="27" height="27">
+    <span class="name"><span class="ll">LL</span>Mantis</span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menü</button>
+  <nav class="nav" id="nav" aria-label="Hauptnavigation">
+    <a class="link" href="#produkt"  data-s="navProduct"></a>
+    <a class="link" href="#warum"    data-s="navWhy"></a>
+    <a class="link" href="#preise"   data-s="navPricing"></a>
+    <a class="link" href="#ueber-uns" data-s="navAbout"></a>
+    <a class="btn"  href="#art50"    data-s="navCta"></a>
+  </nav>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow" data-s="heroEyebrow"></div>
+      <h1 data-s="heroTitle"></h1>
+      <p class="slogan" data-s="slogan"></p>
+      <p class="sub" data-s="heroSub"></p>
+      <div class="cta">
+        <a class="btn" href="#art50" data-s="heroCta1"></a>
+        <a class="btn btn--ghost" href="#produkt" data-s="heroCta2"></a>
+      </div>
+      <p class="under" data-s="heroUnder"></p>
+    </div>
+    <div class="netwrap">
+      <canvas id="net" width="900" height="900" role="img" data-s-alt="netAlt"></canvas>
+    </div>
+  </section>
+
+  <section id="produkt">
+    <h2 class="h2" data-s="prodTitle"></h2>
+    <p class="lead" data-s="prodLead"></p>
+
+    <div class="pipe-shell">
+      <div class="pipe-bar">
+        <span data-s="pipeBar"></span>
+        <span class="count" id="pipeCount"></span>
+        <button id="pipeToggle" aria-pressed="false"></button>
+      </div>
+      <div class="pipe-wrap">
+        <svg id="pipe" viewBox="0 0 900 200" role="img" aria-labelledby="pipeTitle pipeDesc">
+          <title id="pipeTitle" data-s="pipeTitle"></title>
+          <desc id="pipeDesc" data-s="pipeDesc"></desc>
+        </svg>
+      </div>
+      <p class="pipe-caption"><b data-s="pipeCaptionLabel"></b> <span data-s="pipeCaption"></span></p>
+    </div>
+  </section>
+
+  <section id="art50">
+    <h2 class="h2" data-s="layersTitle"></h2>
+    <div class="cards">
+      <div class="card">
+        <div class="tagline" data-s="layerFreeTag"></div>
+        <h3 data-s="layerFreeName"></h3>
+        <p data-s="layerFreeBody"></p>
+      </div>
+      <div class="card tall">
+        <div class="tagline" data-s="layerPaidTag"></div>
+        <h3 data-s="layerPaidName"></h3>
+        <p data-s="layerPaidBody"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="warum">
+    <div class="eyebrow" data-s="grcEyebrow"></div>
+    <h2 class="h2" data-s="grcTitle"></h2>
+    <p class="lead" data-s="grcLead"></p>
+    <div class="facts" id="facts"></div>
+    <div class="frame">
+      <p><b data-s="grcFrameLead"></b> <span data-s="grcFrameBody"></span></p>
+    </div>
+  </section>
+
+  <section id="preise">
+    <h2 class="h2" data-s="priceTitle"></h2>
+    <p class="lead" data-s="priceLead"></p>
+    <div class="plans" id="plans"></div>
+    <div class="services" id="services"></div>
+    <p class="lead" style="font-size:13.5px" data-s="priceVat"></p>
+  </section>
+
+  <section id="ueber-uns">
+    <h2 class="h2" data-s="aboutTitle"></h2>
+    <p class="lead" data-s="aboutLead"></p>
+    <div class="team" id="team"></div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="in">
+    <span class="slog" data-s="slogan"></span>
+    <span data-s="footCopy"></span>
+    <a href="/static/impressum.html">Impressum</a>
+    <a href="/static/datenschutz.html">Datenschutzerklärung</a>
+    <a href="/.well-known/security.txt">security.txt</a>
+    <span class="sp" data-s="footNote"></span>
+  </div>
+</footer>
+
+<noscript>
+  <div style="padding:24px clamp(16px,4vw,44px);color:var(--muted);position:relative;z-index:2">
+    LLMantis prüft KI-Chatbots gegen dokumentierte Angriffstechniken aus der OWASP Top 10 für LLM.
+    Jeder Befund trägt den wörtlichen Beleg aus der Antwort Ihres Bots.
+    Für die vollständige Seite bitte JavaScript aktivieren.
+  </div>
+</noscript>
+
+<script>
+'use strict';
+
+/* ===========================================================================
+   ALLE SICHTBAREN TEXTE — ein Block.
+   Eine englische Fassung ist ein Austausch dieses Objekts, sonst nichts.
+   Sprachregel: PLAYBOOK §8 — UI englisch, Marketing-Copy deutsch (Ausnahme
+   dokumentiert im Sessionbericht).
+   =========================================================================== */
+const S = {
+  navProduct: 'Produkt',
+  navWhy:     'Warum',
+  navPricing: 'Preise',
+  navAbout:   'Über uns',
+  navCta:     'Kostenlose Prüfung starten',
+
+  slogan:      'Wissen, was Ihr Chatbot wirklich sagt.',
+  heroEyebrow: 'OWASP Top 10 für LLM',
+  heroTitle:   'Ihr Chatbot lässt sich überreden.',
+  heroSub:     'LLMantis führt dokumentierte Angriffe gegen Ihren Bot aus, lässt jede ' +
+               'Antwort von einem separaten Modell bewerten und liefert einen Prüfbericht — ' +
+               'jeder Befund mit dem wörtlichen Zitat, das ihn belegt. Kein Zitat, kein Befund.',
+  heroCta1:    'Kostenlose Prüfung starten',
+  heroCta2:    'So funktioniert es',
+  heroUnder:   'Der Art.-50-Check ist kostenlos und passiv — er sendet Ihrem Bot keine Nachricht.',
+  netAlt:      'Der LLMantis-Kopf, gezeichnet als neuronales Netz',
+
+  prodTitle: 'Fünf Schritte, und Sie sehen jeden davon',
+  prodLead:  'Was passiert, wenn Sie den Knopf drücken. Die Darstellung unten zeigt den ' +
+             'Ablauf schematisch — sie ersetzt keinen echten Prüflauf.',
+  pipeBar:   'llmantis — Ablauf einer Prüfung',
+  pipeTitle: 'Schematischer Ablauf einer LLMantis-Prüfung',
+  pipeDesc:  'Fünf Stufen: Ziel, Angriffe aus der Bibliothek, Antwort des Bots, ' +
+             'Bewertung in zwei Ebenen, Note und Prüfbericht.',
+  pipeCaptionLabel: 'Illustration des Prüfablaufs — keine Live-Daten.',
+  pipeCaption: 'Namen und Zahlen sind erfunden. Einen echten Befund sehen Sie erst in Ihrem eigenen Prüfbericht.',
+  pipePause: 'Pause',
+  pipePlay:  'Abspielen',
+
+  stage1: 'Ziel',
+  stage2: 'Angriffe',
+  stage3: 'Antwort',
+  stage4: 'Bewertung',
+  stage5: 'Note + Bericht',
+  stage1sub: 'Example Bot',
+  stage2sub: 'Angriff 12 von 75',
+  stage3sub: 'Antwort erhalten',
+  stage4sub: 'zwei Ebenen',
+  stage5sub: 'Prüfbericht',
+  layer1: 'Ebene 1 — Canary, deterministisch',
+  layer2: 'Ebene 2 — Judge, mit Zitat',
+
+  layersTitle:   'Zwei Ebenen, und nur eine berührt Ihren Bot',
+  layerFreeTag:  'Kostenlos · keine Freigabe nötig',
+  layerFreeName: 'Art.-50-Check',
+  layerFreeBody: 'Ein einziger Abruf Ihrer öffentlichen Seite. Gibt es ein Chat-Widget, und ' +
+                 'weist es darauf hin, dass es eine KI ist? Wir senden Ihrem Bot dabei keine ' +
+                 'einzige Nachricht.',
+  layerPaidTag:  'Kostenpflichtig · Eigentumsnachweis erforderlich',
+  layerPaidName: 'Red Team',
+  layerPaidBody: 'Die vollständige Bibliothek über fünf OWASP-LLM-Kategorien — Prompt ' +
+                 'Injection, Datenabfluss, Jailbreak, überschrittene Handlungsvollmacht, ' +
+                 'Markensicherheit. Aktive Prüfung, deshalb weisen Sie vorher nach, dass das ' +
+                 'Ziel Ihnen gehört. Jeder Befund mit Beleg und konkreter Empfehlung.',
+
+  grcEyebrow: 'Warum überhaupt',
+  grcTitle:   'Drei Dinge, die bereits gelten',
+  grcLead:    'Keine Vorschrift verlangt, einen Chatbot testen zu lassen. Was gilt, ist ' +
+              'Folgendes — und dafür wollen Sie im Zweifel etwas in der Hand haben.',
+  grcFrameLead: 'Was wir verkaufen, ist ein Nachweis.',
+  grcFrameBody: 'Dokumentierte Sorgfalt: Sie haben geprüft, Sie wissen, was gefunden wurde, ' +
+                'und Sie können zeigen, was Sie daraufhin geändert haben. Das ist es, was ' +
+                'gegenüber Aufsicht, Versicherung und Kundschaft zählt.',
+
+  priceTitle: 'Preise',
+  priceLead:  'Der Einstieg kostet nichts und verlangt kein Konto.',
+  priceVat:   'Alle Preise verstehen sich zzgl. MwSt.',
+
+  aboutTitle: 'Über uns',
+  aboutLead:  'Vier Leute, ein Produkt. Wir prüfen zuerst unseren eigenen Bot und ' +
+              'veröffentlichen, was dabei herauskommt. Der gesamte Stack liegt in der EU — ' +
+              'auch das Modell, das die Antworten bewertet, weil es Ihre Systemprompts liest.',
+
+  footCopy: '© 2026 LLMantis',
+  footNote: 'Prüfbericht, keine Zertifizierung.'
+};
+
+/* Die drei belegbaren Aussagen. Jede mit Quelle; nichts darüber hinaus.
+   Jeder Satz mit § oder Art. ist im DOM mit <!-- REVIEW: Kwabena --> markiert. */
+const FACTS = [
+  { n: '01',
+    h: 'Ihr Bot muss sagen, dass er eine KI ist',
+    p: 'Art. 50(1) der KI-Verordnung gilt seit dem 2. August 2026: Nutzerinnen und Nutzer ' +
+       'müssen spätestens bei der ersten Interaktion erfahren, dass sie mit einer KI ' +
+       'sprechen — außer es ist offensichtlich. Ein Bot, der sich dazu überreden lässt, das ' +
+       'zu bestreiten, erfüllt das nicht mehr.',
+    s: 'Verordnung (EU) 2024/1689, Art. 50(1); Bußgeldrahmen Art. 99' },
+  { n: '02',
+    h: 'Was Ihr Bot sagt, sagen Sie',
+    p: 'Das Civil Resolution Tribunal in British Columbia entschied im Februar 2024 gegen ' +
+       'Air Canada: Die Argumentation, der Chatbot sei eine eigenständige Rechtsperson, ' +
+       'wurde zurückgewiesen. Das Unternehmen haftete für die Auskunft seines Bots.',
+    s: 'Moffatt v. Air Canada, BC Civil Resolution Tribunal, Februar 2024' },
+  { n: '03',
+    h: 'Ein Datenabfluss startet eine Frist',
+    p: 'Gibt Ihr Bot Daten einer anderen Person preis, ist das eine Verletzung des Schutzes ' +
+       'personenbezogener Daten. Die Meldung an die Aufsichtsbehörde hat dann binnen 72 ' +
+       'Stunden zu erfolgen. Die Uhr läuft ab Kenntnis — nicht ab Aufklärung.',
+    s: 'Art. 33 DSGVO' }
+];
+
+const PLANS = [
+  { name: 'Art.-50-Check', price: '0 €', unit: '', featured: false,
+    cta: 'Jetzt prüfen', href: '/',
+    items: [
+      { t: 'Passive Prüfung einer öffentlichen Seite' },
+      { t: 'Ein einziger Abruf, keine Nachricht an den Bot' },
+      { t: 'Keine Freigabe, kein Konto nötig' },
+      { t: 'Prüft die Seite — öffnet den Chat nicht und testet sein Verhalten nicht', k: 'cannot' }
+    ] },
+  { name: 'Starter', price: '29 €', unit: '/ Prüfung', featured: true,
+    cta: 'Prüfung starten', href: '/',
+    items: [
+      { t: 'Vollständige Angriffsbibliothek gegen einen Bot' },
+      { t: 'Prompt-Modus: Sie fügen Ihren eigenen Systemprompt ein' },
+      { t: 'Prüfbericht als PDF' },
+      { t: 'Note, Befunde mit wörtlichem Beleg, Empfehlungen' }
+    ] },
+  { name: 'Business', price: '199 €', unit: '/ Monat', featured: false,
+    cta: 'Business anfragen', href: 'mailto:kontakt@llmantis.de?subject=Business',
+    items: [
+      { t: 'Alles aus Starter' },
+      { t: 'Prüfung eines Live-Endpunkts' },
+      { t: 'Erneute Prüfung nach Änderungen, mit Verlauf' },
+      { t: 'Mehrere Bots' },
+      { t: 'Eigentumsnachweis für das Ziel erforderlich', k: 'req' }
+    ] }
+];
+
+const SERVICES = [
+  { h: 'Individuelle Prüfung', p: 'Ein Mensch prüft ein konkretes System und schreibt den ' +
+      'Bericht dazu. Umfang und Aufwand klären wir vorher gemeinsam. Kein Warenkorb, keine ' +
+      'Onlinebuchung.', mail: 'kontakt@llmantis.de', subject: 'Individuelle Prüfung' },
+  { h: 'Remediation', p: 'Wir arbeiten die Befunde mit Ihnen ab: Systemprompt härten, ' +
+      'Leitplanken einziehen, danach erneut prüfen, damit die Änderung belegt ist. Das ist ' +
+      'Arbeit nach Aufwand, kein Produkt mit zugesichertem Ergebnis.',
+    mail: 'kontakt@llmantis.de', subject: 'Remediation' }
+];
+
+const TEAM = [
+  { who: 'Bogdan', role: 'Koordination, Design, Positionierung' },
+  { who: 'Vlad',   role: 'Engine, API, Datenhaltung' },
+  { who: 'Gregor', role: 'Ziel-Labor, Kalibrierung' },
+  { who: 'Kwabena', role: 'GRC, rechtliche Grenzen' }
+];
+
+/* ------------------------------------------------------------------ render */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+document.querySelectorAll('[data-s]').forEach(el => { el.textContent = S[el.dataset.s] || ''; });
+document.querySelectorAll('[data-s-alt]').forEach(el => {
+  el.setAttribute('aria-label', S[el.dataset.sAlt] || '');
+});
+
+$('#facts').innerHTML = FACTS.map(f =>
+  // REVIEW: Kwabena — jeder Satz mit § oder Art. in diesem Block
+  '<div class="fact"><span class="n">' + f.n + '</span><div>' +
+  '<h3>' + esc(f.h) + '</h3><p>' + esc(f.p) + '</p>' +
+  '<p class="src">' + esc(f.s) + '</p></div></div>').join('');
+
+$('#plans').innerHTML = PLANS.map(p =>
+  '<div class="plan' + (p.featured ? ' featured' : '') + '">' +
+    '<div class="pname">' + esc(p.name) + '</div>' +
+    '<div class="price">' + esc(p.price) + '<small> ' + esc(p.unit) + '</small></div>' +
+    '<div class="vat">zzgl. MwSt.</div>' +
+    '<ul>' + p.items.map(i =>
+      '<li class="' + (i.k || '') + '">' + esc(i.t) + '</li>').join('') + '</ul>' +
+    '<div class="foot"><a class="btn' + (p.featured ? '' : ' btn--ghost') + '" href="' +
+      esc(p.href) + '">' + esc(p.cta) + '</a></div>' +
+  '</div>').join('');
+
+$('#services').innerHTML = SERVICES.map(s =>
+  '<div class="service"><div class="head"><h3>' + esc(s.h) + '</h3>' +
+  '<span class="onreq">auf Anfrage</span></div>' +
+  '<p>' + esc(s.p) + '</p>' +
+  '<a class="mail" href="mailto:' + esc(s.mail) + '?subject=' + encodeURIComponent(s.subject) +
+  '">' + esc(s.mail) + '</a></div>').join('');
+
+$('#team').innerHTML = TEAM.map(m =>
+  '<div class="member"><div class="who">' + esc(m.who) + '</div>' +
+  '<div class="role">' + esc(m.role) + '</div></div>').join('');
+
+/* ------------------------------------------------------------ mobile menu */
+$('#menuBtn').addEventListener('click', () => {
+  const open = $('#nav').classList.toggle('open');
+  $('#menuBtn').setAttribute('aria-expanded', String(open));
+});
+$('#nav').addEventListener('click', e => {
+  if (e.target.tagName === 'A') {
+    $('#nav').classList.remove('open');
+    $('#menuBtn').setAttribute('aria-expanded', 'false');
+  }
+});
+
+/* aria-current on the section actually in view. */
+const navLinks = [...document.querySelectorAll('.nav a.link')];
+const ratios = new Map();
+function syncCurrent() {
+  let best = null, bestR = 0;
+  ratios.forEach((r, id) => { if (r > bestR) { bestR = r; best = id; } });
+  navLinks.forEach(a => {
+    if (best && a.getAttribute('href') === '#' + best) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
+  });
+}
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => ratios.set(en.target.id, en.intersectionRatio));
+    syncCurrent();
+  }, { threshold: [0, .25, .5, .75, 1], rootMargin: '-84px 0px -45% 0px' });
+  navLinks.forEach(a => {
+    const el = document.querySelector(a.getAttribute('href'));
+    if (el) io.observe(el);
+  });
+}
+
+/* ===========================================================================
+   Der Kopf als neuronales Netz. Die Knoten werden zur Laufzeit aus dem echten
+   Logo-Pfad abgetastet — die Grafik IST die Markengeometrie.
+   =========================================================================== */
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const HEAD  = 'M 50 29 C 44 27, 30 26, 18 27 C 12 27.5, 9 31, 10 37 C 12 51, 22 68, 34 78 C 38 82, 44 86, 50 87 C 56 86, 62 82, 66 78 C 78 68, 88 51, 90 37 C 91 31, 88 27.5, 82 27 C 70 26, 56 27, 50 29 Z M 18.5 31.28 a 14 8.5 50 1 0 18 21.44 a 14 8.5 50 1 0 -18 -21.44 Z M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18 21.44 Z';
+const ANT_L = 'M 44 31 C 36 22, 24 12, 6 2 C 21 13, 34 24, 46.5 34.5 Z';
+const ANT_R = 'M 56 31 C 64 22, 76 12, 94 2 C 79 13, 66 24, 53.5 34.5 Z';
+
+const cv = $('#net'), ctx = cv.getContext('2d'), SIZE = 900;
+
+const nodes = (function sample() {
+  const off = document.createElement('canvas');
+  off.width = off.height = SIZE;
+  const o = off.getContext('2d');
+  o.setTransform(SIZE / 100, 0, 0, SIZE / 100, 0, 0);
+  o.fillStyle = '#fff';
+  o.fill(new Path2D(HEAD), 'evenodd');
+  o.fill(new Path2D(ANT_L));
+  o.fill(new Path2D(ANT_R));
+  const data = o.getImageData(0, 0, SIZE, SIZE).data;
+  const pts = [], STEP = 15;
+  for (let y = 0; y < SIZE; y += STEP)
+    for (let x = 0; x < SIZE; x += STEP)
+      if (data[(y * SIZE + x) * 4 + 3] > 128) {
+        const jx = x + (Math.random() - .5) * STEP * 1.1;
+        const jy = y + (Math.random() - .5) * STEP * 1.1;
+        pts.push({ x: jx, y: jy, ox: jx, oy: jy, ph: Math.random() * 6.28,
+                   sp: .4 + Math.random() * .7, r: Math.random() < .12 ? 2.6 : 1.35 });
+      }
+  return pts;
+})();
+
+// Kanten einmal berechnen. Nachbarschaftssuche pro Frame über ~900 Knoten ist
+// genau das, was einen Laptop zum Schmelzen bringt.
+const EDGE_MAX = 34, edges = [];
+for (let i = 0; i < nodes.length; i++)
+  for (let j = i + 1; j < nodes.length; j++) {
+    const dx = nodes[i].ox - nodes[j].ox, dy = nodes[i].oy - nodes[j].oy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < EDGE_MAX * EDGE_MAX) edges.push({ a: i, b: j, d: Math.sqrt(d2) });
+  }
+
+const pulses = [];
+const spawnPulse = () => edges.length &&
+  pulses.push({ e: edges[(Math.random() * edges.length) | 0], t: 0, sp: .012 + Math.random() * .02 });
+for (let i = 0; i < 26; i++) spawnPulse();
+
+let netT = 0;
+function drawNet() {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  netT += 0.01;
+  if (!REDUCED) for (const n of nodes) {
+    n.x = n.ox + Math.sin(netT * n.sp + n.ph) * 3.4;
+    n.y = n.oy + Math.cos(netT * n.sp * .85 + n.ph) * 3.4;
+  }
+  ctx.lineWidth = 1;
+  for (const e of edges) {
+    const a = nodes[e.a], b = nodes[e.b];
+    ctx.strokeStyle = 'rgba(123, 227, 63, ' + ((1 - e.d / EDGE_MAX) * .3).toFixed(3) + ')';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  for (const n of nodes) {
+    ctx.fillStyle = n.r > 2 ? 'rgba(160, 240, 110, .95)' : 'rgba(123, 227, 63, .5)';
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 6.284); ctx.fill();
+  }
+  if (!REDUCED) for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    p.t += p.sp;
+    if (p.t >= 1) { pulses.splice(i, 1); spawnPulse(); continue; }
+    const a = nodes[p.e.a], b = nodes[p.e.b];
+    ctx.fillStyle = 'rgba(200, 255, 160, ' + (Math.sin(p.t * Math.PI) * .95).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t, 2.4, 0, 6.284);
+    ctx.fill();
+  }
+}
+
+/* ===========================================================================
+   Der Prüfablauf, schematisch. Fünf Stufen, SVG, kein Fremdcode.
+   Läuft nicht, wenn der Tab verborgen ist oder die Sektion aus dem Bild
+   gescrollt wurde — eine Endlosschleife auf einer Marketingseite ist ein
+   Batteriefehler. Pausierbar: WCAG 2.2.2.
+   =========================================================================== */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const pipe = $('#pipe');
+const STAGES = [
+  { x: 60,  label: S.stage1, sub: S.stage1sub },
+  { x: 250, label: S.stage2, sub: S.stage2sub },
+  { x: 440, label: S.stage3, sub: S.stage3sub },
+  { x: 630, label: S.stage4, sub: S.stage4sub },
+  { x: 830, label: S.stage5, sub: S.stage5sub }
+];
+
+function el(tag, attrs, text) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+(function buildPipe() {
+  // Verbindungen
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    pipe.appendChild(el('line', {
+      x1: STAGES[i].x + 42, y1: 86, x2: STAGES[i + 1].x - 42, y2: 86,
+      stroke: 'var(--border)', 'stroke-width': 2, id: 'link' + i
+    }));
+  }
+  STAGES.forEach((s, i) => {
+    const g = el('g', { id: 'stage' + i });
+    g.appendChild(el('rect', {
+      x: s.x - 42, y: 58, width: 84, height: 56, rx: 10,
+      fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, id: 'box' + i
+    }));
+    g.appendChild(el('text', {
+      x: s.x, y: 82, 'text-anchor': 'middle', fill: 'var(--text)',
+      'font-size': 13, 'font-weight': 600, 'font-family': 'var(--sans)'
+    }, s.label));
+    g.appendChild(el('text', {
+      x: s.x, y: 100, 'text-anchor': 'middle', fill: 'var(--muted)',
+      'font-size': 10.5, 'font-family': 'var(--mono)', id: 'sub' + i
+    }, s.sub));
+    pipe.appendChild(g);
+  });
+  // Zwei Bewertungsebenen unter Stufe 4
+  pipe.appendChild(el('text', {
+    x: STAGES[3].x, y: 138, 'text-anchor': 'middle', fill: 'var(--muted)',
+    'font-size': 10, 'font-family': 'var(--mono)', id: 'lay1'
+  }, S.layer1));
+  pipe.appendChild(el('text', {
+    x: STAGES[3].x, y: 154, 'text-anchor': 'middle', fill: 'var(--muted)',
+    'font-size': 10, 'font-family': 'var(--mono)', id: 'lay2'
+  }, S.layer2));
+  // Das wandernde Paket
+  pipe.appendChild(el('circle', { cx: -20, cy: 86, r: 6, fill: 'var(--accent)', id: 'packet' }));
+  // Note am Ende
+  pipe.appendChild(el('text', {
+    x: STAGES[4].x, y: 40, 'text-anchor': 'middle', fill: 'var(--accent)',
+    'font-size': 22, 'font-weight': 700, 'font-family': 'var(--sans)', id: 'gradeOut', opacity: 0
+  }, 'B'));
+})();
+
+const packet = pipe.querySelector('#packet');
+const gradeOut = pipe.querySelector('#gradeOut');
+const toggle = $('#pipeToggle');
+const countEl = $('#pipeCount');
+
+function setStage(active) {
+  STAGES.forEach((s, i) => {
+    const box = pipe.querySelector('#box' + i);
+    box.setAttribute('stroke', i === active ? 'var(--accent)' : 'var(--border)');
+    box.setAttribute('fill', i === active ? 'var(--surface-2)' : 'var(--surface)');
+  });
+  pipe.querySelector('#lay1').setAttribute('fill', active === 3 ? 'var(--accent)' : 'var(--muted)');
+  pipe.querySelector('#lay2').setAttribute('fill', active === 3 ? 'var(--medium)' : 'var(--muted)');
+}
+
+/* Statische Fassung: dieselben fünf Stufen, kein Frame, kein Timer. */
+function renderStatic() {
+  setStage(-1);
+  STAGES.forEach((s, i) => { pipe.querySelector('#sub' + i).textContent = s.sub; });
+  packet.setAttribute('opacity', 0);
+  gradeOut.setAttribute('opacity', 1);
+  countEl.textContent = '75 / 75';
+  toggle.hidden = true;
+}
+
+let running = false, t0 = 0, rafId = 0;
+const CYCLE = 9000;
+
+function frame(now) {
+  if (!running) return;
+  if (!t0) t0 = now;
+  const p = ((now - t0) % CYCLE) / CYCLE;
+
+  const seg = Math.min(4, Math.floor(p * 5));
+  setStage(seg);
+
+  const local = (p * 5) - seg;
+  const from = STAGES[Math.max(0, seg)].x;
+  const to   = STAGES[Math.min(4, seg + 1)].x;
+  packet.setAttribute('cx', from + (to - from) * local);
+  packet.setAttribute('opacity', seg >= 4 ? 0 : 1);
+
+  const n = Math.min(75, Math.round(p * 75) + 1);
+  countEl.textContent = n + ' / 75';
+  pipe.querySelector('#sub1').textContent = 'Angriff ' + n + ' von 75';
+  gradeOut.setAttribute('opacity', seg >= 4 ? String(Math.min(1, (local * 2))) : '0');
+
+  drawNet();
+  rafId = requestAnimationFrame(frame);
+}
+
+function start() {
+  if (running || REDUCED) return;
+  running = true; t0 = 0;
+  toggle.textContent = S.pipePause;
+  toggle.setAttribute('aria-pressed', 'false');
+  rafId = requestAnimationFrame(frame);
+}
+function stop() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  toggle.textContent = S.pipePlay;
+  toggle.setAttribute('aria-pressed', 'true');
+}
+
+let userPaused = false;
+let inView = false;
+toggle.addEventListener('click', () => {
+  userPaused = running;
+  if (running) stop(); else start();
+});
+
+// Nicht laufen, wenn der Tab verborgen ist.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { cancelAnimationFrame(rafId); running = false; }
+  else if (!userPaused && inView) start();
+});
+
+// Nicht laufen, wenn die Sektion aus dem Bild ist.
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(es => {
+    inView = es[0].isIntersecting;
+    if (inView && !userPaused && !document.hidden) start(); else if (!inView) stop();
+  }, { threshold: .15 }).observe($('#produkt'));
+} else { inView = true; }
+
+if (REDUCED) { renderStatic(); drawNet(); }
+else { toggle.textContent = S.pipePause; start(); }
+</script>
+</body>
+</html>

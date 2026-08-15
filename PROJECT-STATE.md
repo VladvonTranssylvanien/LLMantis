@@ -43,6 +43,8 @@
 | 9 | Canary strings in system prompts | Turns a judge's opinion into a deterministic fact. Only `confirmed` may produce an F | 15.08 |
 | 10 | **Working language: English** | Code, comments, commits, docs, UI — all English | 15.08 |
 | 11 | **Repository stays public** | Research project; openness works for us at this stage. A deliberate decision, **not** tech debt — do not "fix" it | 15.08 |
+| 13 | **Brand: the geometric mark is the brand** | Original geometry, ours, vector, favicon-safe. A candidate mark was rejected — derived from licensed stock, not sub-licensable | 15.08 |
+| 14 | **Landing copy in German** | The buyer is a German compliance manager; the app and the Prüfbericht stay English. Documented exception to decision #10 | 15.08 |
 | 12 | **Licence: AGPL-3.0** | Repo is public and the product is a hosted service. Under AGPL a competitor who hosts our code must publish their changes; under MIT they need not. Agreed with Vlad as repo owner | 15.08 |
 
 ---
@@ -84,6 +86,7 @@
 | 4 | Organizations in the data model | week 3 | Vlad |
 | 5 | Attack library versioning | week 3 | Vlad |
 | 6 | Rename the Notion page | this week | Bogdan |
+| 8 | **Original illustrated mark** — the geometric mark is the brand and ships as final; an illustrated one may replace it. Owner: Bogdan, no date | open | Bogdan |
 | 7 | **README §Scoring contradicts decision #8.** README documents the shipped behaviour — flat severity weights, critical cap at **D**. Prompt 3 / P0 specifies BASE + CONF_K multipliers and a cap at **C**. Update the README in the same commit as P0, or the repo documents two different scoring rules | with P0 | Vlad |
 
 ---
@@ -136,3 +139,15 @@ defaults to a US provider at `backend/config.py:33`.
 **Open, needs a decision:** the wordmark is still a live `<text>` element in the
 lockup SVGs and renders in a fallback face on any machine without Inter. It must
 be converted to outlines before anything goes in front of a customer.
+
+**15.08.2026 (frontend)** — Redesigned all three pages on the geometric mark.
+Self-hosted Inter and JetBrains Mono; the pages now make zero external requests,
+verified by rendering with every non-localhost host blackholed. Contrast on the
+Prüfbericht raised to AA. Landing rebuilt in German with navigation, a labelled
+illustration of the scan pipeline, the GRC section and pricing. Impressum and
+Datenschutz exist as structural placeholders with `{{TOKEN}}` fields — Kwabena
+owns the wording.
+
+**Open API request (not implemented — frontend must not add backend fields):**
+the Prüfbericht wants an **attack-library version** on page 1. The report shows
+"not reported by the backend" until `report.attack_library_version` exists.

@@ -3,181 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LLMantis</title>
+<title>Run a scan — LLMantis</title>
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/assets/brand/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="/static/assets/base.css">
 <style>
 /* ===========================================================================
-   LLMantis - scan UI
-   ---------------------------------------------------------------------------
-   Design system: PLAYBOOK.md section 3. Near-black ground, ONE accent
-   (mantis green). Severity colours are semantic state, not decoration, and
-   are the only other hues allowed.
-
-   On glass: PLAYBOOK forbids glassmorphism as a style - frosted panels over
-   coloured blobs. What is used here is an Apple-style *material*, and only on
-   chrome that overlays content: the sticky header and the live feed. Content
-   panels are opaque. The rule is in PLAYBOOK.md section 3.
-
-   No image files, no webfonts over the network, no CDN. A demo must never
-   depend on the network.
+   LLMantis — scan app. Tokens and typefaces live in assets/base.css.
+   No colour literal here; everything resolves to a token.
    =========================================================================== */
 
-:root {
-  /* --- PLAYBOOK section 3 ------------------------------------------------ */
-  --bg:       #0A0A0B;
-  --surface:  #141518;
-  --border:   #24262B;
-  --text:     #E8E8EA;
-  --muted:    #8A8F98;
-  --accent:   #7BE33F;
-
-  --critical: #FF4D4D;
-  --high:     #FF8A3D;
-  --medium:   #FFC53D;
-  --low:      #6EA8FE;
-  --info:     #8A8F98;
-
-  /* --- derived ----------------------------------------------------------- */
-  --surface-2: #1B1D21;
-  --accent-dim: rgba(123, 227, 63, .12);
-
-  /* Apple-style material. The saturate() is what stops the blur looking grey;
-     the inset top hairline is the light catching the top edge of the glass. */
-  --glass-bg:      rgba(18, 19, 22, .72);
-  --glass-border:  rgba(255, 255, 255, .09);
-  --glass-shine:   inset 0 1px 0 rgba(255, 255, 255, .07);
-  --glass-lift:    0 8px 32px -8px rgba(0, 0, 0, .7);
-
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --r: 12px;
-
-  /* Self-host Inter and JetBrains Mono into frontend/fonts/ and add the
-     @font-face blocks here. Until then these stacks are the fallback.
-     Google Fonts is banned - see PLAYBOOK, EU-only stack. */
-  --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
-
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-
 body {
-  margin: 0;
-  background: var(--bg);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(1000px 700px at 8% -10%, var(--bloom-warm), transparent 62%),
+    radial-gradient(900px 800px at 100% 4%, var(--bloom-cool), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+  background-attachment: fixed;
   color: var(--text);
-  font: 15px/1.6 var(--sans);
-  -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3 { letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
-.mono { font-family: var(--mono); }
-
-/* ---------------------------------------------------------------- material */
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(30px) saturate(180%);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shine), var(--glass-lift);
-}
-/* Without this, a browser with no backdrop-filter renders a see-through panel
-   and the text underneath shows through it. Opaque is the safe failure. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass { background: #16171B; }
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
 }
 
 /* ------------------------------------------------------------------ header */
-header {
-  position: sticky; top: 0; z-index: 40;
+.topbar {
+  position: sticky; top: 0; z-index: 60;
   display: flex; align-items: center; gap: 14px;
-  padding: 13px clamp(16px, 4vw, 40px);
+  padding: 12px clamp(16px, 4vw, 40px);
   border-width: 0 0 1px 0;
-  border-radius: 0;
 }
-header .mark { width: 26px; height: 26px; color: var(--accent); flex: none; }
-header .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
-header .name .ll { color: var(--accent); }
-.chip {
-  margin-left: auto; font-family: var(--mono); font-size: 11px;
-  color: var(--muted); border: 1px solid var(--border);
-  padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 26px; height: 26px; display: block; }
+.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.brand .name .ll { color: var(--accent); }
+
+.nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.nav a.link {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 7px 11px; border-radius: 7px;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.nav a.link:hover { color: var(--text); background: var(--surface-2); }
+.nav a.link[aria-current="page"] { color: var(--accent); background: var(--surface-2); }
+.nav .btn { margin-left: 8px; }
+
+.menu-btn {
+  display: none; margin-left: auto; background: transparent; border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 8px 11px; cursor: pointer; font: inherit;
+}
+@media (max-width: 760px) {
+  .menu-btn { display: block; }
+  .nav {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 10px clamp(16px, 4vw, 40px) 16px;
+    background: var(--glass-fallback); border-bottom: 1px solid var(--border);
+  }
+  .nav.open { display: flex; }
+  .nav .btn { margin: 8px 0 0; text-align: center; }
 }
 
-/* -------------------------------------------------------------------- page */
+/* ------------------------------------------------------------------ layout */
 .wrap {
   max-width: 940px; margin: 0 auto;
-  padding: clamp(28px, 5vw, 56px) clamp(16px, 4vw, 40px) 120px;
-  display: flex; flex-direction: column; gap: 28px;
+  padding: clamp(26px, 5vw, 48px) clamp(16px, 4vw, 40px) 110px;
+  display: flex; flex-direction: column; gap: 24px;
 }
-
-.lede { color: var(--muted); max-width: 60ch; margin: 0; }
+.lede { color: var(--muted); max-width: 60ch; margin: 10px 0 0; }
 .lede b { color: var(--text); font-weight: 500; }
+h1 { font-size: clamp(24px, 4vw, 32px); }
 
-/* Content panels are opaque. Only chrome gets the material. */
 .panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: clamp(18px, 3vw, 26px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: clamp(18px, 3vw, 26px);
 }
 
-label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
+/* ------------------------------------------------------------ mock banner */
+.mockbar {
+  display: none; align-items: center; gap: 11px;
+  border: 1px solid var(--medium); background: rgba(255, 197, 61, .09);
+  border-radius: var(--r); padding: 13px 16px; font-size: 14px;
+}
+.mockbar.on { display: flex; }
+.mockbar b { color: var(--medium); }
 
+/* ------------------------------------------------------------------- form */
+label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
 .row { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
 @media (max-width: 620px) { .row { grid-template-columns: 1fr; } }
 
 select, input, textarea {
   width: 100%; font: inherit; color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
   padding: 10px 12px;
   transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
 }
 input.mono, textarea { font-family: var(--mono); font-size: 13px; }
 textarea { min-height: 150px; resize: vertical; margin-top: 14px; }
-select:focus-visible, input:focus-visible, textarea:focus-visible,
-button:focus-visible, .fhead:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-dim);
+select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring);
 }
-.fhead:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
-button {
-  font: inherit; font-weight: 600; cursor: pointer;
-  color: #08170B; background: var(--accent);
-  border: 0; border-radius: 9px; padding: 11px 22px;
-  transition: filter .2s var(--ease), transform .2s var(--ease);
-}
-button:hover:not(:disabled) { filter: brightness(1.08); }
-button:active:not(:disabled) { transform: translateY(1px); }
-button:disabled { opacity: .5; cursor: default; }
 
 .actions { display: flex; align-items: center; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
 .err { color: var(--critical); font-size: 13px; }
+.chip {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+}
 
 /* ------------------------------------------------- signature: live feed --- */
-/* The product's signature per PLAYBOOK: the customer watches the attack,
-   not a progress bar. */
 #live { display: none; border-radius: var(--r); padding: 0; overflow: hidden; }
 #live.on { display: block; }
-
 .live-top {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 18px; border-bottom: 1px solid var(--glass-border);
 }
 .live-title { font-size: 13px; font-weight: 600; }
-.live-count { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.pbar { height: 2px; background: rgba(255,255,255,.07); }
+.live-count {
+  margin-left: auto; font-family: var(--mono); font-size: 12px;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.pbar { height: 2px; background: var(--surface-2); }
 .pbar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s var(--ease); }
 
-.feed {
-  font-family: var(--mono); font-size: 12.5px;
-  max-height: 320px; overflow-y: auto; padding: 10px 0;
-}
+.feed { font-family: var(--mono); font-size: 12.5px; max-height: 320px; overflow-y: auto; padding: 10px 0; }
 .line {
-  display: grid; grid-template-columns: 22px 1fr auto auto;
-  gap: 12px; align-items: baseline;
-  padding: 5px 18px;
+  display: grid; grid-template-columns: 22px 1fr auto auto; gap: 12px;
+  align-items: baseline; padding: 5px 18px;
   animation: slide .25s var(--ease) both;
 }
 .line .g { text-align: center; }
@@ -186,17 +141,15 @@ button:disabled { opacity: .5; cursor: default; }
 .line .ms { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11.5px; }
 .line.pass .g, .line.pass .st { color: var(--accent); }
 .line.fail .g, .line.fail .st { color: var(--critical); }
-.line.fail { background: rgba(255, 77, 77, .06); }
-.line.err  .g, .line.err  .st { color: var(--medium); }
+.line.fail { background: rgba(255, 107, 107, .06); }
+.line.err .g, .line.err .st { color: var(--medium); }
 .line .note { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; }
 @keyframes slide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 /* --------------------------------------------------------------- incomplete */
 .banner {
   border-radius: var(--r); padding: 16px 18px;
-  border: 1px solid var(--medium);
-  background: rgba(255, 197, 61, .08);
-  display: none;
+  border: 1px solid var(--medium); background: rgba(255, 197, 61, .08); display: none;
 }
 .banner.on { display: block; }
 .banner b { color: var(--medium); }
@@ -208,7 +161,7 @@ button:disabled { opacity: .5; cursor: default; }
 .ring {
   width: 108px; height: 108px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
-  background: conic-gradient(var(--accent) 0deg, rgba(255,255,255,.07) 0);
+  background: conic-gradient(var(--accent) 0deg, var(--surface-2) 0);
   transition: background .6s var(--ease);
 }
 .ring > div {
@@ -222,93 +175,102 @@ button:disabled { opacity: .5; cursor: default; }
 .stats .v { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stats .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 
-.capped { display: none; margin-top: 20px; padding: 13px 15px; border-radius: 9px;
-  border: 1px solid var(--high); background: rgba(255,138,61,.08); font-size: 13.5px; }
+.capped {
+  display: none; margin-top: 20px; padding: 13px 15px; border-radius: 9px;
+  border: 1px solid var(--high); background: rgba(255, 138, 61, .08); font-size: 13.5px;
+}
 .capped.on { display: block; }
 
 .cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 22px; }
 .cat { border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; background: var(--bg); }
-.cat h4 { margin: 0 0 3px; font-size: 13px; font-weight: 600; }
+.cat h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
 .cat .m { font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
-.mini { height: 3px; background: rgba(255,255,255,.07); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.mini { height: 3px; background: var(--surface-2); border-radius: 2px; margin-top: 10px; overflow: hidden; }
 .mini > i { display: block; height: 100%; width: 0; transition: width .5s var(--ease); }
 
 .method { color: var(--muted); font-size: 12.5px; margin: 18px 0 0; font-family: var(--mono); }
+.report-cta { display: flex; gap: 12px; align-items: center; margin-top: 22px; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------- findings */
 #findings { display: flex; flex-direction: column; gap: 10px; }
 #findings h2 { font-size: 17px; margin: 22px 0 4px; }
 #findings h2:first-child { margin-top: 0; }
-
 .finding {
-  background: var(--surface); border: 1px solid var(--border);
-  border-left: 2px solid var(--border);
-  border-radius: 10px; overflow: hidden;
-  animation: rise .3s var(--ease) both;
-  transition: border-color .2s var(--ease);
+  background: var(--surface); border: 1px solid var(--border); border-left: 2px solid var(--border);
+  border-radius: 10px; overflow: hidden; animation: rise .3s var(--ease) both;
 }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
 .fhead {
   display: flex; align-items: center; gap: 12px; padding: 13px 16px;
-  cursor: pointer; user-select: none;
+  cursor: pointer; user-select: none; width: 100%; text-align: left;
+  background: transparent; border: 0; color: inherit; font: inherit;
 }
 .fhead:hover { background: var(--surface-2); }
 .pill {
-  font-family: var(--mono); font-size: 10.5px; text-transform: uppercase;
-  letter-spacing: .07em; padding: 3px 8px; border-radius: 5px;
-  border: 1px solid currentColor; flex: none;
+  font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+  padding: 3px 8px; border-radius: 5px; border: 1px solid currentColor; flex: none;
 }
 .ftitle { font-size: 14px; flex: 1; min-width: 0; }
 .fmeta { font-family: var(--mono); font-size: 11px; color: var(--muted); flex: none; }
 @media (max-width: 620px) { .fmeta { display: none; } }
 .fsign { color: var(--muted); flex: none; transition: transform .2s var(--ease); }
 .finding.open .fsign { transform: rotate(45deg); }
-
 .fbody { display: none; padding: 4px 16px 18px; border-top: 1px solid var(--border); }
 .finding.open .fbody { display: block; }
 .blk { margin-top: 14px; }
-.blk label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.blk .lbl {
+  display: block; font-size: 11px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .08em; margin-bottom: 6px;
+}
 .blk pre {
   margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
   white-space: pre-wrap; word-break: break-word;
-  background: var(--bg); border: 1px solid var(--border);
-  border-left: 2px solid var(--border);
+  background: var(--bg); border: 1px solid var(--border); border-left: 2px solid var(--border);
   border-radius: 7px; padding: 11px 13px;
 }
 .footnote { color: var(--muted); font-size: 12.5px; margin-top: 26px; max-width: 62ch; }
 
-/* PLAYBOOK makes this mandatory. */
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-  }
+footer.site { border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+footer.site .in {
+  max-width: 940px; margin: 0 auto; padding: 26px clamp(16px, 4vw, 40px);
+  display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
 }
+footer.site a { color: var(--muted); }
+footer.site .sp { margin-left: auto; }
 </style>
 </head>
 <body>
 
-<header class="glass">
-  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
-    <path fill="currentColor" fill-rule="evenodd" d="M 50 29 C 44 27, 30 26, 18 27 C 12 27.5, 9 31, 10 37 C 12 51, 22 68, 34 78 C 38 82, 44 86, 50 87 C 56 86, 62 82, 66 78 C 78 68, 88 51, 90 37 C 91 31, 88 27.5, 82 27 C 70 26, 56 27, 50 29 Z M 18.5 31.28 a 14 8.5 50 1 0 18 21.44 a 14 8.5 50 1 0 -18 -21.44 Z M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18 21.44 Z"/>
-    <path fill="currentColor" d="M 44 31 C 36 22, 24 12, 6 2 C 21 13, 34 24, 46.5 34.5 Z"/>
-    <path fill="currentColor" d="M 56 31 C 64 22, 76 12, 94 2 C 79 13, 66 24, 53.5 34.5 Z"/>
-  </svg>
-  <span class="name"><span class="ll">LL</span>Mantis</span>
-  <span class="chip" id="chip">loading library…</span>
+<header class="topbar glass">
+  <a class="brand" href="/static/landing.html">
+    <img src="/static/assets/brand/mark.svg" alt="" width="26" height="26">
+    <span class="name"><span class="ll">LL</span>Mantis</span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav class="nav" id="nav" aria-label="Main">
+    <a class="link" href="/static/landing.html#produkt">Product</a>
+    <a class="link" href="/static/landing.html#warum">Why</a>
+    <a class="link" href="/static/landing.html#preise">Pricing</a>
+    <a class="link" href="/static/landing.html#ueber-uns">About</a>
+    <a class="link" href="/" aria-current="page">Run scan</a>
+    <a class="btn" href="/static/landing.html#art50">Start free check</a>
+  </nav>
 </header>
 
 <div class="wrap">
 
   <div>
-    <h1 style="font-size:clamp(24px,4vw,32px)">Penetration test for AI chatbots</h1>
-    <p class="lede" style="margin-top:10px">
+    <h1>Penetration test for AI chatbots</h1>
+    <p class="lede">
       Paste the bot's system prompt. Every attack in the library runs against it,
       a separate judge rules on each answer, and every finding carries the exact
       quote that proves it. <b>No quote, no finding.</b>
     </p>
+  </div>
+
+  <div class="mockbar" id="mockbar" role="status">
+    <b>Mock mode</b>
+    <span>— these results are simulated. No number from a mock run may leave the team.</span>
   </div>
 
   <div class="panel">
@@ -325,25 +287,29 @@ button:disabled { opacity: .5; cursor: default; }
     <label class="field" for="prompt" style="margin-top:16px">System prompt under test</label>
     <textarea id="prompt" placeholder="You are the customer support assistant for..."></textarea>
     <div class="actions">
-      <button id="run">Run scan</button>
-      <span class="err" id="error"></span>
+      <button class="btn" id="run">Run scan</button>
+      <span class="chip" id="chip" role="status">loading library…</span>
+      <span class="err" id="error" role="alert"></span>
     </div>
   </div>
 
-  <div class="glass" id="live">
+  <section class="glass" id="live" aria-labelledby="liveTitle">
     <div class="live-top">
-      <span class="live-title">Live attack feed</span>
+      <span class="live-title" id="liveTitle">Live attack feed</span>
       <span class="live-count" id="pnum">0 / 0</span>
     </div>
-    <div class="pbar"><i id="pfill"></i></div>
-    <div class="feed" id="feed"></div>
-  </div>
+    <div class="pbar" id="pbar" role="progressbar"
+         aria-labelledby="liveTitle" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+      <i id="pfill"></i>
+    </div>
+    <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions"></div>
+  </section>
 
-  <div class="banner" id="incomplete"></div>
+  <div class="banner" id="incomplete" role="status"></div>
 
   <div class="panel" id="score">
     <div class="scoreRow">
-      <div class="ring" id="ring"><div id="grade">?</div></div>
+      <div class="ring" id="ring"><div id="grade" role="img" aria-label="Grade">?</div></div>
       <div>
         <div class="bignum"><span id="scoreNum">0</span><small>/100</small></div>
         <div class="stats">
@@ -358,31 +324,61 @@ button:disabled { opacity: .5; cursor: default; }
     <div class="capped" id="capped"></div>
     <div class="cats" id="cats"></div>
     <p class="method" id="method"></p>
+    <!-- STEP 6: this action is distinct from "Run scan" and appears only once a
+         scan has completed. It must never share a button with starting a scan. -->
+    <div class="report-cta">
+      <a class="btn" id="openReport" href="/static/report.html" target="_blank" rel="noopener">
+        Download PDF report
+      </a>
+      <span style="color:var(--muted);font-size:13px">Opens the <span lang="de">Prüfbericht</span>, then print to PDF.</span>
+    </div>
   </div>
 
   <div id="findings"></div>
 
 </div>
 
+<footer class="site">
+  <div class="in">
+    <span>© 2026 LLMantis</span>
+    <a href="/static/impressum.html" lang="de">Impressum</a>
+    <a href="/static/datenschutz.html" lang="de">Datenschutzerklärung</a>
+    <span class="sp"><span lang="de">Prüfbericht</span>, not a certification.</span>
+  </div>
+</footer>
+
 <script>
 'use strict';
 
-/* The share of errored attacks above which no grade may be shown.
-   PLAYBOOK: an incomplete scan has no grade. */
+/* An incomplete scan gets no grade — PLAYBOOK. */
 const INCOMPLETE_THRESHOLD = 0.10;
+const REPORT_KEY = 'llmantis:lastReport';
 
 const SEV = { critical:'var(--critical)', high:'var(--high)', medium:'var(--medium)', low:'var(--low)' };
 
 const $   = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-const nice = s => String(s || '').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+const nice = s => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 const secs = ms => (ms == null ? '' : (ms / 1000).toFixed(1) + ' s');
+const truncate = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
 let demoTargets = [];
 
+/* ---------------------------------------------------------- mobile menu -- */
+$('menuBtn').addEventListener('click', () => {
+  const open = $('nav').classList.toggle('open');
+  $('menuBtn').setAttribute('aria-expanded', String(open));
+});
+
 /* ------------------------------------------------------------- bootstrap -- */
 (async function init() {
+  try {
+    const health = await (await fetch('/api/health')).json();
+    // No number from a mock run may leave the team, so say so on screen.
+    if (String(health.provider).toLowerCase() === 'mock') $('mockbar').classList.add('on');
+  } catch (e) { /* best effort; the library call below reports a dead backend */ }
+
   try {
     const lib = await (await fetch('/api/attacks')).json();
     $('chip').textContent = lib.total + ' attacks / ' + lib.categories.length + ' categories';
@@ -420,6 +416,7 @@ $('run').addEventListener('click', async () => {
   $('feed').innerHTML = '';
   $('pfill').style.width = '0%';
   $('pnum').textContent = '0 / 0';
+  setProgress(0, 0);
 
   try {
     const res = await fetch('/api/scan', {
@@ -433,8 +430,8 @@ $('run').addEventListener('click', async () => {
     });
     if (!res.ok) throw new Error(await res.text());
 
-    // The backend streams NDJSON: one JSON object per line, sent the moment
-    // each attack finishes. Reading it live is what moves the feed.
+    // The backend streams NDJSON: one object per line, sent the moment each
+    // attack finishes. Reading it live is what moves the feed.
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
@@ -454,12 +451,20 @@ $('run').addEventListener('click', async () => {
   }
 });
 
+function setProgress(done, total) {
+  const bar = $('pbar');
+  bar.setAttribute('aria-valuemax', String(total));
+  bar.setAttribute('aria-valuenow', String(done));
+  bar.setAttribute('aria-valuetext', done + ' of ' + total + ' checks complete');
+}
+
 function onEvent(ev) {
-  if (ev.type === 'start') $('pnum').textContent = '0 / ' + ev.total;
+  if (ev.type === 'start') { $('pnum').textContent = '0 / ' + ev.total; setProgress(0, ev.total); }
 
   if (ev.type === 'result') {
     $('pfill').style.width = Math.round(100 * ev.done / ev.total) + '%';
     $('pnum').textContent = ev.done + ' / ' + ev.total;
+    setProgress(ev.done, ev.total);
     appendLine(ev.result);
   }
 
@@ -467,7 +472,7 @@ function onEvent(ev) {
   if (ev.type === 'error')    { $('error').textContent = ev.message; }
 }
 
-/* One row per finished attack. ERROR is its own state - an attack that never
+/* One row per finished attack. ERROR is its own state — an attack that never
    ran is not an attack the bot defended. */
 function appendLine(r) {
   const v = r.verdict;
@@ -478,39 +483,32 @@ function appendLine(r) {
   const el = document.createElement('div');
   el.className = 'line ' + cls;
   let html =
-    '<span class="g">' + mark + '</span>' +
+    '<span class="g" aria-hidden="true">' + mark + '</span>' +
     '<span class="id">' + esc(r.attack_id) + '</span>' +
     '<span class="st">' + word + '</span>' +
     '<span class="ms">' + secs(r.duration_ms) + '</span>';
-  if (v === 'FAIL' && r.evidence) {
-    html += '<span class="note">→ ' + esc(truncate(r.evidence, 90)) + '</span>';
-  }
-  if (v === 'ERROR' && r.reason) {
-    html += '<span class="note">→ ' + esc(truncate(r.reason, 90)) + '</span>';
-  }
+  if (v === 'FAIL' && r.evidence) html += '<span class="note">→ ' + esc(truncate(r.evidence, 90)) + '</span>';
+  if (v === 'ERROR' && r.reason)  html += '<span class="note">→ ' + esc(truncate(r.reason, 90)) + '</span>';
   el.innerHTML = html;
   $('feed').appendChild(el);
   $('feed').scrollTop = $('feed').scrollHeight;
 }
 
-const truncate = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
-
 /* ---------------------------------------------------------------- render -- */
 function render(report) {
-  const s       = report.summary;
+  const s = report.summary;
   const results = report.results || [];
-  // The backend already counts these; fall back to counting only if it stops.
   const errored = s.errors != null ? s.errors : results.filter(r => r.verdict === 'ERROR').length;
   const total   = s.total  != null ? s.total  : results.length;
-
-  // PLAYBOOK: if more than 10% of attacks error out, no grade is issued.
   const incomplete = total > 0 && (errored / total) > INCOMPLETE_THRESHOLD;
+
+  // Hand the report to the print view without a round trip to the backend.
+  try { sessionStorage.setItem(REPORT_KEY, JSON.stringify(report)); } catch (e) { /* quota */ }
 
   if (incomplete) {
     $('incomplete').classList.add('on');
     $('incomplete').innerHTML =
-      '<b>Scan incomplete: ' + errored + ' of ' + total + ' checks failed. ' +
-      'No grade issued.</b><br>' +
+      '<b>Scan incomplete: ' + errored + ' of ' + total + ' checks failed. No grade issued.</b><br>' +
       'A grade computed from partial results would misrepresent the bot. ' +
       'Fix the errors above and run the scan again.';
   }
@@ -522,13 +520,14 @@ function render(report) {
     $('ring').style.background = 'conic-gradient(var(--border) 360deg, var(--border) 0)';
     gradeEl.textContent = '–';
     gradeEl.style.color = 'var(--muted)';
+    gradeEl.setAttribute('aria-label', 'No grade issued — scan incomplete');
     $('scoreNum').textContent = '–';
   } else {
     const col = gradeColour(s.grade);
-    $('ring').style.background =
-      'conic-gradient(' + col + ' ' + (s.score * 3.6) + 'deg, rgba(255,255,255,.07) 0)';
+    $('ring').style.background = 'conic-gradient(' + col + ' ' + (s.score * 3.6) + 'deg, var(--surface-2) 0)';
     gradeEl.textContent = s.grade;
     gradeEl.style.color = col;
+    gradeEl.setAttribute('aria-label', 'Grade ' + s.grade + ', score ' + s.score + ' out of 100');
     $('scoreNum').textContent = s.score;
   }
 
@@ -544,7 +543,7 @@ function render(report) {
   $('method').textContent = report.scoring_explanation || '';
 
   // The cap letter comes from the backend. Hardcoding it here is how the UI
-  // and the scoring rules drift apart - see PROJECT-STATE tech debt 7.
+  // and the scoring rules drift apart — PROJECT-STATE tech debt 7.
   $('capped').classList.toggle('on', !!s.capped && !incomplete);
   if (s.capped && !incomplete) {
     $('capped').innerHTML =
@@ -565,7 +564,7 @@ function render(report) {
       '<div class="m">' + c.passed + '/' + c.total + ' defended</div>' +
       '<div class="mini"><i style="background:' + col + '"></i></div>';
     $('cats').appendChild(div);
-    // Fill just after paint so the bar animates instead of jumping. 60 ms stagger.
+    // Fill after paint so the bar animates instead of jumping. 60 ms stagger.
     setTimeout(() => { div.querySelector('.mini > i').style.width = pct + '%'; }, 60 + i * 60);
   });
 
@@ -586,16 +585,17 @@ function render(report) {
     html += '<h2>' + ok.length + ' attack' + (ok.length === 1 ? '' : 's') +
             ' defended</h2>' + ok.map(r => card(r, n++)).join('');
   }
-  html += '<p class="footnote">A grade reflects the documented attacks in our ' +
-          'library as of today. It does not mean the bot is unbreakable — new ' +
-          'techniques appear every month and we add them.</p>';
+  html += '<p class="footnote">A grade reflects the documented attacks in our library ' +
+          'as of today. It does not mean the bot is unbreakable — new techniques appear ' +
+          'every month and we add them.</p>';
   $('findings').innerHTML = html;
 
+  // aria-expanded has to track reality. Setting it once at render time and never
+  // updating it makes every card claim to be collapsed forever.
   document.querySelectorAll('.fhead').forEach(h => {
-    const toggle = () => h.parentElement.classList.toggle('open');
-    h.addEventListener('click', toggle);
-    h.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    h.addEventListener('click', () => {
+      const open = h.parentElement.classList.toggle('open');
+      h.setAttribute('aria-expanded', String(open));
     });
   });
 }
@@ -608,14 +608,14 @@ function gradeColour(g) {
 }
 
 function card(r, i) {
-  const v      = r.verdict;
+  const v = r.verdict;
   const failed = v === 'FAIL';
   const errored = v === 'ERROR';
   const col = failed ? (SEV[r.severity] || 'var(--critical)')
             : errored ? 'var(--medium)' : 'var(--accent)';
 
   const blk = (label, text) =>
-    '<div class="blk"><label>' + label + '</label><pre>' + esc(text) + '</pre></div>';
+    '<div class="blk"><span class="lbl">' + label + '</span><pre>' + esc(text) + '</pre></div>';
 
   let body = blk('What we sent', r.message) +
              blk('What the bot answered', r.answer || '(no answer)');
@@ -624,16 +624,16 @@ function card(r, i) {
   if (errored && r.reason) body += blk('Why it could not run', r.reason);
 
   const tag = failed ? (r.severity || 'fail') : errored ? 'errored' : 'defended';
+  const bodyId = 'fbody-' + i;
 
-  return '<div class="finding" style="animation-delay:' + (i * 45) + 'ms;' +
-      'border-left-color:' + col + '">' +
-    '<div class="fhead" tabindex="0" role="button" aria-expanded="false">' +
+  return '<div class="finding" style="border-left-color:' + col + '">' +
+    '<button class="fhead" type="button" aria-expanded="false" aria-controls="' + bodyId + '">' +
       '<span class="pill" style="color:' + col + '">' + esc(tag) + '</span>' +
       '<span class="ftitle">' + esc(r.reason || r.attack_id) + '</span>' +
       '<span class="fmeta">' + esc(r.attack_id) + ' · ' + esc(r.method) + '</span>' +
-      '<span class="fsign">+</span>' +
-    '</div>' +
-    '<div class="fbody">' + body + '</div>' +
+      '<span class="fsign" aria-hidden="true">+</span>' +
+    '</button>' +
+    '<div class="fbody" id="' + bodyId + '">' + body + '</div>' +
   '</div>';
 }
 </script>
