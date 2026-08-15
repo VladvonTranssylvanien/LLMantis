@@ -92,23 +92,23 @@ async def _mock_chat(system: str, user: str, model: str, max_tokens: int) -> str
 # ANTHROPIC PROVIDER
 # ---------------------------------------------------------------------------
 
-_client = None
+_anthropic_client = None
 
 
 async def _anthropic_chat(system: str, user: str, model: str, max_tokens: int) -> str:
-    global _client
+    global _anthropic_client
 
     # Create the client once, on first use, and reuse it afterwards.
-    if _client is None:
+    if _anthropic_client is None:
         try:
             from anthropic import AsyncAnthropic
         except ImportError as e:
             raise LLMError("Run: pip install anthropic") from e
         if not config.ANTHROPIC_API_KEY:
             raise LLMError("PROVIDER=anthropic but ANTHROPIC_API_KEY is empty in .env")
-        _client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+        _anthropic_client = AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
 
-    response = await _client.messages.create(
+    response = await _anthropic_client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=system,
@@ -118,12 +118,56 @@ async def _anthropic_chat(system: str, user: str, model: str, max_tokens: int) -
 
 
 # ---------------------------------------------------------------------------
+# MISTRAL PROVIDER (EU-COMPLIANT)
+# ---------------------------------------------------------------------------
+
+_mistral_client = None
+
+
+async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> str:
+    """
+    Mistral AI provider (France-based, EU-compliant).
+
+    WHY MISTRAL?
+        The judge processes customer system prompts (trade secrets).
+        CLOUD Act (US) contradicts EU data protection. We use Mistral (France)
+        to guarantee that customer data stays in the EU.
+    """
+    global _mistral_client
+
+    # Create the client once, on first use, and reuse it afterwards.
+    if _mistral_client is None:
+        try:
+            from mistralai.async_client import MistralAsyncClient
+        except ImportError as e:
+            raise LLMError(
+                "Run: pip install mistralai\n"
+                "Then get API key from https://console.mistral.ai"
+            ) from e
+        if not config.MISTRAL_API_KEY:
+            raise LLMError(
+                "PROVIDER=mistral but MISTRAL_API_KEY is empty in .env\n"
+                "Get key from: https://console.mistral.ai → API Keys → Generate New Key"
+            )
+        _mistral_client = MistralAsyncClient(api_key=config.MISTRAL_API_KEY)
+
+    response = await _mistral_client.chat(
+        model=model,
+        max_tokens=max_tokens,
+        system_prompt=system,
+        messages=[{"role": "user", "content": user}],
+    )
+    return response.choices[0].message.content
+
+
+# ---------------------------------------------------------------------------
 # PUBLIC INTERFACE
 # ---------------------------------------------------------------------------
 
 _PROVIDERS = {
     "mock": _mock_chat,
     "anthropic": _anthropic_chat,
+    "mistral": _mistral_chat,
 }
 
 
