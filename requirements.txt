@@ -4,3 +4,4 @@ pyyaml==6.0.2
 python-dotenv==1.2.2
 httpx==0.28.1
 anthropic==0.42.0
+beautifulsoup4==4.15.0   # tools/art50check.py parses HTML for chat widgets

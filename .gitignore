@@ -34,3 +34,6 @@ venv/
 # Brand: unlicensed reference art.
 # The shipped mark is original geometry and does not depend on it.
 Brand/Screenshot*.png
+
+# tool output
+art50-results.csv
