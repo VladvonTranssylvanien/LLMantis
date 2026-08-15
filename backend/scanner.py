@@ -154,13 +154,27 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         r["attack_id"],
     ))
 
+    summary = scoring.compute(results)
+
+    # If >10% of attacks errored, the scan is incomplete - set grade to None
+    total_attacks = len(results)
+    error_count = len([r for r in results if r["verdict"] == "ERROR"])
+    error_rate = round(100 * error_count / total_attacks) if total_attacks > 0 else 0
+
+    if error_rate > 10:
+        summary["grade"] = None
+        summary["incomplete"] = True
+    else:
+        summary["incomplete"] = False
+
     return {
         "scan_id": scan_id,
         "duration_s": round(time.time() - started, 1),
         "target_mode": target.mode,
-        "summary": scoring.compute(results),
+        "summary": summary,
         "results": results,
         "scoring_explanation": scoring.explain(),
+        "error_rate": error_rate,
     }
 
 
