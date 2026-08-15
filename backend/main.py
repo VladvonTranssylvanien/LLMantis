@@ -35,6 +35,7 @@ from .scanner import Target, detect_canary, run_scan
 from .database import SessionLocal
 from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
 from .art50check import check_art50
+from .ownership import create_challenge, verify_ownership
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
 
@@ -204,6 +205,44 @@ async def art50_check(request: ScanRequest):
         raise HTTPException(400, "api_url (the website URL) is required")
 
     result = await check_art50(request.api_url)
+    return result.dict()
+
+
+class OwnershipChallengeRequest(BaseModel):
+    """Request to generate ownership verification challenge."""
+    domain: str
+
+
+class OwnershipVerifyRequest(BaseModel):
+    """Request to verify ownership."""
+    domain: str
+    token: str
+
+
+@app.post("/api/ownership/challenge")
+async def ownership_challenge(request: OwnershipChallengeRequest):
+    """
+    Generate a DNS verification challenge.
+
+    Returns: token and instructions for DNS TXT record.
+
+    User adds: _llmantis.{domain} TXT {token}
+    Then calls /api/ownership/verify to confirm.
+    """
+    result = await create_challenge(request.domain)
+    return result.dict()
+
+
+@app.post("/api/ownership/verify")
+async def ownership_verify(request: OwnershipVerifyRequest):
+    """
+    Verify ownership by checking DNS TXT record.
+
+    Looks for: _llmantis.{domain} TXT {token}
+
+    Returns: {"verified": true/false, "verified_at": "...", "error": "..."}
+    """
+    result = await verify_ownership(request.domain, request.token)
     return result.dict()
 
 
