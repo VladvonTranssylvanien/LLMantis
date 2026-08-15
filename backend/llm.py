@@ -45,7 +45,7 @@ async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> 
     # Create the client once, on first use, and reuse it afterwards.
     if _mistral_client is None:
         try:
-            from mistralai.async_client import MistralAsyncClient
+            from mistralai.client import Mistral
         except ImportError as e:
             raise LLMError(
                 "Run: pip install mistralai\n"
@@ -56,13 +56,15 @@ async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> 
                 "PROVIDER=mistral but MISTRAL_API_KEY is empty in .env\n"
                 "Get key from: https://console.mistral.ai → API Keys → Generate New Key"
             )
-        _mistral_client = MistralAsyncClient(api_key=config.MISTRAL_API_KEY)
+        _mistral_client = Mistral(api_key=config.MISTRAL_API_KEY)
 
-    response = await _mistral_client.chat(
+    response = _mistral_client.chat.complete(
         model=model,
         max_tokens=max_tokens,
-        system_prompt=system,
-        messages=[{"role": "user", "content": user}],
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
     return response.choices[0].message.content
 
