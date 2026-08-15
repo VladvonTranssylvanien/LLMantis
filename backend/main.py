@@ -220,6 +220,18 @@ class OwnershipVerifyRequest(BaseModel):
     token: str
 
 
+class OrganizationCreateRequest(BaseModel):
+    """Request to create an organization."""
+    name: str
+    domain: str
+
+
+class OrganizationMemberRequest(BaseModel):
+    """Request to add a member to an organization."""
+    user_id: str
+    role: str  # "owner", "admin", or "member"
+
+
 @app.post("/api/ownership/challenge")
 async def ownership_challenge(request: OwnershipChallengeRequest):
     """
@@ -245,6 +257,93 @@ async def ownership_verify(request: OwnershipVerifyRequest):
     """
     result = await verify_ownership(request.domain, request.token)
     return result.dict()
+
+
+# ---------------------------------------------------------------- ORGANIZATIONS
+
+
+@app.post("/api/organizations")
+async def create_organization(request: OrganizationCreateRequest, db: Session = Depends(lambda: SessionLocal())):
+    """
+    Create a new organization.
+
+    Returns: {"id": "...", "name": "...", "domain": "...", "created_at": "..."}
+    """
+    org = Organization(
+        id=uuid4(),
+        name=request.name,
+        domain=request.domain,
+        created_at=datetime.utcnow()
+    )
+    db.add(org)
+    db.commit()
+    db.refresh(org)
+
+    return {
+        "id": str(org.id),
+        "name": org.name,
+        "domain": org.domain,
+        "created_at": org.created_at.isoformat(),
+    }
+
+
+@app.get("/api/organizations")
+async def list_organizations(db: Session = Depends(lambda: SessionLocal())):
+    """
+    List all organizations.
+
+    Returns: {"total": N, "organizations": [...]}
+    """
+    orgs = db.query(Organization).all()
+    return {
+        "total": len(orgs),
+        "organizations": [
+            {
+                "id": str(o.id),
+                "name": o.name,
+                "domain": o.domain,
+                "created_at": o.created_at.isoformat(),
+            }
+            for o in orgs
+        ]
+    }
+
+
+@app.get("/api/organizations/{org_id}")
+async def get_organization(org_id: str, db: Session = Depends(lambda: SessionLocal())):
+    """
+    Get organization details with members and scans.
+
+    Returns: {"id": "...", "name": "...", "members": [...], "scans": [...]}
+    """
+    try:
+        from uuid import UUID
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    org = db.query(Organization).filter_by(id=org_uuid).first()
+    if not org:
+        raise HTTPException(404, f"Organization {org_id} not found")
+
+    scans = db.query(DBScan).filter_by(org_id=org_uuid).all()
+
+    return {
+        "id": str(org.id),
+        "name": org.name,
+        "domain": org.domain,
+        "created_at": org.created_at.isoformat(),
+        "scans": [
+            {
+                "id": str(s.id),
+                "score": s.score,
+                "grade": s.grade,
+                "library_version": s.library_version,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in scans
+        ]
+    }
 
 
 @app.get("/api/scans")
