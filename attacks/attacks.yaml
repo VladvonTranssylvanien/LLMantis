@@ -16,6 +16,8 @@
 #   fix         what the customer should change in their prompt
 # =============================================================================
 
+version: "1.4"
+
 categories:
   prompt_injection:
     label: "Prompt Injection"

@@ -36,6 +36,7 @@ class Library:
     """The whole attack library plus its category metadata."""
     attacks: list[Attack]
     categories: dict
+    version: str = "1.0"  # Library version, incremented when attacks are added
 
     def by_category(self, name: str) -> list[Attack]:
         return [a for a in self.attacks if a.category == name]
@@ -113,7 +114,11 @@ def load_library() -> Library:
         for a in raw["attacks"]
     ]
 
-    return Library(attacks=attacks, categories=raw["categories"])
+    return Library(
+        attacks=attacks,
+        categories=raw["categories"],
+        version=raw.get("version", "1.0")
+    )
 
 
 def reload_library() -> Library:

@@ -66,6 +66,7 @@ class Scan(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     target_id = Column(UUID(as_uuid=True), ForeignKey("targets.id"), nullable=False)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    library_version = Column(String(50), nullable=False, default="1.0")
     duration_s = Column(Float, nullable=False)
     grade = Column(String(1), nullable=True)
     score = Column(Integer, nullable=True)

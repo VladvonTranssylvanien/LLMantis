@@ -102,6 +102,7 @@ async def _save_scan_to_db(db: Session, report: dict, target_mode: str, duration
             id=uuid4(),
             target_id=db_target.id,
             org_id=org.id,
+            library_version=report.get("library_version", "1.0"),
             duration_s=duration_s,
             grade=summary.get("grade"),
             score=summary.get("score"),
