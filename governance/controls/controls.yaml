@@ -1,0 +1,356 @@
+# =============================================================================
+# GOVERNANCE CONTROL DEFINITIONS — PromptGuard / LLMantis
+# =============================================================================
+# Defines the 10 governance controls and 2 logging controls assessed by
+# governance/scripts/run_governance.py.
+#
+# The reference standards listed below (ISO/IEC 42001, ISO/IEC 23894,
+# ISO 31000, ISO/IEC 27001) are used as governance vocabulary and structuring
+# references only. Implementing these controls does NOT constitute
+# certification against any of these standards, and PromptGuard makes no
+# certification claim. See docs/legal/DISCLAIMERS.md.
+#
+# assessment_criteria describes what evidence would justify each status.
+# The actual status assigned in governance/reports/GOVERNANCE_REPORT.md is
+# a judgment call made against real repository evidence, not automatically
+# derived from this file alone.
+# =============================================================================
+
+version: 1
+schema: "promptguard-governance-controls/v1"
+assessed_repository: "PromptGuard (renamed LLMantis, 2026-08-15)"
+
+controls:
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-01
+    name: AI Component Inventory
+    description: >
+      Verify that AI models, AI providers, LLM components and AI judges used
+      by PromptGuard can be identified, including version/configuration
+      information, so that anyone assessing the system's AI risk knows what
+      AI is actually involved.
+    reference_standards:
+      - "ISO/IEC 42001"
+    automated_checks:
+      - "backend/config.py declares TARGET_MODEL and JUDGE_MODEL with explicit default values"
+      - "backend/llm.py exposes a provider registry (_PROVIDERS) naming every supported AI provider"
+      - "requirements.txt pins the anthropic SDK to an exact version"
+    manual_checks:
+      - "Confirm the configured model identifiers match what actually runs when PROVIDER=anthropic, not only mock mode"
+      - "Confirm PLAYBOOK.md's EU-only stack invariant (judge must be Mistral/Aleph Alpha, never Anthropic/OpenAI/Google) against the current default in backend/config.py"
+      - "Confirm PROJECT-STATE.md technical-debt entries about the judge provider are current"
+    expected_evidence:
+      - "backend/config.py"
+      - "backend/llm.py"
+      - "requirements.txt"
+      - "PROJECT-STATE.md (technical debt #1)"
+      - "PLAYBOOK.md (Part II, §1 EU-only stack)"
+    assessment_criteria:
+      pass: "Every AI component (target model, judge model, provider) is named in one version-controlled configuration file, dependency versions are pinned, and the configuration matches documented policy."
+      partial: "Components are identifiable, but the configuration contradicts documented policy, or version/provider information is incomplete."
+      fail: "AI components cannot be identified from the repository."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-02
+    name: Attack Governance
+    description: >
+      Verify that attack definitions used to test target chatbots are
+      structured, uniquely identified, categorized, and traceable, and that
+      the library does not contain silent duplicates.
+    reference_standards:
+      - "ISO/IEC 42001"
+      - "ISO/IEC 23894"
+    automated_checks:
+      - "attacks/attacks.yaml exists and parses"
+      - "every attack has a unique, non-empty id"
+      - "every attack declares a category present in the categories: block"
+      - "every attack declares a severity in {critical, high, medium, low}"
+      - "backend/attacks.py enforces the above at load time (_validate)"
+    manual_checks:
+      - "Confirm attack coverage against the 5 declared OWASP-LLM-aligned categories is representative, not just internally consistent"
+      - "Confirm the stated attack count in README.md/pitch materials matches the actual count in attacks.yaml"
+    expected_evidence:
+      - "attacks/attacks.yaml"
+      - "backend/attacks.py"
+      - "README.md (Status section: attack count)"
+    assessment_criteria:
+      pass: "Attacks carry unique IDs, valid categories and severities, validation is enforced in code, and there is at least one automated test exercising that validation."
+      partial: "Attacks are structured and validated at load time, but no automated test exists to prevent regression of that validation, or documented counts are stale."
+      fail: "Attack definitions are unstructured, unvalidated, or contain duplicate/invalid entries."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-03
+    name: AI Risk and Scoring
+    description: >
+      Verify that findings are assessed consistently: severity is defined,
+      scoring is deterministic given the same inputs, and critical findings
+      cannot be diluted into a passing grade.
+    reference_standards:
+      - "ISO/IEC 23894"
+      - "ISO 31000"
+    automated_checks:
+      - "backend/scoring.py defines SEVERITY_WEIGHT for all four severities"
+      - "backend/scoring.py defines a critical-failure grade cap (CRITICAL_FAIL_MAX_GRADE)"
+      - "scoring.compute() is unit-testable in isolation from the network/LLM"
+    manual_checks:
+      - "Confirm the grade cap logic (backend/scoring.py:_is_better) actually prevents a critical FAIL from producing better than the capped grade, across boundary cases"
+      - "Confirm README.md's documented scoring rule matches the shipped implementation (PROJECT-STATE.md flags a prior mismatch: README said cap=D, code implements cap=C)"
+    expected_evidence:
+      - "backend/scoring.py"
+      - "README.md (Scoring section)"
+      - "PROJECT-STATE.md (technical debt #7)"
+    assessment_criteria:
+      pass: "Scoring logic, severity weights and the critical-failure cap are implemented, documented consistently in one place, and covered by automated tests."
+      partial: "Scoring logic exists and is internally consistent, but has no automated test coverage, or documentation elsewhere in the repository has drifted from the implementation."
+      fail: "No scoring or severity logic exists, or findings are not assessed consistently."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-04
+    name: AI Judge Validation
+    description: >
+      Verify that the AI judge (a model evaluating another model's answers)
+      has meaningful validation behind it, not just an implementation.
+      Existence of a judge is not sufficient evidence of validation.
+    reference_standards:
+      - "ISO/IEC 42001"
+    automated_checks:
+      - "backend/judge.py implements a deterministic layer (string/canary match) that does not depend on the AI judge"
+      - "backend/judge.py's AI-judge layer tags every verdict with a confidence level (confirmed/likely/possible)"
+      - "backend/judge.py handles malformed/unparseable judge output without raising (_extract_json fallback to ERROR)"
+    manual_checks:
+      - "Confirm whether a judge calibration set (human-labelled bot answers vs. judge verdicts) exists and what agreement rate it shows"
+      - "Confirm whether 'possible'-confidence findings are actually excluded from customer-facing reports, per README.md's stated policy"
+    expected_evidence:
+      - "backend/judge.py"
+      - "README.md (Status: 'Judge calibration set — not started')"
+      - "PROJECT-STATE.md §7 (key numbers: judge agreement with human labels — not measured)"
+      - "docs/GREGOR-TARGET-LAB.md (calibration set ownership)"
+    assessment_criteria:
+      pass: "A calibration set exists, judge/human agreement has been measured and documented, and the deterministic layer plus confidence tiering are implemented and tested."
+      partial: "The judge has structural safeguards (deterministic layer, confidence levels, malformed-output fallback) but no calibration set has been run and no agreement rate has been measured."
+      fail: "The AI judge exists with no fallback, no confidence tiering, and no plan or evidence of validation."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+    note: >
+      Do not mark PASS on the basis that a judge implementation exists.
+      A PASS requires calibration evidence.
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-05
+    name: Target Authorization
+    description: >
+      Verify whether the system prevents active testing of targets the
+      requester does not control or own.
+    reference_standards:
+      - "ISO/IEC 42001"
+      - "ISO/IEC 27001"
+    automated_checks:
+      - "backend/models.py defines an OwnershipVerification entity"
+      - "backend/main.py's POST /api/scan endpoint checks ownership/authorization state before running an active ('api' mode) scan"
+      - "an automated test exists asserting that an unverified/invalid target is rejected"
+    manual_checks:
+      - "Confirm whether PLAYBOOK.md's Layer 2 rule ('active red team requires VERIFIED OWNERSHIP, no exceptions') is enforced in code or only stated as policy"
+      - "Confirm README.md's 'Not built yet' table entry for ownership verification against the current code"
+    expected_evidence:
+      - "backend/models.py (OwnershipVerification)"
+      - "backend/main.py (POST /api/scan)"
+      - "backend/scanner.py (Target, api mode)"
+      - "PLAYBOOK.md (Part II §4, two-layer architecture)"
+      - "README.md ('Not built yet': real DNS ownership verification)"
+    assessment_criteria:
+      pass: "The scan endpoint refuses to run an active scan against a target without a verified ownership record, and this is covered by an automated test."
+      partial: "An ownership/authorization data model exists, but the scan endpoint does not check it before executing an active scan."
+      fail: "No authorization or ownership-verification mechanism exists, or it exists purely as documentation with no enforcement in code."
+      na: "Not applicable — evaluate only if the deployment supports active ('api' mode) scanning of externally owned targets."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-06
+    name: Sensitive Data Protection
+    description: >
+      Verify the repository does not contain obviously exposed secrets, and
+      that logging/reporting paths do not echo sensitive values.
+    reference_standards:
+      - "ISO/IEC 27001"
+    automated_checks:
+      - ".env is excluded via .gitignore and is not present in git-tracked files"
+      - "no committed file matches common secret patterns (API keys, private key headers, AWS-style access keys)"
+      - "config.summary() reports whether an API key is set/not set, without printing its value"
+    manual_checks:
+      - "Confirm scan results/customer system prompts (results/, scans/, *.scan.json — trade secrets) are excluded from version control, per .gitignore"
+      - "Confirm governance/evidence/ and governance/reports/ do not themselves accumulate secret material over time"
+    expected_evidence:
+      - ".gitignore"
+      - "backend/config.py (summary())"
+      - ".env.example (placeholder only, no real key)"
+    assessment_criteria:
+      pass: "No secrets are committed, .gitignore excludes .env and customer scan data, and configuration surfaces only redacted state (set/not set)."
+      partial: "No secrets found, but coverage of the secret-scan patterns is narrow, or trade-secret exclusions (scan results) are not explicitly enforced."
+      fail: "A credential, key, or token is found committed in the repository."
+      na: "Not applicable."
+      unclear: "Automated scanning is necessarily incomplete (pattern-based); treat FAIL/PASS here as a lower bound, not a guarantee."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-07
+    name: Change Management
+    description: >
+      Verify that significant changes to the repository are traceable through
+      version control and, ideally, a review process.
+    reference_standards:
+      - "ISO/IEC 42001"
+      - "ISO/IEC 27001"
+    automated_checks:
+      - "the repository is a git repository with recorded commit history"
+      - "commit history contains merge commits corresponding to reviewed pull requests"
+      - "more than one branch exists, consistent with PLAYBOOK.md's per-person branch workflow"
+    manual_checks:
+      - "Confirm whether pull requests require review/approval before merge (this is a hosting-platform setting, not visible from a local clone)"
+      - "Confirm whether branch protection rules exist on `main`"
+    expected_evidence:
+      - "git log"
+      - "git branch -a"
+      - "PLAYBOOK.md (Part V §11, collaboration rules: 'everyone works in their own branch')"
+    assessment_criteria:
+      pass: "Commit history shows a consistent pull-request-and-merge workflow, branch protection is confirmed, and a documented contribution process exists."
+      partial: "Commit history shows PR merges and per-person branches, but branch protection/review enforcement cannot be confirmed from repository contents alone, and no CONTRIBUTING document exists."
+      fail: "No version control, or no evidence of any review process."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-08
+    name: Human Oversight
+    description: >
+      Verify whether critical or uncertain AI-driven findings can receive
+      human review, and whether responsibility for such review is assigned.
+    reference_standards:
+      - "ISO/IEC 42001"
+    automated_checks:
+      - "judge output structurally distinguishes confidence levels, enabling a human-review policy to key off them"
+      - "no automated mechanism auto-publishes a report without the possibility of review (i.e. no auto-send-to-customer code path)"
+    manual_checks:
+      - "Confirm README.md's stated policy that 'possible' confidence findings are omitted from reports is actually enforced in the report-rendering path (frontend/report.html), not just in prose"
+      - "Confirm PLAYBOOK.md's assignment of legal-wording review responsibility (Kwabena) and design-decision authority (Bogdan) as a documented human-oversight/responsibility model"
+      - "Confirm whether a mechanism exists for escalating a low-confidence or disputed finding for manual review"
+    expected_evidence:
+      - "backend/judge.py (confidence tiering)"
+      - "PLAYBOOK.md (Part V §11, role boundaries; Part IV §10, external review cycle)"
+      - "frontend/report.html"
+    assessment_criteria:
+      pass: "Confidence-based filtering is enforced at the point findings are rendered, and a documented, assigned review process exists for critical/uncertain findings."
+      partial: "A documented review/responsibility model and confidence tiering exist, but no in-product escalation or override mechanism exists for a specific finding."
+      fail: "No human review path exists for critical or uncertain findings, and no responsibility is documented."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-09
+    name: Evidence and Traceability
+    description: >
+      Verify that a finding can be connected back to the scan, attack,
+      target, timestamp, result and supporting evidence that produced it.
+    reference_standards:
+      - "ISO/IEC 42001"
+      - "ISO/IEC 27001"
+    automated_checks:
+      - "backend/scanner.py assigns a scan_id per run"
+      - "each result carries attack_id, category, severity, verdict, evidence, method and duration_ms"
+      - "backend/models.py persists Scan and Result rows with created_at timestamps and a foreign key chain (Result -> Scan -> Target -> Organization)"
+    manual_checks:
+      - "Confirm whether the target/judge model version is persisted alongside each Scan row, or only available globally via current config (PROJECT-STATE.md flags attack-library version as a requested-but-unimplemented report field)"
+      - "Confirm retention policy for stored scan evidence against PLAYBOOK.md's stated 'delete after scan' option for customer prompts"
+    expected_evidence:
+      - "backend/scanner.py (scan_id, results)"
+      - "backend/models.py (Scan, Result)"
+      - "PROJECT-STATE.md (open API request: report.attack_library_version)"
+    assessment_criteria:
+      pass: "Every finding traces to scan, attack, target, timestamp and evidence, and the attack-library/model version used is persisted alongside the scan record."
+      partial: "Findings trace to scan, attack, target, timestamp and evidence, but the attack-library/model version is not persisted per scan — only available from current, mutable global configuration."
+      fail: "Findings cannot be reliably traced back to the run that produced them."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: GOV-10
+    name: Regression and Monitoring
+    description: >
+      Verify that changes to the scanning/judging/scoring logic can be
+      tested for unintended regressions in a repeatable way.
+    reference_standards:
+      - "ISO/IEC 42001"
+      - "ISO/IEC 23894"
+    automated_checks:
+      - "at least one automated test directory/file exists outside of governance/ (backend or repository-level tests)"
+      - "a CI/CD configuration exists that runs tests on push/PR"
+      - "tests can be executed with a single documented command"
+    manual_checks:
+      - "Confirm whether a mutation-style check has ever been run against the judge (PLAYBOOK.md Part IV §9: 'green tests on existing code prove nothing... break the judge deliberately')"
+      - "Confirm whether monitoring exists for the deployed service beyond local `curl /api/health`"
+    expected_evidence:
+      - "backend/ (no test_*.py files found at time of writing)"
+      - ".github/ (no CI configuration found at time of writing)"
+      - "PLAYBOOK.md (Part IV §9, mutation-check rule)"
+    assessment_criteria:
+      pass: "Automated regression tests exist for backend logic, run in CI on every change, and a documented mutation check has been performed at least once."
+      partial: "Some automated checks exist (e.g. governance's own tests) but the product's core scanning/judging/scoring logic has no regression test suite and no CI."
+      fail: "No automated tests and no CI/CD exist anywhere in the repository for the product's core logic."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: LOG-01
+    name: Security and Application Logging
+    description: >
+      Verify that application errors and security-relevant events are logged
+      with severity and timestamp information, and that sensitive data is not
+      exposed in logs.
+    reference_standards:
+      - "ISO/IEC 27001"
+    automated_checks:
+      - "backend/ modules import Python's logging module or an equivalent structured logger"
+      - "error paths (e.g. scanner.py's _run_one exception handling) write to a log, not only to the in-memory result returned to the caller"
+    manual_checks:
+      - "Confirm what uvicorn's default access logging captures in production, and whether it is retained anywhere"
+      - "Confirm no full system prompts, canary secrets or customer answers are written to any log sink"
+    expected_evidence:
+      - "backend/scanner.py (_run_one exception handling)"
+      - "backend/main.py"
+    assessment_criteria:
+      pass: "Application and security-relevant events (scan errors, judge failures, provider errors) are written to a structured log with severity and timestamp, and sensitive values are excluded by design."
+      partial: "Errors are captured and returned in-band (e.g. as an ERROR verdict) but are not additionally logged to a durable, queryable sink."
+      fail: "No application logging exists; errors are silently swallowed or only visible in an interactive terminal."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
+
+  # ---------------------------------------------------------------------------
+  - id: LOG-02
+    name: Governance Audit Logging
+    description: >
+      Verify whether governance-relevant events (scan started/completed/failed,
+      authorization decisions, critical findings, configuration changes,
+      review/approval decisions) can be traced after the fact.
+    reference_standards:
+      - "ISO/IEC 42001"
+    automated_checks:
+      - "an audit-log table, event log, or equivalent append-only record exists in backend/models.py or elsewhere"
+      - "scan lifecycle events (start/complete/fail) are persisted, not only streamed to the requesting browser via NDJSON"
+    manual_checks:
+      - "Confirm whether the Scan/Result tables in backend/models.py are sufficient as a governance audit trail, or whether a dedicated audit-log entity is required"
+      - "Note: PLAYBOOK.md's data-model sketch (Part II §4) lists an 'AuditLog[]' entity on Organization; confirm whether it has been implemented"
+    expected_evidence:
+      - "backend/models.py"
+      - "backend/main.py (POST /api/scan streaming events)"
+      - "PLAYBOOK.md (Part II §4, data model sketch)"
+    assessment_criteria:
+      pass: "Governance-relevant events are persisted in an append-only, queryable record distinguishable from ordinary scan results."
+      partial: "Scan results are persisted (Scan/Result) and could support reconstruction of most events, but no dedicated audit-log entity exists, and NDJSON stream events are not durably stored."
+      fail: "Governance-relevant events cannot be reconstructed after the fact."
+      na: "Not applicable."
+      unclear: "Available evidence is insufficient for a reliable assessment."
