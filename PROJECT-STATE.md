@@ -15,7 +15,7 @@
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
 - ✅ Repository with a working backend: FastAPI, 21 attacks, two-layer judging, scoring, HTML frontend, mock mode
 - ✅ Playbook and role briefs written
-- ⬜ Repository renamed to `llmantis` ← **needs Vlad**: rename requires repo admin, Bogdan has push only
+- ✅ Repository renamed to `LLMantis` (Vlad, 15.08). GitHub keeps a redirect from the old name
 - ✅ Playbook, role briefs and brand merged into the engine repository
 - ✅ LICENSE added (AGPL-3.0)
 - ✅ Brand mark drawn (`Brand/`) — wordmark still needs outlining
@@ -23,7 +23,7 @@
 - ⬜ Name cleared at DPMA/EUIPO
 - ⬜ Legal map from Kwabena
 
-**Repository:** `github.com/VladvonTranssylvanien/promptguard` → rename to `llmantis`
+**Repository:** `github.com/VladvonTranssylvanien/LLMantis` (renamed 15.08; old URL redirects)
 **Visibility:** public, deliberately — see decision #11. Assume every word here is world-readable.
 
 ---
