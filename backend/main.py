@@ -347,8 +347,14 @@ async def list_attacks():
 
 
 @app.post("/api/attacks/reload")
-async def reload_attacks():
-    """Re-read attacks.yaml without restarting the server."""
+@limiter.limit("5/minute")
+async def reload_attacks(request: Request):
+    """
+    Re-read attacks.yaml without restarting the server. Not org-scoped and
+    doesn't touch or reveal customer data, so no login required — the
+    attack library is shared, global, non-secret content. Rate-limited
+    only to stop it being spammed.
+    """
     library = reload_library()
     return {"status": "reloaded", "total": len(library.attacks)}
 

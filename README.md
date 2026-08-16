@@ -103,6 +103,26 @@ no-signup demo path the course pitch depends on, and it never touches a
 live third-party system. An `X-API-Key` still works without a login token
 too (the key itself is already proof of the organization).
 
+### If the frontend runs on a different origin (CORS)
+
+Today everything is same-origin — FastAPI serves both the API and
+`frontend/*.html` — so no CORS headers exist, and none are needed. If a
+frontend build ever runs on its own dev server (Vite, etc.) on a different
+port, the browser will block its `fetch()` calls to this API until CORS is
+configured for that exact origin. Add it then, in `backend/main.py`, right
+after the rate-limiter setup — **never a wildcard**, especially with bearer
+tokens in play:
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # the frontend's real origin, not "*"
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
 ---
 
 ## Setup

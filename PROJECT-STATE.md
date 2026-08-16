@@ -120,6 +120,7 @@ that next) and the 21→75 attack library.
 | Gründungszuschuss | 🔴 **check NOW** if anyone is registered with the Agentur für Arbeit — the application goes in BEFORE Gewerbeanmeldung |
 | Mollie, payments | when the Gewerbe is registered — team decided 16.08 not to build even the schema until then |
 | ~~PDF export~~ | ✅ **done 16.08** — client-side print via `frontend/report.html`, no backend needed |
+| Email verification, password reset | when Brevo (or any EU email sender) is set up — same reasoning as Mollie: both need a real send-email credential that doesn't exist yet. Team decided 16.08 not to fake it with a console-logged token in the meantime |
 | Badge | after 10 customers |
 | CI/CD integration | when there is a Hetzner server to deploy to |
 | Voice AI agents | year 2 |
@@ -257,3 +258,41 @@ wait, and to leave the frontend for it to Bogdan. Closed technical debt #9:
 
 **Frontend for all of this — organizations, API keys, branding, ownership,
 login/register — is Bogdan's, not built here.** The API is ready for it.
+
+**16.08.2026 (later still) — Security hardening pass on auth.** Worked
+through a punch list from a review of the authentication system just built,
+one item at a time:
+
+1. **Role-based authorization** — any `Membership` role could do anything.
+   Sensitive actions (create/revoke API keys, change branding, ownership
+   verification) now require `admin` or `owner`; adding a new member
+   requires `owner`. Added `POST /api/organizations/{id}/members` — this
+   was missing entirely, so no org could have more than one member before
+   today. `GET /api/organizations/{id}` now actually returns its members
+   (the docstring already claimed it did).
+2. **Logout / token revocation** — JWTs had no invalidation path short of
+   waiting out the 24h expiry. `User.token_version`, embedded in every
+   token; `POST /api/auth/logout` bumps it, invalidating every token for
+   that account at once (no per-session targeting, deliberately simple).
+3. **Per-account brute-force lockout** — the per-IP rate limit on login
+   does nothing against a distributed or slow-paced attack on one account.
+   5 consecutive failures locks that account for 15 minutes regardless of
+   caller IP, even against the correct password.
+4. `POST /api/attacks/reload` had no rate limit at all — added one. Still
+   no login required (shared, non-secret, not org-scoped content).
+5. CORS: deliberately **not** added. Everything is same-origin today; a
+   wildcard policy would be a regression, not a fix. Documented in
+   README.md exactly how to add it correctly (specific origin, never `*`)
+   once a frontend needs it.
+6. **Deferred, not built:** email verification and password reset both
+   need a real send-email credential (Brevo, per the stack decision) that
+   doesn't exist yet — same reasoning as Mollie. Team decided not to fake
+   it with a console-logged token in the meantime.
+7. **HTTPS/TLS:** left entirely to whoever sets up the Hetzner deploy
+   (Bogdan) — nothing to fix in application code until there is a real
+   server and domain to get a certificate for.
+
+Every item verified live before moving to the next, same discipline as the
+rest of today: role permissions with three real accounts, logout with a
+real token before/after, lockout with 5 genuine failed attempts followed
+by a still-rejected correct password, then a successful unlock.
