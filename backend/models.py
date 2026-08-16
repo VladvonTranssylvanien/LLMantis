@@ -29,6 +29,8 @@ class Organization(Base):
     scans = relationship("Scan", back_populates="organization", cascade="all, delete-orphan")
     memberships = relationship("Membership", back_populates="organization", cascade="all, delete-orphan")
     api_keys = relationship("ApiKey", back_populates="organization", cascade="all, delete-orphan")
+    branding = relationship("Branding", back_populates="organization", uselist=False,
+                             cascade="all, delete-orphan")
 
 
 class Target(Base):
@@ -148,3 +150,25 @@ class ApiKey(Base):
     revoked_at = Column(DateTime, nullable=True)
 
     organization = relationship("Organization", back_populates="api_keys")
+
+
+class Branding(Base):
+    """
+    White-label settings for an agency reselling reports to its own clients.
+
+    One row per organization (or none — absence means "use LLMantis
+    branding as-is"). Everything here is cosmetic substitution for the
+    Pruefbericht and the report UI; it changes nothing about how a scan
+    runs or is scored.
+    """
+    __tablename__ = "branding"
+
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
+    display_name = Column(String(255), nullable=True)   # shown instead of "LLMantis"
+    logo_url = Column(Text, nullable=True)               # shown instead of the mantis mark
+    accent_color = Column(String(7), nullable=True)       # hex, e.g. "#7BE33F" — validated on write
+    support_email = Column(String(255), nullable=True)   # shown instead of kontakt@llmantis.de
+    custom_domain = Column(String(255), nullable=True)   # e.g. checks.agency.de — stored, not yet routed
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="branding")

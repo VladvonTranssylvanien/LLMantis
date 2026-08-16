@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime
 from urllib.parse import urlparse
 from uuid import uuid4, UUID
@@ -34,7 +35,7 @@ from . import config
 from .attacks import load_library, reload_library
 from .scanner import Target, detect_canary, run_scan
 from .database import SessionLocal, get_db
-from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
+from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult, Branding
 from .art50check import check_art50
 from .ownership import create_challenge, verify_ownership, is_domain_verified
 from .apikeys import (
@@ -367,6 +368,7 @@ async def get_organization(org_id: str, db: Session = Depends(get_db)):
         "name": org.name,
         "domain": org.domain,
         "created_at": org.created_at.isoformat(),
+        "branding": _branding_dict(org.branding),
         "scans": [
             {
                 "id": str(s.id),
@@ -378,6 +380,80 @@ async def get_organization(org_id: str, db: Session = Depends(get_db)):
             for s in scans
         ]
     }
+
+
+def _branding_dict(b: Branding | None) -> dict | None:
+    if b is None:
+        return None
+    return {
+        "display_name": b.display_name,
+        "logo_url": b.logo_url,
+        "accent_color": b.accent_color,
+        "support_email": b.support_email,
+        "custom_domain": b.custom_domain,
+        "updated_at": b.updated_at.isoformat(),
+    }
+
+
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+class BrandingRequest(BaseModel):
+    """Upsert white-label settings. Every field is optional — send only
+    what you want to set. Omitted fields keep their current value."""
+    display_name: str | None = None
+    logo_url: str | None = None
+    accent_color: str | None = None
+    support_email: str | None = None
+    custom_domain: str | None = None
+
+
+@app.put("/api/organizations/{org_id}/branding")
+async def upsert_branding(org_id: str, request: BrandingRequest, db: Session = Depends(get_db)):
+    """
+    Create or update white-label settings for an organization.
+
+    Cosmetic only — an agency's own logo, name and accent color on the
+    Pruefbericht and report UI. Nothing here changes how a scan runs.
+    """
+    try:
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    org = db.query(Organization).filter_by(id=org_uuid).first()
+    if not org:
+        raise HTTPException(404, f"Organization {org_id} not found")
+
+    if request.accent_color is not None and not HEX_COLOR_RE.match(request.accent_color):
+        raise HTTPException(400, "accent_color must be a hex color like '#7BE33F'")
+
+    branding = db.query(Branding).filter_by(org_id=org_uuid).first()
+    if branding is None:
+        branding = Branding(org_id=org_uuid)
+        db.add(branding)
+
+    for field in ("display_name", "logo_url", "accent_color", "support_email", "custom_domain"):
+        value = getattr(request, field)
+        if value is not None:
+            setattr(branding, field, value)
+    branding.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(branding)
+    return _branding_dict(branding)
+
+
+@app.get("/api/organizations/{org_id}/branding")
+async def get_branding(org_id: str, db: Session = Depends(get_db)):
+    """Get an organization's white-label settings, or null if none are set."""
+    try:
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    branding = db.query(Branding).filter_by(org_id=org_uuid).first()
+    return _branding_dict(branding)
 
 
 class ApiKeyCreateRequest(BaseModel):
