@@ -52,8 +52,10 @@ class OwnershipVerification(Base):
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     domain = Column(String(255), nullable=False)
     method = Column(String(50), nullable=False)
+    token = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default="pending")
     verified_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="ownership_verifications")

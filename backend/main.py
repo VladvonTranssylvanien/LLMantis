@@ -20,7 +20,8 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
-from uuid import uuid4
+from urllib.parse import urlparse
+from uuid import uuid4, UUID
 
 import yaml
 from fastapi import FastAPI, HTTPException, Depends
@@ -32,10 +33,10 @@ from sqlalchemy.orm import Session
 from . import config
 from .attacks import load_library, reload_library
 from .scanner import Target, detect_canary, run_scan
-from .database import SessionLocal
+from .database import SessionLocal, get_db
 from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
 from .art50check import check_art50
-from .ownership import create_challenge, verify_ownership
+from .ownership import create_challenge, verify_ownership, is_domain_verified
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
 
@@ -50,6 +51,10 @@ class ScanRequest(BaseModel):
     api_headers: dict = Field(default_factory=dict)
     canary: str | None = None
     categories: list[str] | None = None
+    # Required for mode="api": whose ownership-verified domain this is.
+    # Not needed for mode="prompt" — that only tests a copy of text the
+    # caller submitted themselves, never a live third-party endpoint.
+    org_id: str | None = None
 
 
 # ---------------------------------------------------------------------- helpers
@@ -211,11 +216,13 @@ async def art50_check(request: ScanRequest):
 
 class OwnershipChallengeRequest(BaseModel):
     """Request to generate ownership verification challenge."""
+    org_id: str
     domain: str
 
 
 class OwnershipVerifyRequest(BaseModel):
     """Request to verify ownership."""
+    org_id: str
     domain: str
     token: str
 
@@ -233,29 +240,43 @@ class OrganizationMemberRequest(BaseModel):
 
 
 @app.post("/api/ownership/challenge")
-async def ownership_challenge(request: OwnershipChallengeRequest):
+async def ownership_challenge(request: OwnershipChallengeRequest, db: Session = Depends(get_db)):
     """
-    Generate a DNS verification challenge.
+    Generate a DNS verification challenge, tied to one organization + domain.
 
     Returns: token and instructions for DNS TXT record.
 
     User adds: _llmantis.{domain} TXT {token}
-    Then calls /api/ownership/verify to confirm.
+    Then calls /api/ownership/verify to confirm. Verified records are what
+    /api/scan checks before allowing an active (mode="api") scan on that domain.
     """
-    result = await create_challenge(request.domain)
+    try:
+        org_uuid = UUID(request.org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    if not db.query(Organization).filter_by(id=org_uuid).first():
+        raise HTTPException(404, f"Organization {request.org_id} not found")
+
+    result = await create_challenge(db, org_uuid, request.domain)
     return result.dict()
 
 
 @app.post("/api/ownership/verify")
-async def ownership_verify(request: OwnershipVerifyRequest):
+async def ownership_verify(request: OwnershipVerifyRequest, db: Session = Depends(get_db)):
     """
-    Verify ownership by checking DNS TXT record.
+    Verify ownership by checking DNS TXT record against a pending challenge.
 
     Looks for: _llmantis.{domain} TXT {token}
 
     Returns: {"verified": true/false, "verified_at": "...", "error": "..."}
     """
-    result = await verify_ownership(request.domain, request.token)
+    try:
+        org_uuid = UUID(request.org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    result = await verify_ownership(db, org_uuid, request.domain, request.token)
     return result.dict()
 
 
@@ -263,7 +284,7 @@ async def ownership_verify(request: OwnershipVerifyRequest):
 
 
 @app.post("/api/organizations")
-async def create_organization(request: OrganizationCreateRequest, db: Session = Depends(lambda: SessionLocal())):
+async def create_organization(request: OrganizationCreateRequest, db: Session = Depends(get_db)):
     """
     Create a new organization.
 
@@ -288,7 +309,7 @@ async def create_organization(request: OrganizationCreateRequest, db: Session = 
 
 
 @app.get("/api/organizations")
-async def list_organizations(db: Session = Depends(lambda: SessionLocal())):
+async def list_organizations(db: Session = Depends(get_db)):
     """
     List all organizations.
 
@@ -310,14 +331,13 @@ async def list_organizations(db: Session = Depends(lambda: SessionLocal())):
 
 
 @app.get("/api/organizations/{org_id}")
-async def get_organization(org_id: str, db: Session = Depends(lambda: SessionLocal())):
+async def get_organization(org_id: str, db: Session = Depends(get_db)):
     """
     Get organization details with members and scans.
 
     Returns: {"id": "...", "name": "...", "members": [...], "scans": [...]}
     """
     try:
-        from uuid import UUID
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
@@ -347,7 +367,7 @@ async def get_organization(org_id: str, db: Session = Depends(lambda: SessionLoc
 
 
 @app.get("/api/scans")
-async def list_scans(db: Session = Depends(lambda: SessionLocal())):
+async def list_scans(db: Session = Depends(get_db)):
     """List all scans, most recent first."""
     scans = db.query(DBScan).order_by(DBScan.created_at.desc()).limit(100).all()
     return {
@@ -367,10 +387,9 @@ async def list_scans(db: Session = Depends(lambda: SessionLocal())):
 
 
 @app.get("/api/scans/{scan_id}")
-async def get_scan(scan_id: str, db: Session = Depends(lambda: SessionLocal())):
+async def get_scan(scan_id: str, db: Session = Depends(get_db)):
     """Get a specific scan with all its results."""
     try:
-        from uuid import UUID
         scan_uuid = UUID(scan_id)
     except ValueError:
         raise HTTPException(400, "Invalid scan_id format")
@@ -406,7 +425,7 @@ async def get_scan(scan_id: str, db: Session = Depends(lambda: SessionLocal())):
 
 
 @app.post("/api/scan")
-async def scan(request: ScanRequest):
+async def scan(request: ScanRequest, db: Session = Depends(get_db)):
     """
     Run a scan and stream results as NDJSON.
 
@@ -420,6 +439,32 @@ async def scan(request: ScanRequest):
         raise HTTPException(400, "system_prompt is required in prompt mode")
     if request.mode == "api" and not request.api_url.strip():
         raise HTTPException(400, "api_url is required in api mode")
+
+    # PLAYBOOK §5: active attacks (mode="api") against a real endpoint
+    # require verified ownership of that domain. mode="prompt" is exempt —
+    # it only replays text the caller submitted themselves, never a live
+    # third-party system.
+    if request.mode == "api":
+        if not request.org_id:
+            raise HTTPException(
+                403,
+                "org_id is required for mode='api'. Verify ownership of the "
+                "target domain first via /api/ownership/challenge and "
+                "/api/ownership/verify."
+            )
+        try:
+            org_uuid = UUID(request.org_id)
+        except ValueError:
+            raise HTTPException(400, "Invalid org_id format")
+
+        domain = urlparse(request.api_url).netloc or request.api_url
+        if not is_domain_verified(db, org_uuid, domain):
+            raise HTTPException(
+                403,
+                f"Ownership of '{domain}' is not verified for this organization. "
+                f"Active attacks are blocked until verification completes "
+                f"(POST /api/ownership/challenge, then /api/ownership/verify)."
+            )
 
     # If the caller did not tell us the secret, try to find it ourselves.
     # Without a canary, layer 1 of the judge cannot run at all.
