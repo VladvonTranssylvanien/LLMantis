@@ -1,3 +1,7 @@
+# Agents specific
+CLAUDE.md
+AGENTS.md
+
 # Never commit secrets
 .env
 .env.*
