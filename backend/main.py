@@ -216,6 +216,13 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
         raise HTTPException(400, "A valid email is required")
     if len(body.password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
+    # bcrypt hard-fails (raises, does not silently truncate) past 72 bytes -
+    # checked in bytes, not characters, since a password with accents or
+    # emoji can be more bytes than characters. Without this check, a long
+    # enough password crashes registration with a raw 500 instead of a
+    # clean 400.
+    if len(body.password.encode("utf-8")) > 72:
+        raise HTTPException(400, "Password must be at most 72 bytes")
     if db.query(User).filter_by(email=email).first():
         raise HTTPException(409, "An account with this email already exists")
 

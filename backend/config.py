@@ -61,13 +61,24 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis
 # also means every token becomes invalid (everyone logged out) on restart.
 # That's a deliberately annoying default: it forces a real secret before this
 # is ever mistaken for production-ready auth.
+#
+# MULTI-WORKER WARNING: this file runs once per process. With no JWT_SECRET
+# set and more than one uvicorn worker (`--workers N`), each worker generates
+# its OWN random secret independently — a token issued by worker A then
+# fails to validate on worker B, so logins appear to randomly fail depending
+# on which worker handles the request. This is exactly the "log in, get
+# logged out again for no reason" bug a multi-worker deploy would hit if
+# JWT_SECRET is still unset by then. Always set a real JWT_SECRET before
+# running more than one worker, for correctness as much as for security.
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 if not JWT_SECRET:
     JWT_SECRET = secrets.token_hex(32)
     print(
         "WARNING: JWT_SECRET not set in .env - using a random one-time secret. "
-        "Every login token will stop working on the next restart. "
-        "Set JWT_SECRET in .env before anything but local dev."
+        "Every login token will stop working on the next restart, and with "
+        "more than one uvicorn worker, logins will randomly fail depending on "
+        "which worker handles the request. Set JWT_SECRET in .env before "
+        "anything but single-worker local dev."
     )
 
 JWT_ALGORITHM = "HS256"
