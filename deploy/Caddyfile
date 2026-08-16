@@ -1,0 +1,34 @@
+# Caddy in front of LLMantis. Terminates TLS, gates the whole site behind a
+# password, and tells crawlers to stay away.
+#
+# Every value comes from the environment (deploy/.env on the server), so this
+# file holds no domain, no user and no hash and is safe in a public repo.
+
+{$LLMANTIS_DOMAIN} {
+	# The site is not public yet, and that is deliberate.
+	#
+	# frontend/impressum.html and frontend/datenschutz.html are still
+	# structural placeholders - 14 and 15 unfilled {{TOKEN}}s, both marked
+	# "not legally reviewed" in the page itself. The site also carries a
+	# Preise page with 29 EUR and 199 EUR on it, which makes it a commercial
+	# offering and triggers the Impressum duty under Section 5 DDG and the
+	# information duties under Art. 13 GDPR.
+	#
+	# Behind a password it is not a public offering, so those duties do not
+	# bite. Remove this block only once Kwabena has filled both pages.
+	basic_auth {
+		{$LLMANTIS_USER} {$LLMANTIS_PASSWORD_HASH}
+	}
+
+	header {
+		# Belt and braces next to the password: a crawler that somehow gets a
+		# response still must not index or archive it.
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		# Do not advertise what is running here.
+		-Server
+	}
+
+	# The app has no published port of its own - it is reachable only on the
+	# compose network, and only through this proxy.
+	reverse_proxy app:8000
+}
