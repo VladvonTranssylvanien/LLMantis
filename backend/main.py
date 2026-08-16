@@ -48,11 +48,18 @@ from . import config
 from .attacks import load_library, reload_library
 from .scanner import Target, detect_canary, run_scan
 from .database import SessionLocal, get_db
-from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult, Branding
+from .models import (
+    Organization, Target as DBTarget, Scan as DBScan, Result as DBResult,
+    Branding, User, Membership,
+)
 from .art50check import check_art50
 from .ownership import create_challenge, verify_ownership, is_domain_verified
 from .apikeys import (
     create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
+)
+from .auth import (
+    hash_password, verify_password, create_access_token,
+    get_current_user, get_current_user_optional, require_membership,
 )
 
 app = FastAPI(title="LLMantis", version="0.1.0")
@@ -180,6 +187,81 @@ async def _save_scan_to_db(db: Session, request: "ScanRequest", report: dict,
 
 # ------------------------------------------------------------------- API routes
 
+# -------------------------------------------------------------- AUTHENTICATION
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+@app.post("/api/auth/register")
+@limiter.limit("5/minute")
+async def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
+    """
+    Create an account. Does not create an organization — POST /api/organizations
+    does that, and requires being logged in first.
+    """
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "A valid email is required")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    if db.query(User).filter_by(email=email).first():
+        raise HTTPException(409, "An account with this email already exists")
+
+    user = User(id=uuid4(), email=email, password_hash=hash_password(body.password),
+                created_at=datetime.utcnow())
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token).dict()
+
+
+@app.post("/api/auth/login")
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
+    """Verify email + password, return a bearer token valid for JWT_EXPIRE_HOURS."""
+    email = body.email.strip().lower()
+    user = db.query(User).filter_by(email=email).first()
+
+    # Same error for "no such user" and "wrong password" - don't reveal
+    # which emails have an account.
+    if not user or not verify_password(body.password, user.password_hash):
+        raise HTTPException(401, "Invalid email or password")
+
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token).dict()
+
+
+@app.get("/api/auth/me")
+async def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Who am I, and which organizations do I belong to."""
+    memberships = db.query(Membership).filter_by(user_id=current_user.id).all()
+    orgs = []
+    for m in memberships:
+        org = db.query(Organization).filter_by(id=m.org_id).first()
+        if org:
+            orgs.append({"org_id": str(org.id), "name": org.name, "role": m.role})
+
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "organizations": orgs,
+    }
+
+
 @app.get("/api/health")
 async def health():
     library = load_library()
@@ -279,9 +361,11 @@ class OrganizationMemberRequest(BaseModel):
 
 @app.post("/api/ownership/challenge")
 @limiter.limit("10/minute")
-async def ownership_challenge(request: Request, body: OwnershipChallengeRequest, db: Session = Depends(get_db)):
+async def ownership_challenge(request: Request, body: OwnershipChallengeRequest, db: Session = Depends(get_db),
+                               current_user: User = Depends(get_current_user)):
     """
     Generate a DNS verification challenge, tied to one organization + domain.
+    Requires membership in that organization.
 
     Returns: token and instructions for DNS TXT record.
 
@@ -294,6 +378,8 @@ async def ownership_challenge(request: Request, body: OwnershipChallengeRequest,
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
+    require_membership(db, current_user, org_uuid)
+
     if not db.query(Organization).filter_by(id=org_uuid).first():
         raise HTTPException(404, f"Organization {body.org_id} not found")
 
@@ -303,9 +389,11 @@ async def ownership_challenge(request: Request, body: OwnershipChallengeRequest,
 
 @app.post("/api/ownership/verify")
 @limiter.limit("10/minute")
-async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: Session = Depends(get_db)):
+async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user)):
     """
     Verify ownership by checking DNS TXT record against a pending challenge.
+    Requires membership in that organization.
 
     Looks for: _llmantis.{domain} TXT {token}
 
@@ -316,6 +404,8 @@ async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: S
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
+    require_membership(db, current_user, org_uuid)
+
     result = await verify_ownership(db, org_uuid, body.domain, body.token)
     return result.dict()
 
@@ -325,9 +415,10 @@ async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: S
 
 @app.post("/api/organizations")
 @limiter.limit("10/minute")
-async def create_organization(request: Request, body: OrganizationCreateRequest, db: Session = Depends(get_db)):
+async def create_organization(request: Request, body: OrganizationCreateRequest, db: Session = Depends(get_db),
+                               current_user: User = Depends(get_current_user)):
     """
-    Create a new organization.
+    Create a new organization. The caller becomes its owner.
 
     Returns: {"id": "...", "name": "...", "domain": "...", "created_at": "..."}
     """
@@ -338,6 +429,10 @@ async def create_organization(request: Request, body: OrganizationCreateRequest,
         created_at=datetime.utcnow()
     )
     db.add(org)
+    db.flush()  # need org.id before the Membership row
+
+    db.add(Membership(user_id=current_user.id, org_id=org.id, role="owner",
+                       created_at=datetime.utcnow()))
     db.commit()
     db.refresh(org)
 
@@ -350,13 +445,18 @@ async def create_organization(request: Request, body: OrganizationCreateRequest,
 
 
 @app.get("/api/organizations")
-async def list_organizations(db: Session = Depends(get_db)):
+async def list_organizations(db: Session = Depends(get_db),
+                              current_user: User = Depends(get_current_user)):
     """
-    List all organizations.
+    List organizations the caller belongs to — not every organization in
+    the system. (Used to return everyone's orgs; that was the first step
+    of a chain that let anyone mint an API key for any organization.)
 
     Returns: {"total": N, "organizations": [...]}
     """
-    orgs = db.query(Organization).all()
+    memberships = db.query(Membership).filter_by(user_id=current_user.id).all()
+    org_ids = [m.org_id for m in memberships]
+    orgs = db.query(Organization).filter(Organization.id.in_(org_ids)).all() if org_ids else []
     return {
         "total": len(orgs),
         "organizations": [
@@ -372,9 +472,10 @@ async def list_organizations(db: Session = Depends(get_db)):
 
 
 @app.get("/api/organizations/{org_id}")
-async def get_organization(org_id: str, db: Session = Depends(get_db)):
+async def get_organization(org_id: str, db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
     """
-    Get organization details with members and scans.
+    Get organization details with members and scans. Requires membership.
 
     Returns: {"id": "...", "name": "...", "members": [...], "scans": [...]}
     """
@@ -382,6 +483,8 @@ async def get_organization(org_id: str, db: Session = Depends(get_db)):
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
+
+    require_membership(db, current_user, org_uuid)
 
     org = db.query(Organization).filter_by(id=org_uuid).first()
     if not org:
@@ -435,9 +538,11 @@ class BrandingRequest(BaseModel):
 
 
 @app.put("/api/organizations/{org_id}/branding")
-async def upsert_branding(org_id: str, request: BrandingRequest, db: Session = Depends(get_db)):
+async def upsert_branding(org_id: str, body: BrandingRequest, db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
     """
-    Create or update white-label settings for an organization.
+    Create or update white-label settings for an organization. Requires
+    membership in that organization.
 
     Cosmetic only — an agency's own logo, name and accent color on the
     Pruefbericht and report UI. Nothing here changes how a scan runs.
@@ -447,11 +552,13 @@ async def upsert_branding(org_id: str, request: BrandingRequest, db: Session = D
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
+    require_membership(db, current_user, org_uuid)
+
     org = db.query(Organization).filter_by(id=org_uuid).first()
     if not org:
         raise HTTPException(404, f"Organization {org_id} not found")
 
-    if request.accent_color is not None and not HEX_COLOR_RE.match(request.accent_color):
+    if body.accent_color is not None and not HEX_COLOR_RE.match(body.accent_color):
         raise HTTPException(400, "accent_color must be a hex color like '#7BE33F'")
 
     branding = db.query(Branding).filter_by(org_id=org_uuid).first()
@@ -460,7 +567,7 @@ async def upsert_branding(org_id: str, request: BrandingRequest, db: Session = D
         db.add(branding)
 
     for field in ("display_name", "logo_url", "accent_color", "support_email", "custom_domain"):
-        value = getattr(request, field)
+        value = getattr(body, field)
         if value is not None:
             setattr(branding, field, value)
     branding.updated_at = datetime.utcnow()
@@ -471,12 +578,16 @@ async def upsert_branding(org_id: str, request: BrandingRequest, db: Session = D
 
 
 @app.get("/api/organizations/{org_id}/branding")
-async def get_branding(org_id: str, db: Session = Depends(get_db)):
-    """Get an organization's white-label settings, or null if none are set."""
+async def get_branding(org_id: str, db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
+    """Get an organization's white-label settings, or null if none are set.
+    Requires membership in that organization."""
     try:
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
+
+    require_membership(db, current_user, org_uuid)
 
     branding = db.query(Branding).filter_by(org_id=org_uuid).first()
     return _branding_dict(branding)
@@ -490,9 +601,12 @@ class ApiKeyCreateRequest(BaseModel):
 
 @app.post("/api/keys")
 @limiter.limit("10/minute")
-async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = Depends(get_db)):
+async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
     """
-    Create a new API key for an organization.
+    Create a new API key for an organization. Requires membership in that
+    organization — this used to be the whole hole: anyone could mint a key
+    for any org_id, no proof of ownership required at all.
 
     Returns the plaintext key ONCE — it is never shown or recoverable
     again after this response. Store it now; to rotate, revoke this one
@@ -502,6 +616,8 @@ async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = 
         org_uuid = UUID(body.org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
+
+    require_membership(db, current_user, org_uuid)
 
     if not db.query(Organization).filter_by(id=org_uuid).first():
         raise HTTPException(404, f"Organization {body.org_id} not found")
@@ -513,28 +629,36 @@ async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = 
 
 
 @app.get("/api/keys")
-async def get_keys(org_id: str, db: Session = Depends(get_db)):
+async def get_keys(org_id: str, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user)):
     """
     List an organization's API keys — never the plaintext or the hash,
     only enough to tell them apart (name, prefix, last used, revoked).
+    Requires membership in that organization.
     """
     try:
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
+    require_membership(db, current_user, org_uuid)
+
     keys = list_api_keys(db, org_uuid)
     return {"total": len(keys), "keys": [k.dict() for k in keys]}
 
 
 @app.delete("/api/keys/{key_id}")
-async def delete_key(key_id: str, org_id: str, db: Session = Depends(get_db)):
-    """Revoke an API key. Soft delete — the row stays, revoked_at is set."""
+async def delete_key(key_id: str, org_id: str, db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
+    """Revoke an API key. Soft delete — the row stays, revoked_at is set.
+    Requires membership in that organization."""
     try:
         key_uuid = UUID(key_id)
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid id format")
+
+    require_membership(db, current_user, org_uuid)
 
     if not revoke_api_key(db, key_uuid, org_uuid):
         raise HTTPException(404, "API key not found for this organization")
@@ -542,9 +666,22 @@ async def delete_key(key_id: str, org_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/api/scans")
-async def list_scans(db: Session = Depends(get_db)):
-    """List all scans, most recent first."""
-    scans = db.query(DBScan).order_by(DBScan.created_at.desc()).limit(100).all()
+async def list_scans(db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
+    """List scans belonging to organizations the caller is a member of,
+    most recent first. (Used to return every scan in the system to anyone —
+    including the confidential `evidence` a scan captured.)"""
+    org_ids = [m.org_id for m in db.query(Membership).filter_by(user_id=current_user.id).all()]
+    if not org_ids:
+        return {"total": 0, "scans": []}
+
+    scans = (
+        db.query(DBScan)
+        .filter(DBScan.org_id.in_(org_ids))
+        .order_by(DBScan.created_at.desc())
+        .limit(100)
+        .all()
+    )
     return {
         "total": len(scans),
         "scans": [
@@ -563,8 +700,11 @@ async def list_scans(db: Session = Depends(get_db)):
 
 
 @app.get("/api/scans/{scan_id}")
-async def get_scan(scan_id: str, db: Session = Depends(get_db)):
-    """Get a specific scan with all its results."""
+async def get_scan(scan_id: str, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user)):
+    """Get a specific scan with all its results. 404s (not 403) for a scan
+    that exists but belongs to an org the caller isn't a member of — so
+    probing scan ids can't distinguish "not yours" from "doesn't exist"."""
     try:
         scan_uuid = UUID(scan_id)
     except ValueError:
@@ -572,6 +712,9 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
 
     scan = db.query(DBScan).filter_by(id=scan_uuid).first()
     if not scan:
+        raise HTTPException(404, f"Scan {scan_id} not found")
+
+    if not db.query(Membership).filter_by(user_id=current_user.id, org_id=scan.org_id).first():
         raise HTTPException(404, f"Scan {scan_id} not found")
 
     results = db.query(DBResult).filter_by(scan_id=scan_uuid).all()
@@ -606,7 +749,8 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
 @app.post("/api/scan")
 @limiter.limit("5/minute")
 async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db),
-                api_key_org: UUID | None = Depends(resolve_org_from_api_key)):
+                api_key_org: UUID | None = Depends(resolve_org_from_api_key),
+                current_user: User | None = Depends(get_current_user_optional)):
     """
     Run a scan and stream results as NDJSON.
 
@@ -619,8 +763,12 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
     ORGANIZATION RESOLUTION
         An X-API-Key header (if valid) always wins — that is how a CI/CD
         pipeline gets its scans attributed without knowing its own org_id.
-        Otherwise we use body.org_id if given, and only fall back to the
-        anonymous demo org for an unidentified mode="prompt" call.
+        Otherwise body.org_id is honoured only for a logged-in caller who
+        is a member of that org (this used to accept any org_id from
+        anyone — the same hole as the old /api/keys). A mode="prompt" call
+        with neither stays fully anonymous and unauthenticated on purpose:
+        that's the free, no-signup demo path, and it never touches a live
+        third-party system, so there is nothing to protect.
 
     RATE LIMIT
         5/minute per IP — each call makes ~21 real Mistral API calls, so
@@ -637,6 +785,15 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
             effective_org_id = UUID(body.org_id)
         except ValueError:
             raise HTTPException(400, "Invalid org_id format")
+        # org_id came from the request body, not a verified API key — the
+        # caller must prove they belong to that org before we act as it.
+        if current_user is None:
+            raise HTTPException(
+                401,
+                "Log in (Authorization: Bearer <token>) to run a scan as this "
+                "organization, or omit org_id, or use a valid X-API-Key."
+            )
+        require_membership(db, current_user, effective_org_id)
 
     # PLAYBOOK §5: active attacks (mode="api") against a real endpoint
     # require verified ownership of that domain. mode="prompt" is exempt —

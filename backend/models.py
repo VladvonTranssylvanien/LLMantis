@@ -52,22 +52,36 @@ class Target(Base):
     scans = relationship("Scan", back_populates="target", cascade="all, delete-orphan")
 
 
+class User(Base):
+    """A person who can log in. Separate from Organization on purpose —
+    one person can belong to more than one org, via Membership."""
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    email = Column(String(255), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    memberships = relationship("Membership", back_populates="user", cascade="all, delete-orphan")
+
+
 class Membership(Base):
     """
     Links a user to an organization with a role.
 
-    No separate `users` table yet — user_id is a bare UUID until real
-    authentication exists. This table is the schema groundwork the
-    implementation plan calls for on day one, so the agency/multi-user
-    tier is a new row later, not a backend rewrite.
+    This table is the schema groundwork the implementation plan called for
+    on day one, so the agency/multi-user tier is a new row later, not a
+    backend rewrite. Built 16.08 with no `users` table yet; wired to real
+    authentication the same day `User` was added.
     """
     __tablename__ = "memberships"
 
-    user_id = Column(UUID(as_uuid=True), primary_key=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
     role = Column(String(50), nullable=False)  # "owner" | "admin" | "member"
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
+    user = relationship("User", back_populates="memberships")
     organization = relationship("Organization", back_populates="memberships")
 
 

@@ -101,8 +101,10 @@ alembic upgrade head              # in case someone added a migration
 docker compose up -d              # in case Postgres isn't already running
 ```
 
-## 🔴 Before you run this anywhere but localhost
+## Auth, if you're building frontend for it
 
-There is no authentication yet — any caller can act as any organization. See
-`PROJECT-STATE.md` technical debt #9 and `README.md` §Status. Do not expose
-this server to the public internet until that's resolved.
+`POST /api/auth/register` / `/login` return `{"access_token": "...", "token_type": "bearer"}`.
+Send it back as `Authorization: Bearer <token>` on any 🔒 endpoint (see the
+table in `README.md`). Set a real `JWT_SECRET` in `.env` — leaving it empty
+logs everyone out on every server restart (that's the intended dev default,
+not a bug).

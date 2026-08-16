@@ -72,6 +72,10 @@ _Last verified against the running code: 16.08.2026._
 - Free, passive Art.-50-Check with its own page (`frontend/art50check.html`),
   verified against real sites
 - Per-IP rate limiting on every write endpoint (`slowapi`)
+- **Authentication** — email/password (bcrypt) + JWT bearer tokens. Every
+  org-scoped endpoint (organizations, API keys, branding, ownership,
+  scan history) requires membership in that org. The free, no-signup scan
+  path (`mode="prompt"`, no `org_id`) is untouched — see "Authentication" below
 - Mock mode still works - build and test with no API key and no cost
 
 **Not built yet:**
@@ -80,19 +84,24 @@ _Last verified against the running code: 16.08.2026._
 |---|---|---|
 | Attacks 21 to 75 | 21 of 75 | Attack Engineer |
 | Judge calibration set | not started | Attack Engineer |
-| Frontend for organizations / API keys / branding / ownership | not started | Frontend |
-| Authentication | **not started — see below** | team decision pending |
+| Frontend for auth / organizations / API keys / branding / ownership | not started | Bogdan |
 | Billing (Mollie) | deferred until Gewerbe is registered | — |
 | CI/CD → Hetzner deploy | deferred until there is a server | — |
 
-### 🔴 No authentication — read this before running anything beyond localhost
+### Authentication
 
-Every endpoint trusts whatever `org_id` a caller sends; there is no login, no
-session, nothing that proves a caller is who they claim. This is fine for a
-localhost demo. **Hard rule: do not expose this server to the public internet
-until this is fixed.** See `PROJECT-STATE.md` technical debt #9. The team is
-deciding the approach together — this is not a "someone forgot", it is a
-known, accepted gap while the course PoC was the priority.
+`POST /api/auth/register` / `/login` return a JWT bearer token
+(`Authorization: Bearer <token>`), valid `JWT_EXPIRE_HOURS` (default 24).
+`GET /api/auth/me` lists the organizations you belong to and your role in
+each. Creating an organization makes you its owner; every other org-scoped
+endpoint requires a `Membership` row for the `org_id` you're acting on, or
+it's a 403.
+
+**Still anonymous on purpose:** `POST /api/scan` with `mode="prompt"` and no
+`org_id` and no `X-API-Key` needs no login at all — that's the free,
+no-signup demo path the course pitch depends on, and it never touches a
+live third-party system. An `X-API-Key` still works without a login token
+too (the key itself is already proof of the organization).
 
 ---
 
@@ -229,30 +238,29 @@ Each file does one thing, so four people can work without colliding.
 
 ### API
 
+🔒 = requires `Authorization: Bearer <token>` and membership in the `org_id` involved.
+
 | Endpoint | What it does |
 |---|---|
 | `GET /api/health` | server status and config |
 | `GET /api/attacks` | the attack library |
 | `POST /api/attacks/reload` | re-read attacks.yaml without restarting |
 | `GET /api/targets` | the demo bots |
-| `POST /api/scan` | run a scan, streams NDJSON as each attack finishes (5/min per IP) |
-| `POST /api/art50check` | passive Art. 50 check on any URL (20/min per IP) |
-| `POST /api/ownership/challenge` | generate a DNS TXT verification token |
-| `POST /api/ownership/verify` | check the DNS TXT record, mark verified |
-| `POST` / `GET /api/organizations` | create / list organizations |
-| `GET /api/organizations/{id}` | org details + its scans + branding |
-| `PUT` / `GET /api/organizations/{id}/branding` | white-label settings |
-| `POST /api/keys` | issue an API key (plaintext shown once) |
-| `GET /api/keys?org_id=` | list an org's keys (never the plaintext) |
-| `DELETE /api/keys/{id}?org_id=` | revoke a key |
-| `GET /api/scans` / `GET /api/scans/{id}` | scan history from Postgres |
+| `POST /api/auth/register` / `/login` | create an account / get a bearer token |
+| `GET /api/auth/me` 🔒 | who you are, and which orgs you belong to |
+| `POST /api/scan` | run a scan, streams NDJSON (5/min per IP). Anonymous for `mode="prompt"` with no `org_id`; 🔒 if `org_id` is given (or a valid `X-API-Key` instead) |
+| `POST /api/art50check` | passive Art. 50 check on any URL (20/min per IP) — always anonymous, by design |
+| `POST /api/ownership/challenge` 🔒 / `/verify` 🔒 | generate / check a DNS TXT verification token |
+| `POST` 🔒 / `GET` 🔒 `/api/organizations` | create (caller becomes owner) / list *your* organizations |
+| `GET /api/organizations/{id}` 🔒 | org details + its scans + branding |
+| `PUT` 🔒 / `GET` 🔒 `/api/organizations/{id}/branding` | white-label settings |
+| `POST /api/keys` 🔒 | issue an API key (plaintext shown once) |
+| `GET /api/keys?org_id=` 🔒 | list an org's keys (never the plaintext) |
+| `DELETE /api/keys/{id}?org_id=` 🔒 | revoke a key |
+| `GET /api/scans` 🔒 / `GET /api/scans/{id}` 🔒 | scan history — scoped to your orgs |
 
 `/api/scan` streams because a scan takes seconds. Without streaming the demo
 would show a frozen screen instead of a moving progress bar.
-
-⚠️ None of the endpoints above check that the caller is authorized for the
-`org_id` they send — see "No authentication" above. Fine for localhost; not
-fine for anything else yet.
 
 ---
 
@@ -279,18 +287,19 @@ To add an attack, copy an existing block and change it. Then:
 
 Owns `backend/**`, the database schema, the API.
 
-- Authentication — the one open item blocking anything beyond localhost.
-  `Membership` (user_id, org_id, role) already exists in `models.py`, unused;
-  no `User` table, no login, no session/JWT. Team decision on approach pending.
-- Frontend for organizations / API keys / branding / ownership — all three
-  work via curl today, none has a UI.
+- Backend work is functionally complete for now — see Status above.
+  Authentication (`backend/auth.py`) is done: register/login/me, JWT bearer
+  tokens, `Membership`-based authorization on every org-scoped endpoint.
 
 ### Frontend
 
 Owns `frontend/**`. Each page is a single file, no build step, no npm.
 
-- Build a UI for organizations, API keys, branding and ownership verification
-  — `index.html` and `art50check.html` are the only pages with one.
+- Build a UI for login/register, organizations, API keys, branding and
+  ownership verification — `index.html` and `art50check.html` are the only
+  pages with one today. The API is ready (see the 🔒 endpoint table above);
+  a page just needs to store the bearer token (e.g. `localStorage`) and send
+  `Authorization: Bearer <token>` on the 🔒 requests.
 - Polish for a projector: bigger type, higher contrast, tested from the back
   of a room.
 

@@ -7,6 +7,7 @@ to look when something needs changing.
 """
 
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -52,6 +53,25 @@ FRONTEND_DIR = ROOT / "frontend"
 
 # --- Database ----------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis")
+
+
+# --- Auth ------------------------------------------------------------------
+# Signs login tokens (JWT). MUST be set explicitly outside dev — if it isn't,
+# we generate a random one on every startup so the app still runs, but that
+# also means every token becomes invalid (everyone logged out) on restart.
+# That's a deliberately annoying default: it forces a real secret before this
+# is ever mistaken for production-ready auth.
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    JWT_SECRET = secrets.token_hex(32)
+    print(
+        "WARNING: JWT_SECRET not set in .env - using a random one-time secret. "
+        "Every login token will stop working on the next restart. "
+        "Set JWT_SECRET in .env before anything but local dev."
+    )
+
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 
 def summary() -> str:

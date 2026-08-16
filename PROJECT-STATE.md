@@ -11,8 +11,9 @@
 
 **Status:** week 1, track A (course submission in 7 days) — **backend/API work for
 Vlad's implementation plan is functionally complete** (P0 + P1 + the P2 items
-that don't need a registered company). Remaining gaps are frontend UI for the
-newer endpoints, the 21→75 attack library, and authentication.
+that don't need a registered company), **including authentication**. Remaining
+gaps are frontend UI for the newer endpoints (a deliberate choice — Bogdan owns
+that next) and the 21→75 attack library.
 
 - ✅ Idea chosen and justified with market data (ECA Mapping 2025)
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
@@ -34,7 +35,8 @@ newer endpoints, the 21→75 attack library, and authentication.
 - ✅ **Security pass done** (16.08): no secrets in git history or code, no
   SQL injection, no XSS, SSRF fixed, `requirements.txt` fixed (was missing
   sqlalchemy/alembic/psycopg/dnspython — a fresh clone would not have started)
-- 🔴 **No authentication** — see technical debt #9. Team deciding the approach
+- ✅ **Authentication** (16.08) — `User` table, bcrypt + JWT, every org-scoped
+  endpoint requires membership. The free anonymous scan path is untouched
 - ⬜ Hypothesis tested on 24 sites ← **blocks the pitch**
 - ⬜ Name cleared at DPMA/EUIPO
 - ⬜ Legal map from Kwabena
@@ -104,7 +106,7 @@ newer endpoints, the 21→75 attack library, and authentication.
 | 6 | Rename the Notion page | this week | Bogdan |
 | 8 | **Original illustrated mark** — the geometric mark is the brand and ships as final; an illustrated one may replace it. Owner: Bogdan, no date | open | Bogdan |
 | 7 | ✅ **RESOLVED** (verified 16.08) ~~README §Scoring contradicts decision #8~~ — `backend/scoring.py` caps at **C** and applies `CONFIDENCE_WEIGHT` multipliers (confirmed/likely/possible), matching README and decision #8. No contradiction found; this must have been fixed during the P0 confidence-levels work | ~~with P0~~ | Vlad |
-| 9 | 🔴 **No authentication layer.** Every API endpoint trusts whatever `org_id` the caller sends — there is no login, session or proof that a caller is who they claim. `Membership` table exists (see #4) but nothing reads it yet. This is fine for a localhost PoC only. **Hard rule: this server must never be reachable from the public internet until this is fixed.** Team to decide the approach together before that changes | before any non-localhost deployment | team decision pending |
+| 9 | ✅ **DONE 16.08** ~~No authentication layer~~ — `POST/GET /api/auth/{register,login,me}` (bcrypt + JWT bearer tokens), every org-scoped endpoint now calls `require_membership()`. `mode="prompt"` scans with no `org_id` and no `X-API-Key` stay fully anonymous on purpose — that's the free demo path and it never touches a live third-party system. Anything that acts *as* an organization (creating one, minting a key, reading scan history, verifying ownership, `mode="api"` or `mode="prompt"` with an `org_id`) now requires a valid token and membership | ~~before any non-localhost deployment~~ | Vlad |
 | 10 | Frontend for organizations, API keys, branding and ownership verification — all four work today via curl only. `index.html` and `art50check.html` are the only pages with a UI | after auth (building a UI for endpoints anyone can call as anyone else is wasted work) | Frontend |
 | 11 | 21 → 75 attacks in `attacks/attacks.yaml` (5 categories × 15) | with Gregor | Attack Engineer |
 
@@ -209,6 +211,49 @@ decided to defer:
   told people to get an Anthropic key)
 
 **What's left of Vlad's plan:** frontend for organizations/API keys/branding/
-ownership (tech debt #10), 21→75 attacks (#11, Gregor's side), then
-authentication, then Mollie billing and CI/CD — both intentionally deferred
-until the Gewerbe is registered.
+ownership (tech debt #10, Bogdan's), 21→75 attacks (#11, Gregor's side), then
+Mollie billing and CI/CD — both intentionally deferred until the Gewerbe is
+registered.
+
+**16.08.2026 (later) — Authentication.** Team decided to build it rather than
+wait, and to leave the frontend for it to Bogdan. Closed technical debt #9:
+
+- New `User` table (email, password_hash, bcrypt) and `backend/auth.py`:
+  `POST /api/auth/register`, `POST /api/auth/login` (both rate-limited),
+  `GET /api/auth/me`. Sessions are JWT bearer tokens (`Authorization: Bearer
+  <token>`), not cookies — the frontend is fetch()-based already, and a
+  bearer token sidesteps CSRF entirely since the browser never sends it
+  automatically. `JWT_SECRET` in `.env`; if unset the app generates a random
+  one at startup and logs everyone out on every restart, on purpose — a
+  deliberately annoying default so a real secret gets set before this is
+  mistaken for production-ready.
+- `Membership` (built earlier today, unused until now) is the authorization
+  source of truth: `require_membership(db, user, org_id)` raises 403 if the
+  caller isn't a member. Wired into every org-scoped endpoint — creating an
+  org (creator becomes owner automatically), listing/reading orgs, branding,
+  ownership challenge/verify, and — the one that mattered most — issuing,
+  listing and revoking API keys. **This closes the exact hole found in this
+  morning's security pass:** anyone could mint a working API key for any
+  `org_id` with zero proof of ownership. Verified live with two accounts: an
+  "attacker" cannot create a key for the "victim" org (403), the real owner
+  can (200) for their own.
+- `GET /api/scans` and `/api/scans/{id}` now scope to the caller's orgs
+  instead of returning every scan in the system (including the confidential
+  `evidence` a scan captured). A scan belonging to someone else's org 404s,
+  not 403s, so probing scan ids can't distinguish "not yours" from "doesn't
+  exist".
+- **The free demo path is untouched on purpose:** `POST /api/scan` with
+  `mode="prompt"` and no `org_id` and no `X-API-Key` still needs no login at
+  all — that's the course-pitch demo, and it only ever replays text the
+  caller submitted themselves, never a live third-party system. `org_id` in
+  the body is now honoured only for a logged-in member of that org; an
+  `X-API-Key` still works exactly as before (the key itself is already proof
+  of the org, no separate login needed on top of it) — verified both paths
+  still work end to end after the change.
+- Verified with 13 separate checks (register/login/me, org creation with and
+  without login, the API-key mint attack across two accounts, anonymous scan,
+  scan with org_id unauthenticated/non-member/owner, scan history scoping,
+  the API-key scan path) before calling this done.
+
+**Frontend for all of this — organizations, API keys, branding, ownership,
+login/register — is Bogdan's, not built here.** The API is ready for it.
