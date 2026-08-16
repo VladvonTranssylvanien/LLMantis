@@ -21,9 +21,13 @@ load_dotenv(ROOT / ".env")
 
 
 # --- Which LLM we talk to ------------------------------------------------
-# "mock"      fake responses, no API key, no cost - use this while developing
-# "mistral"   real Mistral (France/EU), needs MISTRAL_API_KEY - REQUIRED for production
-PROVIDER = os.getenv("PROVIDER", "mock").lower()
+# "mistral" is the only value llm.py accepts. Needs MISTRAL_API_KEY.
+#
+# "mock" was removed from _PROVIDERS during the Mistral migration but stayed
+# the default here, so a scan run by anyone following SETUP.md returned
+# 21 errors out of 21 and no grade - under HTTP 200, which is why neither a
+# status code nor a grep showed it.
+PROVIDER = os.getenv("PROVIDER", "mistral").lower()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 

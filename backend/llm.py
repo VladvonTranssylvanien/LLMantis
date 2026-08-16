@@ -4,11 +4,9 @@ The only place in the project that talks to an AI model.
 Everything else calls chat() and gets text back. It does not know or care
 which provider is behind it. Swap providers here, nowhere else.
 
-MOCK MODE
-    PROVIDER=mock returns canned answers instead of calling an API.
-    The fake bot is deliberately LEAKY, so the scanner produces realistic
-    failures. This lets the whole team build and test with no API key
-    and no cost.
+There is no mock provider. It was removed with the Anthropic code during the
+Mistral migration; _PROVIDERS below is the whole list. A MISTRAL_API_KEY is
+required for any scan to produce a grade.
 """
 
 from __future__ import annotations
