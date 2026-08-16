@@ -64,6 +64,11 @@ class User(Base):
     # issued before the bump, all at once — logout, without a separate
     # table of revoked token ids to store and clean up.
     token_version = Column(Integer, nullable=False, default=0)
+    # Per-account brute-force lockout. Rate limiting on /api/auth/login is
+    # per-IP — it does nothing against a distributed attack, or one paced
+    # just under the limit, targeting one account. Reset to 0 on success.
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     memberships = relationship("Membership", back_populates="user", cascade="all, delete-orphan")

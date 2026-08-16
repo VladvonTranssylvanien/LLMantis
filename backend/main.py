@@ -29,7 +29,7 @@ WHY /api/scan STREAMS
 import asyncio
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 from uuid import uuid4, UUID
 
@@ -229,12 +229,28 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
     return TokenResponse(access_token=token).dict()
 
 
+LOGIN_LOCKOUT_THRESHOLD = 5
+LOGIN_LOCKOUT_DURATION = timedelta(minutes=15)
+
+
 @app.post("/api/auth/login")
 @limiter.limit("10/minute")
 async def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    """Verify email + password, return a bearer token valid for JWT_EXPIRE_HOURS."""
+    """
+    Verify email + password, return a bearer token valid for JWT_EXPIRE_HOURS.
+
+    Per-account lockout, on top of the per-IP rate limit above: the rate
+    limit does nothing against a distributed attack, or one paced just
+    under the limit, that targets one account from many IPs. After
+    LOGIN_LOCKOUT_THRESHOLD consecutive failures this account stops
+    accepting attempts for LOGIN_LOCKOUT_DURATION, regardless of caller IP.
+    """
     email = body.email.strip().lower()
     user = db.query(User).filter_by(email=email).first()
+
+    if user and user.locked_until and user.locked_until > datetime.utcnow():
+        remaining_min = max(1, int((user.locked_until - datetime.utcnow()).total_seconds() // 60) + 1)
+        raise HTTPException(429, f"Too many failed attempts. Try again in {remaining_min} minute(s).")
 
     # Run bcrypt unconditionally, even for a nonexistent email (against a
     # fixed dummy hash) - otherwise this short-circuits before bcrypt runs,
@@ -245,7 +261,17 @@ async def login(request: Request, body: LoginRequest, db: Session = Depends(get_
     password_ok = verify_password(body.password, password_hash)
 
     if not user or not password_ok:
+        if user:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= LOGIN_LOCKOUT_THRESHOLD:
+                user.locked_until = datetime.utcnow() + LOGIN_LOCKOUT_DURATION
+            db.commit()
         raise HTTPException(401, "Invalid email or password")
+
+    if user.failed_login_attempts or user.locked_until:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
 
     token = create_access_token(user.id, user.token_version)
     return TokenResponse(access_token=token).dict()
