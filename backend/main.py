@@ -53,6 +53,7 @@ from .models import (
     Branding, User, Membership,
 )
 from .art50check import check_art50
+from .netguard import is_private_url
 from .ownership import create_challenge, verify_ownership, is_domain_verified
 from .apikeys import (
     create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
@@ -920,7 +921,24 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
             )
 
         domain = urlparse(body.api_url).netloc or body.api_url
-        if not is_domain_verified(db, effective_org_id, domain):
+
+        # A loopback/private target can never pass DNS ownership verification
+        # — there is no record to publish for 127.0.0.1 and nothing to own.
+        # That would make lab/runner.py unscannable, and the lab is the only
+        # way to exercise api mode before a paying customer exists. So a
+        # private target skips ownership when the operator has explicitly
+        # opted in; login and membership above still applied.
+        if is_private_url(body.api_url):
+            if not config.ALLOW_PRIVATE_SCAN_TARGETS:
+                raise HTTPException(
+                    403,
+                    f"'{domain}' is a loopback or private-network address. "
+                    f"Scanning one is off by default, because on a deployed "
+                    f"server it would let a caller reach our own internal "
+                    f"network. If this is a local lab target (see lab/runner.py), "
+                    f"set ALLOW_PRIVATE_SCAN_TARGETS=true in .env and restart."
+                )
+        elif not is_domain_verified(db, effective_org_id, domain):
             raise HTTPException(
                 403,
                 f"Ownership of '{domain}' is not verified for this organization. "

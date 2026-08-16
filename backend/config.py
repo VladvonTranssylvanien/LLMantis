@@ -85,6 +85,25 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 
+# --- Scan targets on the local network ---------------------------------------
+# An api-mode scan POSTs attacks to a URL the caller supplies. Normally that
+# URL must be a public domain whose ownership they have proven by DNS TXT
+# (PLAYBOOK §5). A loopback or private-network target cannot clear that bar:
+# there is no DNS record to publish for 127.0.0.1, and no way to "own" it.
+#
+# That blocks the lab in lab/runner.py, which is the only way to exercise
+# api mode end to end before a paying customer exists. So this flag exists to
+# let a private target skip *ownership verification only* — login and org
+# membership are still required, and the target is still recorded against
+# that org.
+#
+# It defaults to OFF because turning it on is exactly an SSRF hole on a
+# deployed instance: a logged-in user could aim a scan at the cloud metadata
+# endpoint or anything else inside our own network. Turn it on for local
+# development, never on a shared or public host.
+ALLOW_PRIVATE_SCAN_TARGETS = os.getenv("ALLOW_PRIVATE_SCAN_TARGETS", "").lower() in ("1", "true", "yes")
+
+
 def summary() -> str:
     """Human-readable config dump, used by selfcheck and on server startup."""
     if PROVIDER == "mistral":

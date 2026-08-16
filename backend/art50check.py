@@ -18,9 +18,7 @@ Why passive only:
     This is not a breach of the provider's ToS.
 """
 
-import ipaddress
 import re
-import socket
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
@@ -28,6 +26,8 @@ from urllib.robotparser import RobotFileParser
 import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
+
+from .netguard import UnsafeUrlError, assert_public_host
 
 # Identifiable and points at an explanation page — a site owner who notices
 # us in their logs must be able to find out who we are and how to opt out.
@@ -69,45 +69,11 @@ WIDGET_SIGNATURES = {
 }
 
 
-class UnsafeUrlError(Exception):
-    """Raised when a URL resolves to a private/internal address — SSRF guard."""
-
-
-def _assert_public_host(url: str) -> None:
-    """
-    Refuse to fetch anything that resolves to a private, loopback,
-    link-local or otherwise non-public address.
-
-    WHY THIS EXISTS
-        This endpoint takes an arbitrary URL from an unauthenticated caller
-        and fetches it server-side. Without this check, a caller could
-        point us at http://localhost:5432, http://169.254.169.254/... (the
-        cloud metadata endpoint on AWS/GCP/Azure), or any address on our
-        own private network, and use us as a proxy to reach it — a classic
-        SSRF. We are a passive *page* checker; we only ever need to talk
-        to a public website.
-    """
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise UnsafeUrlError(f"Unsupported scheme: {parsed.scheme!r}")
-    if not parsed.hostname:
-        raise UnsafeUrlError("URL has no hostname")
-
-    try:
-        addrs = socket.getaddrinfo(parsed.hostname, None)
-    except socket.gaierror as e:
-        raise UnsafeUrlError(f"Could not resolve host: {e}") from e
-
-    for family, _, _, _, sockaddr in addrs:
-        ip = ipaddress.ip_address(sockaddr[0])
-        if (
-            ip.is_private or ip.is_loopback or ip.is_link_local
-            or ip.is_multicast or ip.is_reserved or ip.is_unspecified
-        ):
-            raise UnsafeUrlError(
-                f"Refusing to fetch {parsed.hostname!r} — resolves to "
-                f"non-public address {ip}"
-            )
+# The SSRF guard lives in backend/netguard.py — scanner.py needs the same
+# rule, and one shared copy cannot drift out of step with the other.
+# _assert_public_host stays as a local alias so the call sites below read
+# the same as they did before.
+_assert_public_host = assert_public_host
 
 
 async def _check_robots_allowed(client: httpx.AsyncClient, url: str) -> bool:
