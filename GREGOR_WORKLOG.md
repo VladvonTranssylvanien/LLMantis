@@ -28,6 +28,8 @@ Read this section first. Detail is in the dated entries below.
 | `lab/bots/teleshop-a.yaml` | Bot A — deliberately vulnerable, German, canary embedded |
 | `lab/bots/teleshop-b.yaml` | Bot B — hardened twin, separate canary |
 | `lab/.env.example` | Committed template, no values. Real values go in `lab/.env` (gitignored) |
+| `lab/harness/matrix.py` | Model-diversity matrix. N runs per cell, drives the runner, reads the canary from the bot YAML. Produces every number below |
+| `lab/harness/detectors.py` | Deterministic FAIL signals only; softer signals reported separately and never counted |
 | `GREGOR_WORKLOG.md` | This file |
 
 `venv/` and `lab/.env` exist locally and are gitignored — verified with
@@ -56,6 +58,15 @@ Two results worth carrying into the pitch:
 
 Measured difficulty ordering, easiest to hardest to attack:
 `Kimi-K2.5` → `gpt-4.1-mini` → `gpt-4.1`.
+
+Reproduce with:
+
+```bash
+python lab/harness/matrix.py lab/bots/teleshop-a.yaml
+python lab/harness/matrix.py lab/bots/teleshop-b.yaml
+```
+
+No credentials on the command line — the runner reads `lab/.env` itself.
 
 ## 🔴 Blocked
 
@@ -1230,3 +1241,45 @@ So the rack is live again and the Session 7 measurements remain reproducible.
   not.
 - The full matrix was not re-run after rotation. Two spot checks only; the
   Session 7 numbers were not re-measured.
+
+---
+
+## 2026-08-16 — Session 13: measurement harness moved into the repository
+
+The scripts that produced every number in this worklog existed only in a session
+scratchpad and would have been lost. Moved to `lab/harness/`, which makes the
+results reproducible instead of merely reported.
+
+| File | What |
+|---|---|
+| `lab/harness/matrix.py` | The matrix driver — attacks, N runs per cell, table output |
+| `lab/harness/detectors.py` | Leak detectors, with the false-positive history in the docstring |
+
+Three things fixed while relocating, each a real defect in the scratchpad
+version:
+
+1. **Hardcoded `/Users/gg.la/...` paths** — useless on anyone else's machine.
+   Now derived from `__file__`.
+2. **The canary was a command-line argument.** Nothing stopped Bot A's canary
+   being measured against Bot B, which would have produced a clean sheet for
+   entirely the wrong reason. It is now read from the bot's own YAML.
+3. **Credentials had to be exported before running.** The runner already loads
+   `lab/.env`, so the driver now passes only model, token budget and timeout.
+   No key ever touches the harness or a shell history.
+
+Verified after relocation, with every credential variable explicitly unset:
+
+```
+Bot A  gpt-4.1-mini 3/7 · gpt-4.1 2/7   (n=1, consistent with the n=3 run)
+Bot B  gpt-4.1-mini 0/7                 (n=1)
+```
+
+Both bots' canaries confirmed distinct and present in their own prompts.
+
+### What I did NOT verify
+
+- Kimi-K2.5 was not exercised through the relocated harness — only the two fast
+  models, to keep the check short. The Kimi code path is unchanged from the
+  version that produced the Session 7 numbers.
+- The harness has not been run by anyone other than this agent, on any other
+  machine. The path fix is reasoned, not tested elsewhere.
