@@ -36,19 +36,20 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Leave `PROVIDER=mock` for now. Mock mode returns fake bot responses, so you can
-build and test everything without an API key and without spending money.
+Keep `PROVIDER=mistral` and put a real `MISTRAL_API_KEY` next to it. Get one
+from https://console.mistral.ai — the free tier is enough for the current
+21-attack library. **Mistral is the only provider** — see `PLAYBOOK.md` §1
+for why (no US vendor in the stack).
 
-Only switch to `PROVIDER=mistral` and add a real `MISTRAL_API_KEY` when you
-need to test against a real model. **Mistral is the only provider** — see
-`PLAYBOOK.md` §1 for why (no US vendor in the stack).
+There is no mock or offline mode. Without a key every attack comes back as
+an error and the scan is issued no grade, under an HTTP 200.
 
 **Never commit `.env`.** It's in `.gitignore`. It will hold an API key.
 
 ## 5. Start the database
 
 Scans, organizations, API keys and branding all live in Postgres now, not
-in memory — this step is required even in mock mode:
+in memory — this step is not optional:
 
 ```bash
 docker compose up -d      # starts Postgres, see docker-compose.yml
