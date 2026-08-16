@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About the LLMantis checker — LLMantis</title>
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/assets/brand/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="/static/assets/base.css">
+<style>
+body {
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(1000px 700px at 8% -10%, var(--bloom-warm), transparent 62%),
+    radial-gradient(900px 800px at 100% 4%, var(--bloom-cool), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+  background-attachment: fixed;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  border-width: 0 0 1px 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 26px; height: 26px; display: block; }
+.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.brand .name .ll { color: var(--accent); }
+
+.wrap {
+  max-width: 680px; margin: 0 auto;
+  padding: clamp(26px, 5vw, 48px) clamp(16px, 4vw, 40px) 110px;
+}
+h1 { font-size: clamp(22px, 4vw, 28px); margin-bottom: 6px; }
+.lede { color: var(--muted); margin: 0 0 32px; }
+h2 { font-size: 16px; margin: 30px 0 10px; }
+p { margin: 0 0 14px; }
+code {
+  font-family: var(--mono); font-size: 13px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px;
+}
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: clamp(16px, 3vw, 22px); margin: 20px 0;
+}
+.panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+ul { margin: 0 0 14px; padding-left: 20px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+footer.site { border-width: 1px 0 0 0; padding: 20px clamp(16px, 4vw, 40px); }
+footer.site .in {
+  max-width: 940px; margin: 0 auto; display: flex; gap: 18px; flex-wrap: wrap;
+  align-items: center; color: var(--muted); font-size: 12.5px;
+}
+footer.site a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="topbar glass">
+  <a class="brand" href="/static/landing.html">
+    <img src="/static/assets/brand/mark.svg" alt="" width="26" height="26">
+    <span class="name"><span class="ll">LL</span>Mantis</span>
+  </a>
+</header>
+
+<div class="wrap">
+  <h1>You've been visited by the LLMantis checker</h1>
+  <p class="lede">
+    This page is what our User-Agent string points to. If a request from
+    <code>LLMantis-Checker/1.0</code> showed up in your server logs, here's
+    exactly what happened and why.
+  </p>
+
+  <h2>What we did</h2>
+  <p>
+    We sent a single HTTP GET request to a public page on your site — the
+    same request an ordinary visitor's browser makes when they open the
+    page. We looked at the HTML for two things:
+  </p>
+  <ul>
+    <li>Is there a chat widget (a known vendor script — Intercom, Tidio,
+      Crisp, and similar)?</li>
+    <li>If so, does the page text disclose that it's an AI, as required by
+      <a href="https://artificialintelligenceact.eu/article/50/" rel="noopener">
+      Art. 50(1) of the EU AI Act</a> (in force since 2 August 2026)?</li>
+  </ul>
+
+  <div class="panel">
+    <h3>What we did not do</h3>
+    <ul>
+      <li>We never opened your chat widget or sent it a message.</li>
+      <li>We never attempted to log in, bypass authentication, or access
+        anything not already public.</li>
+      <li>We didn't store your page content — only whether a widget exists
+        and whether it discloses being AI.</li>
+    </ul>
+  </div>
+
+  <h2>Who we are</h2>
+  <p>
+    LLMantis tests whether AI chatbots disclose that they're AI and, for
+    consenting customers, runs documented security attacks against them.
+    This particular check — the free layer — is passive by design: no
+    permission is required because it's equivalent to a normal page visit.
+  </p>
+
+  <h2>How to opt out</h2>
+  <p>
+    We honour <code>robots.txt</code>. If you'd rather we didn't visit,
+    add a rule disallowing <code>LLMantis-Checker</code> and we won't
+    fetch your pages again. If you have any other concern, write to us —
+    a human reads every message:
+    <a href="mailto:kontakt@llmantis.de">kontakt@llmantis.de</a>.
+  </p>
+</div>
+
+<footer class="site">
+  <div class="in">
+    <span>© 2026 LLMantis</span>
+    <a href="/static/impressum.html" lang="de">Impressum</a>
+    <a href="/static/datenschutz.html" lang="de">Datenschutzerklärung</a>
+  </div>
+</footer>
+
+</body>
+</html>

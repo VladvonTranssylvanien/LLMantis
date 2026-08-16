@@ -23,10 +23,16 @@ import re
 import socket
 from typing import Optional
 from urllib.parse import urljoin, urlparse
+from urllib.robotparser import RobotFileParser
 
 import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
+
+# Identifiable and points at an explanation page — a site owner who notices
+# us in their logs must be able to find out who we are and how to opt out.
+# Matches tools/art50check.py's convention (the standalone 24-site script).
+USER_AGENT = "LLMantis-Checker/1.0 (+https://llmantis.de/scanner)"
 
 
 class Art50Finding(BaseModel):
@@ -104,23 +110,52 @@ def _assert_public_host(url: str) -> None:
             )
 
 
+async def _check_robots_allowed(client: httpx.AsyncClient, url: str) -> bool:
+    """
+    Respect robots.txt, the way a well-behaved crawler is expected to.
+
+    Not a legal requirement for a single one-off passive GET, but our own
+    plan (VLAD-IMPLEMENTATION-PLAN.md §5) calls for it, and a site owner
+    who explicitly disallows bots deserves that to be honoured. Fails
+    open (allowed) if robots.txt is missing or unreachable — that is the
+    standard interpretation, not an error.
+    """
+    parsed = urlparse(url)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    try:
+        response = await client.get(robots_url, headers={"User-Agent": USER_AGENT})
+        if response.status_code >= 400:
+            return True
+        content = response.text
+    except httpx.RequestError:
+        return True
+
+    rp = RobotFileParser()
+    rp.parse(content.splitlines())
+    return rp.can_fetch(USER_AGENT, url)
+
+
 async def _fetch_page(url: str, timeout: int = 10, max_redirects: int = 5) -> tuple[Optional[str], Optional[str]]:
     """
     Fetch a page as an ordinary visitor (async).
 
     Redirects are followed manually, one hop at a time, re-checking the
-    SSRF guard on every hop — a public URL redirecting to a private one
-    partway through the chain is exactly what httpx's built-in
-    follow_redirects=True would not catch for us.
+    SSRF guard and robots.txt on every hop — a public URL redirecting to
+    a private one (or to a host that disallows us) partway through the
+    chain is exactly what httpx's built-in follow_redirects=True would
+    not catch for us.
 
     Returns: (html, error)
     """
-    headers = {"User-Agent": "LLMantis-Checker/1.0 (+https://llmantis.de/scanner)"}
+    headers = {"User-Agent": USER_AGENT}
 
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
             for _ in range(max_redirects + 1):
                 _assert_public_host(url)
+                if not await _check_robots_allowed(client, url):
+                    return None, f"robots.txt at this host disallows automated checks for {url}"
+
                 response = await client.get(url, headers=headers)
 
                 if response.is_redirect:
