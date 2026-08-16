@@ -1837,23 +1837,46 @@ confident "clean" while being broken is worse than no scan.
 | `lab/.env` staged | no; still ignored |
 | `calibration/__pycache__` staged | no |
 
-### 🔴 Bot A's canary is now public
+### ~~🔴 Bot A's canary is now public~~ — WITHDRAWN, the warning was wrong twice over
 
-`LLMANTIS-CANARY-7F3A91` appears 23 times in the pushed diff. This was flagged
-before both the commit and the push; Gregor decided to push. Recording it as a
-decision, not an accident.
+`LLMANTIS-CANARY-7F3A91` does appear 23 times in the pushed diff. Everything
+this worklog inferred from that was wrong, and it was raised as a blocking-ish
+concern three times (sessions 14, 17, 18) before Gregor challenged it.
 
-**Bot B's canary does not appear** — Bot B never leaked its own, so
-`LLMANTIS-CANARY-B2D4E8` is still private.
+**1. The rule was misread.** `GREGOR-TARGET-LAB.md:146` says *"rotate it if the
+**bots** ever go public"*. Gregor's reading: that is about the bots being
+exposed — a live endpoint strangers can talk to — not about the repository
+being public. The section it sits in is about the canary as a detection marker;
+its neighbours are "a different canary per bot, so we can tell which one leaked"
+and "never printed in logs or in the report body". Nothing in §4 concerns source
+control. His reading is the better one.
 
-`GREGOR-TARGET-LAB.md:146` says to rotate a canary if the bots go public. The
-sequencing matters: **rotating Bot A's canary invalidates the eight `clean_fail`
-items**, because the harvested answers still contain the old string. So the
-order is measure first, rotate after — rotating now would cost a re-harvest and
-a re-label of all thirty items before the number exists at all.
+**2. The canary was already public, and had been for five sessions.** Verified:
+`lab/bots/teleshop-a.yaml:23` carries the canary and has been on `origin/main`
+since `173c13b` (PR #9, Session 9). Publishing the bot definitions published the
+canary. Framing this push as a point of no return was simply late — the line was
+crossed by the commit that created the bots, and this fact was available the
+whole time.
 
-`calibrate.py` refuses to run against a rotated canary rather than silently
-turning those eight into false negatives, so this cannot go wrong quietly.
+**3. The string has no value to protect.** Knowing the canary does not help
+anyone make the bot emit it: layer 1 checks the **bot's answer**, not the
+attacker's input. It is a made-up marker in a fictional bot with fictional
+company data and no customer data.
+
+The canary rule that does carry real stakes is the other one — a **customer's**
+canary must never appear in a report body — and it is untouched. It was checked
+in Session 10 and `report.html` still does not render it.
+
+**What survives:** if the lab bots are ever exposed publicly as a chat endpoint,
+rotate then — which is what the brief actually says. And the dependency is still
+real: rotating Bot A's canary invalidates the eight `clean_fail` items, because
+the harvested answers contain the old string. `calibrate.py` refuses to run
+rather than silently turning them into false negatives.
+
+**Lesson for this worklog:** the negative claim here ("this must not be
+published") was never verified against `origin/main`, which would have refuted
+it in one command. `AGENTS.md` §2 says to attack negative claims hardest. This
+one was repeated three times instead.
 
 ### What I did NOT verify
 
