@@ -9,6 +9,18 @@ from alembic import context
 # access to the values within the .ini file in use.
 config = context.config
 
+# The database address comes from backend/config.py — the same value the
+# application itself connects with — and never from alembic.ini.
+#
+# It used to come from both. alembic.ini hardcoded a URL while the app read
+# DATABASE_URL, so on a machine where the .env pointed somewhere else,
+# `alembic upgrade head` migrated a different database than the one the app
+# was using. That is not a configuration inconvenience: on a developer
+# machine running more than one Postgres, it means running migrations
+# against another project's database.
+from backend.config import DATABASE_URL
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
