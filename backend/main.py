@@ -55,7 +55,7 @@ from .apikeys import (
     create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
 )
 
-app = FastAPI(title="PromptGuard", version="0.1.0")
+app = FastAPI(title="LLMantis", version="0.1.0")
 
 # Rate limiting, by caller IP. WHY: /api/scan makes ~21 real Mistral API
 # calls per request — unlimited access here means unlimited cost, not just

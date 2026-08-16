@@ -1,12 +1,13 @@
-# PromptGuard — Setup
+# LLMantis — Setup
 
-Run these once after cloning. Takes 2 minutes.
+Run these once after cloning. Takes about 5 minutes (was 2, before the
+database was added).
 
 ## 1. Clone and enter
 
 ```bash
-git clone git@github.com:VladvonTranssylvanien/promptguard.git
-cd promptguard
+git clone git@github.com:VladvonTranssylvanien/LLMantis.git
+cd LLMantis
 ```
 
 ## 2. Create a virtual environment
@@ -38,15 +39,36 @@ cp .env.example .env
 Leave `PROVIDER=mock` for now. Mock mode returns fake bot responses, so you can
 build and test everything without an API key and without spending money.
 
-Only switch to `PROVIDER=anthropic` and add a real key when we test for real.
+Only switch to `PROVIDER=mistral` and add a real `MISTRAL_API_KEY` when you
+need to test against a real model. **Mistral is the only provider** — see
+`PLAYBOOK.md` §1 for why (no US vendor in the stack).
 
 **Never commit `.env`.** It's in `.gitignore`. It will hold an API key.
 
-## 5. Check it works
+## 5. Start the database
+
+Scans, organizations, API keys and branding all live in Postgres now, not
+in memory — this step is required even in mock mode:
 
 ```bash
-python -m backend.selfcheck
+docker compose up -d      # starts Postgres, see docker-compose.yml
+alembic upgrade head       # applies every migration in alembic/versions/
 ```
+
+## 6. Check it works
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+In another terminal:
+
+```bash
+curl -s localhost:8000/api/health
+```
+
+You should get back `{"status":"ok", ...}`. Open http://localhost:8000, pick
+a demo bot, press **Run scan**.
 
 ## Adding a new dependency
 
@@ -58,11 +80,29 @@ pip install somepackage==1.2.3
 echo "somepackage==1.2.3" >> requirements.txt
 ```
 
+## Changed `backend/models.py`?
+
+Generate a migration before committing — never hand-edit the schema or ship
+a model change without one:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head
+```
+
 ## Daily routine
 
 ```bash
-cd promptguard
+cd LLMantis
 source venv/bin/activate
 git pull
 pip install -r requirements.txt   # in case someone added a dependency
+alembic upgrade head              # in case someone added a migration
+docker compose up -d              # in case Postgres isn't already running
 ```
+
+## 🔴 Before you run this anywhere but localhost
+
+There is no authentication yet — any caller can act as any organization. See
+`PROJECT-STATE.md` technical debt #9 and `README.md` §Status. Do not expose
+this server to the public internet until that's resolved.

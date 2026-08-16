@@ -49,31 +49,50 @@ Germany that is a § 5 UWG problem, not a wording preference. See `PLAYBOOK.md`.
 
 ## Status
 
-**Working today:**
+_Last verified against the running code: 16.08.2026._
+
+**Working today, verified against real Mistral scans (not just mock mode):**
 
 - 21 attacks across the 5 OWASP LLM categories
-- Two-layer judging (deterministic string match, then AI judge)
+- Two-layer judging (deterministic string match, then AI judge) — **judge runs
+  on Mistral (France), not a US provider.** See `PLAYBOOK.md` §1
 - Canary auto-detection - finds the bot's secret without being told
 - Severity-weighted scoring with a critical-failure grade cap
-- Web UI with live progress, grade, expandable findings and fixes
-- 3 demo bots, including a hardened one for the before/after demo
-- Mock mode - build and test with no API key and no cost
+- Web UI with live progress, grade, expandable findings and fixes, PDF export
+  (client-side print, see `frontend/report.html`)
+- 3 demo bots, including a hardened one for the before/after demo — both run
+  clean end to end (unprotected: D/53, hardened: A/100)
+- API mode (`mode="api"`, attacking a live endpoint) — tested, and gated
+  behind DNS ownership verification per the scope-of-use rule above
+- Persistent Postgres database — every scan, target, org and result survives
+  a restart (Alembic migrations in `alembic/versions/`)
+- Organizations, API keys (for CI/CD-style programmatic access), white-label
+  branding — all implemented and tested; no UI for any of them yet, curl/API
+  only
+- Free, passive Art.-50-Check with its own page (`frontend/art50check.html`),
+  verified against real sites
+- Per-IP rate limiting on every write endpoint (`slowapi`)
+- Mock mode still works - build and test with no API key and no cost
 
 **Not built yet:**
 
 | Item | Status | Owner |
 |---|---|---|
 | Attacks 21 to 75 | 21 of 75 | Attack Engineer |
-| PDF report export | not started | Frontend |
-| API mode (attack a live endpoint) | code written, never tested | Backend |
 | Judge calibration set | not started | Attack Engineer |
-| Scan history / database | not started | Backend |
-| Tested against a real model | **never run outside mock mode** | anyone |
+| Frontend for organizations / API keys / branding / ownership | not started | Frontend |
+| Authentication | **not started — see below** | team decision pending |
+| Billing (Mollie) | deferred until Gewerbe is registered | — |
+| CI/CD → Hetzner deploy | deferred until there is a server | — |
 
-The last row is the important one. Everything so far has been verified against
-mock responses. Until someone runs a scan with a real API key, we do not know
-the real scan duration, the real cost per scan, or whether the AI judge is
-accurate on real answers.
+### 🔴 No authentication — read this before running anything beyond localhost
+
+Every endpoint trusts whatever `org_id` a caller sends; there is no login, no
+session, nothing that proves a caller is who they claim. This is fine for a
+localhost demo. **Hard rule: do not expose this server to the public internet
+until this is fixed.** See `PROJECT-STATE.md` technical debt #9. The team is
+deciding the approach together — this is not a "someone forgot", it is a
+known, accepted gap while the course PoC was the priority.
 
 ---
 
@@ -96,6 +115,14 @@ cp .env.example .env
 
 Leave `PROVIDER=mock` in `.env`. No API key needed to develop.
 
+**The database is required even in mock mode** — scans, organizations, API
+keys and branding all live in Postgres now, not memory:
+
+```bash
+docker compose up -d      # starts Postgres (docker-compose.yml)
+alembic upgrade head       # applies every migration in alembic/versions/
+```
+
 ## Run it
 
 ```bash
@@ -104,6 +131,14 @@ uvicorn backend.main:app --reload --port 8000
 ```
 
 Open http://localhost:8000, pick a demo bot from the dropdown, press **Run scan**.
+
+Changed `models.py`? Generate a migration before you commit, don't hand-edit
+the schema:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+alembic upgrade head
+```
 
 Check the server is healthy:
 
@@ -166,16 +201,29 @@ findings are shown in reports; `possible` findings are omitted (legal requiremen
         attacks.yaml     the attack library - DATA, not code
       demo/
         targets.yaml     demo bots for the pitch
+      alembic/
+        versions/        one migration per schema change - never edit models.py
+                          without generating one (alembic revision --autogenerate)
       backend/
         config.py        all settings, read from .env
-        llm.py           the only file that talks to an AI provider
+        llm.py           the only file that talks to an AI provider (Mistral only)
         attacks.py       loads and validates attacks.yaml
         judge.py         decides PASS or FAIL
         scoring.py       score, grade, critical cap
         scanner.py       runs the scan, handles both target modes
-        main.py          the web server
+        models.py        SQLAlchemy tables: organizations, targets, scans,
+                          results, ownership_verifications, memberships,
+                          api_keys, branding
+        database.py      engine + get_db() session dependency
+        art50check.py    passive Art. 50 widget/disclosure checker (SSRF-guarded)
+        ownership.py     DNS TXT ownership verification, gates mode="api" scans
+        apikeys.py       API key issue/list/revoke, resolves org from X-API-Key
+        main.py          the web server - every endpoint lives here
       frontend/
-        index.html       the whole UI, single file, no build step
+        index.html       the scan UI, single file, no build step
+        art50check.html  the free check's own page
+        report.html      the printable Pruefbericht (sessionStorage, no backend round-trip)
+        landing.html     marketing page (German copy, documented exception)
 
 Each file does one thing, so four people can work without colliding.
 
@@ -187,10 +235,24 @@ Each file does one thing, so four people can work without colliding.
 | `GET /api/attacks` | the attack library |
 | `POST /api/attacks/reload` | re-read attacks.yaml without restarting |
 | `GET /api/targets` | the demo bots |
-| `POST /api/scan` | run a scan, streams NDJSON as each attack finishes |
+| `POST /api/scan` | run a scan, streams NDJSON as each attack finishes (5/min per IP) |
+| `POST /api/art50check` | passive Art. 50 check on any URL (20/min per IP) |
+| `POST /api/ownership/challenge` | generate a DNS TXT verification token |
+| `POST /api/ownership/verify` | check the DNS TXT record, mark verified |
+| `POST` / `GET /api/organizations` | create / list organizations |
+| `GET /api/organizations/{id}` | org details + its scans + branding |
+| `PUT` / `GET /api/organizations/{id}/branding` | white-label settings |
+| `POST /api/keys` | issue an API key (plaintext shown once) |
+| `GET /api/keys?org_id=` | list an org's keys (never the plaintext) |
+| `DELETE /api/keys/{id}?org_id=` | revoke a key |
+| `GET /api/scans` / `GET /api/scans/{id}` | scan history from Postgres |
 
 `/api/scan` streams because a scan takes seconds. Without streaming the demo
 would show a frozen screen instead of a moving progress bar.
+
+⚠️ None of the endpoints above check that the caller is authorized for the
+`org_id` they send — see "No authentication" above. Fine for localhost; not
+fine for anything else yet.
 
 ---
 
@@ -215,18 +277,20 @@ To add an attack, copy an existing block and change it. Then:
 
 ### Backend
 
-Owns `scanner.py`, `main.py`, `llm.py`.
+Owns `backend/**`, the database schema, the API.
 
-- Test API mode against a real live chatbot endpoint. The code exists but has
-  never been run.
-- Store scan history so a customer can see whether their score improved.
+- Authentication — the one open item blocking anything beyond localhost.
+  `Membership` (user_id, org_id, role) already exists in `models.py`, unused;
+  no `User` table, no login, no session/JWT. Team decision on approach pending.
+- Frontend for organizations / API keys / branding / ownership — all three
+  work via curl today, none has a UI.
 
 ### Frontend
 
-Owns `frontend/index.html`. Single file, no build step, no npm.
+Owns `frontend/**`. Each page is a single file, no build step, no npm.
 
-- PDF export. The demo script promises it at 1:40 and it does not exist. This is
-  the most visible gap.
+- Build a UI for organizations, API keys, branding and ownership verification
+  — `index.html` and `art50check.html` are the only pages with one.
 - Polish for a projector: bigger type, higher contrast, tested from the back
   of a room.
 

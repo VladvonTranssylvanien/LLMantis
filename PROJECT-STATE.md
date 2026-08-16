@@ -3,13 +3,16 @@
 > Project memory. Update after every stage.
 > Returning in a new chat: *"Continuing LLMantis. Read `~/LLMantis/PROJECT-STATE.md`."*
 >
-> Last updated: 15.08.2026 · Bogdan
+> Last updated: 16.08.2026 · Vlad (session with Claude Code)
 
 ---
 
 ## 1. Where we are
 
-**Status:** week 1, track A (course submission in 7 days).
+**Status:** week 1, track A (course submission in 7 days) — **backend/API work for
+Vlad's implementation plan is functionally complete** (P0 + P1 + the P2 items
+that don't need a registered company). Remaining gaps are frontend UI for the
+newer endpoints, the 21→75 attack library, and authentication.
 
 - ✅ Idea chosen and justified with market data (ECA Mapping 2025)
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
@@ -19,6 +22,19 @@
 - ✅ Playbook, role briefs and brand merged into the engine repository
 - ✅ LICENSE added (AGPL-3.0)
 - ✅ Brand mark drawn (`Brand/`) — wordmark still needs outlining
+- ✅ **Judge migrated to Mistral** — no US provider anywhere in the stack (16.08)
+- ✅ **Postgres database** — organizations, targets, scans, results, ownership
+  verifications, memberships, API keys, branding. Alembic migrations (16.08)
+- ✅ **Real DNS ownership verification**, gating active (`mode="api"`) scans (16.08)
+- ✅ **Organizations, API keys, white-label branding** — implemented and
+  tested via curl; no frontend yet (16.08)
+- ✅ **Art.-50-Check** — free passive layer, its own page, SSRF-guarded, tested
+  against real sites (16.08)
+- ✅ **Rate limiting** (`slowapi`, per IP) on every write endpoint (16.08)
+- ✅ **Security pass done** (16.08): no secrets in git history or code, no
+  SQL injection, no XSS, SSRF fixed, `requirements.txt` fixed (was missing
+  sqlalchemy/alembic/psycopg/dnspython — a fresh clone would not have started)
+- 🔴 **No authentication** — see technical debt #9. Team deciding the approach
 - ⬜ Hypothesis tested on 24 sites ← **blocks the pitch**
 - ⬜ Name cleared at DPMA/EUIPO
 - ⬜ Legal map from Kwabena
@@ -80,15 +96,17 @@
 
 | # | What | Due | Who |
 |---|---|---|---|
-| 1 | 🔴 **Migrate the judge to Mistral** — confirmed in code: `backend/config.py:33` sets `JUDGE_MODEL` default to `claude-sonnet-4-5` (US provider). `TARGET_MODEL` on line 30 is the same, but that one only simulates a customer bot, so it is far less urgent. **Public repo, so this is publicly readable** | before the first paying customer | Vlad |
-| 2 | Persistent database instead of in-memory state | week 2 | Vlad |
-| 3 | Real ownership verification (DNS TXT) | week 4 | Vlad |
-| 4 | Organizations in the data model | week 3 | Vlad |
-| 5 | Attack library versioning | week 3 | Vlad |
+| 1 | ✅ **DONE 16.08** ~~Migrate the judge to Mistral~~ — `backend/llm.py` talks only to Mistral. No US provider anywhere; `anthropic` removed from `requirements.txt` too | ~~before the first paying customer~~ | Vlad |
+| 2 | ✅ **DONE 16.08** ~~Persistent database instead of in-memory state~~ — Postgres + Alembic, every scan/org/result survives a restart | ~~week 2~~ | Vlad |
+| 3 | ✅ **DONE 16.08** ~~Real ownership verification (DNS TXT)~~ — gates every `mode="api"` scan; 90-day re-verification | ~~week 4~~ | Vlad |
+| 4 | ✅ **DONE 16.08** ~~Organizations in the data model~~ — plus a `Membership` table (user_id, org_id, role), unused until auth exists | ~~week 3~~ | Vlad |
+| 5 | ✅ **DONE 16.08** ~~Attack library versioning~~ — `attacks.yaml` has `version: "1.4"`, shows up in every scan report and the Pruefbericht | ~~week 3~~ | Vlad |
 | 6 | Rename the Notion page | this week | Bogdan |
 | 8 | **Original illustrated mark** — the geometric mark is the brand and ships as final; an illustrated one may replace it. Owner: Bogdan, no date | open | Bogdan |
-| 7 | **README §Scoring contradicts decision #8.** README documents the shipped behaviour — flat severity weights, critical cap at **D**. Prompt 3 / P0 specifies BASE + CONF_K multipliers and a cap at **C**. Update the README in the same commit as P0, or the repo documents two different scoring rules | with P0 | Vlad |
-| 9 | 🔴 **No authentication layer.** Every API endpoint trusts whatever `org_id` the caller sends — there is no login, session or proof that a caller is who they claim. This is fine for a localhost PoC only. **Hard rule: this server must never be reachable from the public internet until this is fixed.** Team to decide the approach together before that changes | before any non-localhost deployment | team decision pending |
+| 7 | ✅ **RESOLVED** (verified 16.08) ~~README §Scoring contradicts decision #8~~ — `backend/scoring.py` caps at **C** and applies `CONFIDENCE_WEIGHT` multipliers (confirmed/likely/possible), matching README and decision #8. No contradiction found; this must have been fixed during the P0 confidence-levels work | ~~with P0~~ | Vlad |
+| 9 | 🔴 **No authentication layer.** Every API endpoint trusts whatever `org_id` the caller sends — there is no login, session or proof that a caller is who they claim. `Membership` table exists (see #4) but nothing reads it yet. This is fine for a localhost PoC only. **Hard rule: this server must never be reachable from the public internet until this is fixed.** Team to decide the approach together before that changes | before any non-localhost deployment | team decision pending |
+| 10 | Frontend for organizations, API keys, branding and ownership verification — all four work today via curl only. `index.html` and `art50check.html` are the only pages with a UI | after auth (building a UI for endpoints anyone can call as anyone else is wasted work) | Frontend |
+| 11 | 21 → 75 attacks in `attacks/attacks.yaml` (5 categories × 15) | with Gregor | Attack Engineer |
 
 ---
 
@@ -98,10 +116,10 @@
 |---|---|
 | Business registration (Gewerbe) | before the first invoice |
 | Gründungszuschuss | 🔴 **check NOW** if anyone is registered with the Agentur für Arbeit — the application goes in BEFORE Gewerbeanmeldung |
-| Mollie, payments | when a customer is ready to pay |
-| PDF export | after the course submission |
+| Mollie, payments | when the Gewerbe is registered — team decided 16.08 not to build even the schema until then |
+| ~~PDF export~~ | ✅ **done 16.08** — client-side print via `frontend/report.html`, no backend needed |
 | Badge | after 10 customers |
-| CI/CD integration | when a customer asks |
+| CI/CD integration | when there is a Hetzner server to deploy to |
 | Voice AI agents | year 2 |
 
 ---
@@ -112,7 +130,7 @@
 |---|---|---|
 | Sites checked for the hypothesis | 0 of 24 | 🔴 blocks the pitch |
 | Attacks in the library | 21 of 75 | 🟠 |
-| Test bots | 0 of 3 | 🔴 |
+| Test bots | 3 of 3 | ✅ `demo/targets.yaml` — unprotected, hardened, MediClinic |
 | Calibration set | 0 of 30 | 🔴 |
 | Judge agreement with human labels | not measured | 🔴 |
 | Paid reports per month (**north star**) | 0 | — |
@@ -149,6 +167,48 @@ illustration of the scan pipeline, the GRC section and pricing. Impressum and
 Datenschutz exist as structural placeholders with `{{TOKEN}}` fields — Kwabena
 owns the wording.
 
-**Open API request (not implemented — frontend must not add backend fields):**
-the Prüfbericht wants an **attack-library version** on page 1. The report shows
-"not reported by the backend" until `report.attack_library_version` exists.
+**16.08.2026** — Full backend session (Vlad, with Claude Code). Completed the
+rest of Vlad's implementation plan and closed out P1/P2 up to what the team
+decided to defer:
+
+- Migrated the judge fully to Mistral (removed all Anthropic code and the
+  `anthropic` dependency — tech debt #1, closed)
+- Postgres + Alembic: organizations, targets, scans, results, ownership
+  verifications, `Membership` (schema-only, unused until auth), `ApiKey`,
+  `Branding` — tech debt #2 and #4, closed
+- Real DNS TXT ownership verification, wired as a hard gate in front of every
+  `mode="api"` scan — tech debt #3, closed
+- Attack library versioning (`attacks.yaml` → `version: "1.4"`), now shown
+  correctly in the Prüfbericht — tech debt #5, closed; also fixed the report
+  page reading the wrong field name (`attack_library_version` vs the API's
+  actual `library_version`) and a missing `target_name`, both of which made
+  every printed report show placeholders instead of the real scan
+- API keys (`POST/GET/DELETE /api/keys`) for CI/CD-style programmatic access,
+  and white-label branding (`PUT/GET /api/organizations/{id}/branding`) for
+  the agency tier — both P2 items, both tested
+- Free Art.-50-Check got its own page (`frontend/art50check.html`), wired to
+  the pricing card that used to link nowhere; verified against real sites
+  (otto.de missing AI disclosure, zendesk.com clean, wikipedia.org no widget)
+- **Security pass:** git history and current code clean of secrets; no SQL
+  injection (ORM everywhere) or XSS (escaped consistently on all 3 frontend
+  pages); found and fixed a real SSRF hole in Art.-50-Check (it fetched any
+  caller-supplied URL server-side with no guard — blocked private/loopback/
+  link-local/metadata-endpoint addresses, re-checked on every redirect hop);
+  found and fixed `requirements.txt` missing sqlalchemy/alembic/psycopg/
+  dnspython (a fresh clone would not have started) and a stale `anthropic`
+  entry; added per-IP rate limiting (`slowapi`) since `/api/scan` makes ~21
+  real Mistral calls and had zero cost protection
+- **Found, not fixed (team decision pending):** no authentication anywhere —
+  any caller can create organizations, mint API keys for any `org_id`, and
+  read any scan's results, including the confidential `evidence` quotes a
+  scan captured. Fine for a localhost PoC, not fine for anything else. See
+  technical debt #9. Do not deploy this server beyond localhost until the
+  team has decided an approach and it is built.
+- Rewrote the stale parts of `README.md` (Status/Project structure/API table/
+  Who-does-what all predated the database entirely) and `SECRETS.md` (still
+  told people to get an Anthropic key)
+
+**What's left of Vlad's plan:** frontend for organizations/API keys/branding/
+ownership (tech debt #10), 21→75 attacks (#11, Gregor's side), then
+authentication, then Mollie billing and CI/CD — both intentionally deferred
+until the Gewerbe is registered.
