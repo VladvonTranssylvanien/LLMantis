@@ -3,6 +3,9 @@ uvicorn[standard]==0.34.0
 pyyaml==6.0.2
 python-dotenv==1.2.2
 httpx==0.28.1
-anthropic==0.42.0
 mistralai==2.9.3          # EU provider for judge (France-based, CLOUD Act compliance)
-beautifulsoup4==4.15.0   # tools/art50check.py parses HTML for chat widgets
+beautifulsoup4==4.15.0    # tools/art50check.py and backend/art50check.py parse HTML for chat widgets
+dnspython==2.8.0          # backend/ownership.py - DNS TXT record verification
+sqlalchemy==2.0.52        # backend/models.py, backend/database.py
+alembic==1.13.1           # database migrations
+psycopg[binary]==3.3.4    # PostgreSQL driver for SQLAlchemy
