@@ -1,4 +1,7 @@
-fastapi==0.115.6
+fastapi==0.141.1
+starlette==1.6.0          # pinned directly: fastapi 0.115.6 forced starlette<0.42.0,
+                          # which had 9 known CVEs (incl. a ReDoS in StaticFiles) with
+                          # no compatible fix - this pin is the fix, don't let it drift down
 uvicorn[standard]==0.34.0
 pyyaml==6.0.2
 python-dotenv==1.2.2
