@@ -90,7 +90,8 @@ in `backend/`, which is Vlad's zone.
 | 2 | Target timeout hardcoded at 30 s in `scanner.py:57`; measured 31.8 s on a reasoning model | [#8](https://github.com/VladvonTranssylvanien/LLMantis/issues/8) |
 | 3 | `PROVIDER=mock` registered nowhere — no scan runs out of the box | mentioned in #7, not yet its own issue |
 | 4 | In `api` mode the judge receives an empty system prompt (`scanner.py:39` vs `:101`) | not filed |
-| 5 | `requirements.txt:6` still pins `anthropic`, which `llm.py` no longer uses | not filed |
+| 5 | ~~`requirements.txt` still pins `anthropic`~~ — ✅ **already fixed on `main`**, verified 16.08 | withdrawn |
+| 6 | `scanner.py` now returns `"canary": target.canary` and `main.py:140` persists it. Not rendered in the report, so the brief's rule is not broken — but a customer's planted secret now lives in our database | question, not filed |
 
 ### Documents that are still wrong — re-checked against `origin/main` 16.08
 
