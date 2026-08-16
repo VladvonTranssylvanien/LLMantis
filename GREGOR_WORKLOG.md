@@ -1138,3 +1138,42 @@ knowing which canary was used.
   of `lab/bots/`. Recorded as a coordination question above.
 - GitHub reported `mergeable: UNKNOWN` at query time — it had not finished
   computing. The local `git merge-tree` result is the basis for "clean".
+
+---
+
+## 2026-08-16 — Session 11: AGENTS.md and CLAUDE.md untracked before merge
+
+Gregor's intent was that these two never enter the repository. They had been
+committed in `173c13b`, so they were removed from tracking with
+`git rm --cached`. Both remain on disk as untracked files and keep working
+locally.
+
+**Why it mattered.** Both are written in the first person — *"I am Gregor"*,
+*"this agent works only on Gregor's tasks"* — and carry a whitelist of
+`lab/**`, `calibration/**` and `GREGOR_WORKLOG.md`. `CLAUDE.md` imports
+`AGENTS.md` and both sit at the repository root, which is where every agent
+looks. On `main` they would have told Vlad's, Kwabena's and Bogdan's agents that
+they are Gregor and may not touch `backend/`.
+
+**`.gitignore` does not actually list them.** Gregor believed it did. Checked
+three places — `.gitignore`, the global `core.excludesFile` (unset), and
+`.git/info/exclude` — no rule matches either file. And a `.gitignore` entry would
+not have helped here anyway: it never untracks something already committed.
+
+So nothing currently stops a later `git add .` from re-adding them. Adding the
+entry is a decision about a shared file that affects every contributor — it would
+prevent the team ever tracking a common agent-instruction file — so it was left
+to Gregor rather than taken unilaterally (`AGENTS.md` §4).
+
+**PR #9 final state:** 5 files, `mergeable: MERGEABLE`, `mergeStateStatus:
+CLEAN`. Net diff adds `GREGOR_WORKLOG.md` and `lab/**` only. The live key appears
+in neither the net diff nor the branch history; the detector was validated
+against a decoy before trusting that result.
+
+### What I did NOT verify
+
+- Where Gregor's intended `.gitignore` edit went. It is not in any of the three
+  ignore files checked.
+- The two files remain in the branch's *history* (blob objects in `173c13b`),
+  though not in the merged tree. They contain no secrets, so this was not
+  rewritten.
