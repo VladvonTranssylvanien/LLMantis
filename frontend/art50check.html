@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Art. 50 disclosure check — LLMantis</title>
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/assets/brand/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="/static/assets/base.css">
+<style>
+/* ===========================================================================
+   LLMantis — free Art.-50-Check. Passive only: one GET on the caller's own
+   page, no message ever sent to their bot. See backend/art50check.py.
+   Tokens and typefaces live in assets/base.css, same as index.html.
+   =========================================================================== */
+
+body {
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(1000px 700px at 8% -10%, var(--bloom-warm), transparent 62%),
+    radial-gradient(900px 800px at 100% 4%, var(--bloom-cool), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+  background-attachment: fixed;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ header */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  border-width: 0 0 1px 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 26px; height: 26px; display: block; }
+.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.brand .name .ll { color: var(--accent); }
+.nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.nav a.link {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 7px 11px; border-radius: 7px;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.nav a.link:hover { color: var(--text); background: var(--surface-2); }
+.nav a.link[aria-current="page"] { color: var(--accent); background: var(--surface-2); }
+.nav .btn { margin-left: 8px; }
+.menu-btn {
+  display: none; margin-left: auto; background: transparent; border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 8px 11px; cursor: pointer; font: inherit;
+}
+@media (max-width: 760px) {
+  .menu-btn { display: block; }
+  .nav {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 10px clamp(16px, 4vw, 40px) 16px;
+    background: var(--glass-fallback); border-bottom: 1px solid var(--border);
+  }
+  .nav.open { display: flex; }
+  .nav .btn { margin: 8px 0 0; text-align: center; }
+}
+
+/* ------------------------------------------------------------------ layout */
+.wrap {
+  max-width: 720px; margin: 0 auto;
+  padding: clamp(26px, 5vw, 48px) clamp(16px, 4vw, 40px) 110px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+.lede { color: var(--muted); max-width: 60ch; margin: 10px 0 0; }
+.lede b { color: var(--text); font-weight: 500; }
+h1 { font-size: clamp(24px, 4vw, 32px); }
+
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: clamp(18px, 3vw, 26px);
+}
+label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
+input {
+  width: 100%; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+  padding: 10px 12px;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+input:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring);
+}
+.actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.err { color: var(--critical); font-size: 13px; }
+
+/* ------------------------------------------------------------------ result */
+#result { display: none; }
+#result.on { display: block; }
+.r-url {
+  font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  word-break: break-all; margin-bottom: 16px;
+}
+.r-empty { color: var(--muted); font-size: 14px; }
+.r-check {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 14px; padding: 12px 0; border-top: 1px solid var(--border);
+}
+.r-check:first-child { border-top: 0; }
+.r-check .label { font-size: 14px; font-weight: 500; }
+.r-check .evidence { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.r-status {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; padding: 3px 9px; border-radius: 999px;
+}
+.r-status.pass { color: var(--accent); background: rgba(123, 227, 63, .1); }
+.r-status.fail { color: var(--critical); background: rgba(255, 107, 107, .1); }
+
+.cta-row {
+  display: flex; align-items: center; gap: 14px; margin-top: 22px; flex-wrap: wrap;
+  padding-top: 18px; border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ footer */
+footer.site {
+  border-width: 1px 0 0 0; padding: 20px clamp(16px, 4vw, 40px);
+}
+footer.site .in {
+  max-width: 940px; margin: 0 auto; display: flex; gap: 18px; flex-wrap: wrap;
+  align-items: center; color: var(--muted); font-size: 12.5px;
+}
+footer.site a { color: var(--muted); }
+footer.site .sp { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<header class="topbar glass">
+  <a class="brand" href="/static/landing.html">
+    <img src="/static/assets/brand/mark.svg" alt="" width="26" height="26">
+    <span class="name"><span class="ll">LL</span>Mantis</span>
+  </a>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+  <nav class="nav" id="nav" aria-label="Main">
+    <a class="link" href="/static/landing.html#produkt">Product</a>
+    <a class="link" href="/static/landing.html#warum">Why</a>
+    <a class="link" href="/static/landing.html#preise">Pricing</a>
+    <a class="link" href="/static/landing.html#ueber-uns">About</a>
+    <a class="link" href="/">Run scan</a>
+    <a class="link" href="/static/art50check.html" aria-current="page">Start free check</a>
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <div>
+    <h1>Art. 50 disclosure check</h1>
+    <p class="lede">
+      One request to your public page. Does a chat widget exist, and does it
+      say it is AI? <b>We never send your bot a message</b> — this only reads
+      the page, the same way an ordinary visitor's browser would.
+    </p>
+  </div>
+
+  <div class="panel">
+    <form id="checkForm">
+      <label class="field" for="url">Website URL</label>
+      <input id="url" placeholder="your-company.de" autocomplete="off" required>
+      <div class="actions">
+        <button class="btn" id="run" type="submit">Check now</button>
+        <span class="err" id="error" role="alert"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel" id="result" role="status" aria-live="polite">
+    <div class="r-url" id="rUrl"></div>
+    <div id="rBody"></div>
+    <div class="cta-row">
+      <a class="btn" href="/">Run the full test on your own prompt</a>
+      <span style="color:var(--muted);font-size:13px">
+        This check is passive. The full 21-attack scan requires
+        <span lang="de">Eigentumsnachweis</span> before it touches a live bot.
+      </span>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site">
+  <div class="in">
+    <span>© 2026 LLMantis</span>
+    <a href="/static/impressum.html" lang="de">Impressum</a>
+    <a href="/static/datenschutz.html" lang="de">Datenschutzerklärung</a>
+    <span class="sp">This is an automated technical check, not legal advice.</span>
+  </div>
+</footer>
+
+<script>
+'use strict';
+
+const CHECK_LABELS = {
+  ai_disclosure: 'Discloses it is AI (Art. 50 Abs. 1)',
+  privacy_link:  'Privacy policy link',
+  impressum:     'Impressum (§ 5 DDG)',
+};
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+const menuBtn = document.getElementById('menuBtn');
+const nav = document.getElementById('nav');
+menuBtn.addEventListener('click', () => {
+  const open = nav.classList.toggle('open');
+  menuBtn.setAttribute('aria-expanded', String(open));
+});
+
+const form = document.getElementById('checkForm');
+const runBtn = document.getElementById('run');
+const errEl = document.getElementById('error');
+const result = document.getElementById('result');
+const rUrl = document.getElementById('rUrl');
+const rBody = document.getElementById('rBody');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = document.getElementById('url').value.trim();
+  if (!url) return;
+
+  errEl.textContent = '';
+  runBtn.disabled = true;
+  const label = runBtn.textContent;
+  runBtn.textContent = 'Checking…';
+  result.classList.remove('on');
+
+  try {
+    const res = await fetch('/api/art50check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_url: url }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.detail || 'Check failed.';
+      return;
+    }
+    if (data.status === 'error') {
+      errEl.textContent = 'Could not reach the page: ' + data.error;
+      return;
+    }
+
+    rUrl.textContent = data.url;
+
+    if (!data.widgets_found) {
+      rBody.innerHTML = '<p class="r-empty">No chat widget found on this page. ' +
+        'Widgets loaded dynamically via JavaScript are not detected by this ' +
+        'simple check — no widget found is not proof none exists.</p>';
+    } else {
+      rBody.innerHTML = data.findings
+        .filter(f => f.check !== 'widget_found')
+        .map(f => {
+          const pass = f.status === 'pass';
+          return '<div class="r-check">' +
+            '<div><div class="label">' + escHtml(CHECK_LABELS[f.check] || f.check) + '</div>' +
+            '<div class="evidence">' + escHtml(f.evidence) + '</div></div>' +
+            '<div class="r-status ' + (pass ? 'pass' : 'fail') + '">' +
+            (pass ? 'OK' : 'Missing') + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    result.classList.add('on');
+  } catch (err) {
+    errEl.textContent = 'Check failed: ' + String(err);
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = label;
+  }
+});
+</script>
+</body>
+</html>

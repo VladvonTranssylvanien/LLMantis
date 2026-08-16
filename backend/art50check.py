@@ -40,6 +40,7 @@ class Art50Result(BaseModel):
     status: str  # "ok" or "error" or "incomplete"
     error: Optional[str] = None
     widgets_found: int = 0
+    widget_names: list[str] = []
     findings: list[Art50Finding] = []
     duration_ms: int = 0
 
@@ -286,7 +287,8 @@ async def check_art50(url: str) -> Art50Result:
     return Art50Result(
         url=url,
         status=overall_status,
-        widgets_found=widget_check.get("widgets", []) if widget_check["found"] else 0,
+        widgets_found=len(widget_check["widgets"]),
+        widget_names=[w["name"] for w in widget_check["widgets"]],
         findings=findings,
         duration_ms=int((time.time() - start) * 1000)
     )
