@@ -76,7 +76,7 @@ in `backend/`, which is Vlad's zone.
 
 | # | What | Why |
 |---|---|---|
-| 1 | 🔴 **Rotate the Azure key** | Pasted into a chat transcript. `SECRETS.md` treats that as a leak requiring rotation. Deleting the deployment did **not** invalidate it — verified: the old key still returns 404, not 401 |
+| 1 | ✅ **DONE 16.08 — Azure key rotated.** Old key verified dead (HTTP 401). The leak is burned. 🔴 **But the replacement in `lab/.env` does not authenticate** — see Session 10 | Was pasted into a chat transcript; `SECRETS.md` treats that as a leak requiring rotation |
 | 2 | Decide where the target bots live long-term | `demo/targets.yaml` is off-limits and its ownership is unresolved (deviation #1) |
 | 3 | Approve drafting the calibration set | `calibration/**` is whitelisted; drafting was explicitly deferred |
 | 4 | Get a Mistral API key, or ask Vlad to restore mock | The only thing standing between here and the judge-agreement number |
@@ -92,16 +92,42 @@ in `backend/`, which is Vlad's zone.
 | 4 | In `api` mode the judge receives an empty system prompt (`scanner.py:39` vs `:101`) | not filed |
 | 5 | `requirements.txt:6` still pins `anthropic`, which `llm.py` no longer uses | not filed |
 
-### Documents that are now wrong
+### Documents that are still wrong — re-checked against `origin/main` 16.08
 
-| Document | What is stale |
-|---|---|
-| `PROJECT-STATE.md:83` | Tech debt #1 "migrate the judge to Mistral" is **done** — `config.py:33` defaults to `mistral-small` and no Anthropic provider remains |
-| `PROJECT-STATE.md:85-87` | Debt #2 #3 #4 #5 (persistence, DNS verification, Organizations, library versioning) all appear implemented in recent commits |
-| `PROJECT_COMPLETE_OVERVIEW.md:386` | Tells the reader to demo in mock mode, which cannot work |
-| `backend/llm.py:7-11` | Docstring still documents mock mode as a feature |
-| `docs/GREGOR-TARGET-LAB.md:32` | Canary `LLMANTIS-CANARY-7f3a91` is invisible to `detect_canary()` — lowercase tail (deviation #3) |
-| `PROJECT-STATE.md:114` | "Test bots 0 of 3" — A and B now exist |
+Vlad landed 17 commits after this branch was cut, including
+`da489f9 docs: Bring README, PROJECT-STATE, SETUP and SECRETS up to date`.
+Most of the staleness recorded in earlier sessions is **fixed**; the list below
+is what survives re-checking.
+
+| Document | What is stale | Verified against `origin/main` |
+|---|---|---|
+| `PROJECT_COMPLETE_OVERVIEW.md:386` | "Test in Mock Mode" walkthrough — cannot work, `mock` is registered nowhere | ✅ still present |
+| `backend/llm.py:7-11` | Docstring still documents mock mode as a working feature | ✅ `llm.py` unchanged |
+| `docs/GREGOR-TARGET-LAB.md:32` | Canary `LLMANTIS-CANARY-7f3a91` is invisible to `detect_canary()` — lowercase tail (deviation #3) | ✅ unchanged |
+| `PROJECT-STATE.md:136` | **"Test bots 3 of 3 ✅ `demo/targets.yaml`"** — see below | ✅ new claim, added by someone else |
+
+**Corrected — no longer stale, do not re-report:**
+tech debt #1 (judge → Mistral), #2 (persistence), #3 (DNS ownership), #4
+(Organizations), #5 (library versioning), #7 (scoring/README), #9 (auth) are all
+marked **DONE 16.08** on `main`, and `anthropic` has been removed from
+`requirements.txt`. Earlier sessions of this worklog reported several of these as
+open. They were, at the time. They are not now.
+
+### ⚠️ Conflicting claim about test bots — needs a decision
+
+`PROJECT-STATE.md:136` on `main` now reads **"Test bots | 3 of 3 | ✅
+`demo/targets.yaml` — unprotected, hardened, MediClinic"**.
+
+Those are not the bots this brief specifies. `docs/GREGOR-TARGET-LAB.md` asks for
+TeleShop A (German, Art. 50 violation, canary `LLMANTIS-CANARY-…`), its hardened
+twin, and **Praxis Dr. Weber**. `demo/targets.yaml` holds English prompts, a
+shared canary across both TeleShop bots, and MediClinic instead of Dr. Weber
+(deviation #1).
+
+So the project now records the target-bot deliverable as complete while the
+bots described in the brief are `lab/bots/teleshop-{a,b}.yaml` (this PR) and Bot
+C does not exist at all. Someone has to decide which set is authoritative — this
+is a coordination question, not a code one.
 
 These are other people's files. Reported, not edited.
 
@@ -1010,3 +1036,105 @@ high-entropy literals in the diff. `lab/.env.example` ships with
 - That the PR passes any CI. None was observed to run.
 - Whether pushing `AGENTS.md` and `CLAUDE.md` conflicts with anything the other
   contributors keep locally — both were untracked before this commit.
+
+---
+
+## 2026-08-16 — Session 10: key rotation verified, merge safety assessed
+
+### ✅ Rotation worked — the leaked key is burned
+
+The old key now returns **HTTP 401** against the same endpoint that previously
+served it. Earlier it returned 404 (authenticated, model missing), so this is a
+genuine revocation and not a deployment artefact. The scratchpad copy was
+deleted.
+
+### 🔴 The replacement key in `lab/.env` does not authenticate
+
+Gregor pasted a new key into `lab/.env`. It is rejected.
+
+File contents are structurally sound — inspected without printing the value:
+
+```
+LAB_AZURE_URL     https://chatbots.services.ai.azure.com/openai/v1/chat/completions
+LAB_AZURE_KEY     length=84  quoted=False  no leading/trailing space  charset ok
+LAB_AZURE_MODEL   gpt-4.1-mini
+```
+
+84 characters and the right character set, so it is shaped like a real Azure
+key — it is not a truncated paste or a leftover placeholder. Azure still refuses
+it:
+
+| attempt | result |
+|---|---|
+| `api-key` header | HTTP 401 |
+| `Authorization: Bearer` | HTTP 401 |
+| retry after 15s / 30s / 45s (propagation lag) | HTTP 401 each time |
+
+Both auth styles and 90 seconds of retries. The URL is the one verified working
+in Session 6, and the model name is a deployment that answered then.
+
+Most likely: the key belongs to a **different resource** than
+`chatbots.services.ai.azure.com`, or the portal was showing a different key
+field than the one regenerated. Unresolved — needs Gregor to re-copy.
+
+**Consequence:** no further lab measurement is possible until this is fixed. The
+numbers already recorded stand; they were taken before rotation.
+
+### Merge safety of PR #9 — mechanically clean
+
+| Check | Result |
+|---|---|
+| Conflicts | none — `git merge-tree` merges cleanly |
+| Files colliding with `main` | none; all seven paths are new on `main` |
+| `main` moved since branch point | **yes, 17 commits** |
+| Secrets in the commit | none — key absent from staged content, commit and full history |
+
+The 17 commits are Vlad's: authentication, API keys, rate limiting, SSRF and
+timing fixes, white-label branding, robots.txt, persistence. None touch `lab/`.
+
+### The claims in issues #7 and #8 were re-verified against current `main`
+
+Not assumed to have survived 17 commits — checked:
+
+| Claim | Status on `origin/main` |
+|---|---|
+| `httpx.AsyncClient(timeout=30)` at `scanner.py:57` (#8) | ✅ still there, unchanged |
+| No empty-answer guard in `scanner.py` (#7) | ✅ still absent |
+| `MAX_TOKENS_TARGET = 600` (#7) | ✅ still 600, but **moved from `config.py:38` to `config.py:44`** |
+| `PROVIDER=mock` registered nowhere while remaining the default | ✅ still true in `llm.py:76-78`, `config.py:26`, `.env.example:3` |
+
+Issue #7's line citation was corrected on GitHub. Everything else holds.
+
+### ⚠️ New on `main`: the canary is now persisted
+
+Commit `89f59b1` added one line to `scanner.py`:
+
+```python
+"canary": target.canary,  # the one actually used (explicit or auto-detected)
+```
+
+`main.py:140` then stores it: `canary=report.get("canary")`.
+
+Checked how far it travels: **not rendered in `report.html`** — the only canary
+references there are explanatory prose and the input field on `index.html`. So
+the brief's literal rule, *"never printed in logs or in the report body"*
+(`GREGOR-TARGET-LAB.md:145`), is **not** broken.
+
+But the value is now written to the database. For a customer scan that is a
+planted secret from their own system prompt sitting in our storage, which sits
+oddly beside `PLAYBOOK.md`'s "customer prompts carry a retention policy … they
+are trade secrets". Raised as a question for Vlad rather than filed as a defect —
+it may well be deliberate, since layer 1 cannot be audited afterwards without
+knowing which canary was used.
+
+### What I did NOT verify
+
+- **Why the new key fails.** Only that it does, consistently, on both auth
+  styles. No access to the Azure portal from here, so which resource it belongs
+  to could not be checked.
+- Whether the canary is stored encrypted or in plain text, and whether any
+  retention policy covers it. Only that it reaches `main.py:140`.
+- Whether `PROJECT-STATE.md:136`'s "test bots 3 of 3" was written with knowledge
+  of `lab/bots/`. Recorded as a coordination question above.
+- GitHub reported `mergeable: UNKNOWN` at query time — it had not finished
+  computing. The local `git merge-tree` result is the basis for "clean".
