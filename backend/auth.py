@@ -129,12 +129,29 @@ async def get_current_user_optional(
         return None
 
 
-def require_membership(db: Session, user: User, org_id: UUID) -> Membership:
+# Higher number = more privilege. "member" is the floor every role clears.
+ROLE_RANK = {"member": 0, "admin": 1, "owner": 2}
+
+
+def require_membership(db: Session, user: User, org_id: UUID, min_role: str = "member") -> Membership:
     """
-    Raises 403 if `user` has no Membership row for `org_id`. Call this at
-    the top of every org-scoped endpoint, right after resolving org_id.
+    Raises 403 if `user` has no Membership row for `org_id`, or if their role
+    ranks below `min_role`. Call this at the top of every org-scoped endpoint,
+    right after resolving org_id.
+
+    Default is "member" — any role clears it, so existing calls are unaffected.
+    Pass min_role="admin" for actions with organization-wide impact (revoking
+    a key someone else depends on, changing branding, verifying domain
+    ownership) that a plain member should not be able to do alone.
     """
     membership = db.query(Membership).filter_by(user_id=user.id, org_id=org_id).first()
     if not membership:
         raise HTTPException(403, "You are not a member of this organization")
+
+    if ROLE_RANK.get(membership.role, -1) < ROLE_RANK.get(min_role, 999):
+        raise HTTPException(
+            403,
+            f"This action requires the '{min_role}' role or higher "
+            f"(you are '{membership.role}')"
+        )
     return membership

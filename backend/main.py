@@ -371,7 +371,8 @@ async def ownership_challenge(request: Request, body: OwnershipChallengeRequest,
                                current_user: User = Depends(get_current_user)):
     """
     Generate a DNS verification challenge, tied to one organization + domain.
-    Requires membership in that organization.
+    Requires the admin or owner role — this unlocks active attacks against
+    a real target, not something a plain member should trigger alone.
 
     Returns: token and instructions for DNS TXT record.
 
@@ -384,7 +385,7 @@ async def ownership_challenge(request: Request, body: OwnershipChallengeRequest,
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
-    require_membership(db, current_user, org_uuid)
+    require_membership(db, current_user, org_uuid, min_role="admin")
 
     if not db.query(Organization).filter_by(id=org_uuid).first():
         raise HTTPException(404, f"Organization {body.org_id} not found")
@@ -399,7 +400,7 @@ async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: S
                             current_user: User = Depends(get_current_user)):
     """
     Verify ownership by checking DNS TXT record against a pending challenge.
-    Requires membership in that organization.
+    Requires the admin or owner role (same reasoning as the challenge step).
 
     Looks for: _llmantis.{domain} TXT {token}
 
@@ -410,7 +411,7 @@ async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: S
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
-    require_membership(db, current_user, org_uuid)
+    require_membership(db, current_user, org_uuid, min_role="admin")
 
     result = await verify_ownership(db, org_uuid, body.domain, body.token)
     return result.dict()
@@ -497,6 +498,12 @@ async def get_organization(org_id: str, db: Session = Depends(get_db),
         raise HTTPException(404, f"Organization {org_id} not found")
 
     scans = db.query(DBScan).filter_by(org_id=org_uuid).all()
+    members = db.query(Membership).filter_by(org_id=org_uuid).all()
+    member_list = []
+    for m in members:
+        u = db.query(User).filter_by(id=m.user_id).first()
+        if u:
+            member_list.append({"user_id": str(u.id), "email": u.email, "role": m.role})
 
     return {
         "id": str(org.id),
@@ -504,6 +511,7 @@ async def get_organization(org_id: str, db: Session = Depends(get_db),
         "domain": org.domain,
         "created_at": org.created_at.isoformat(),
         "branding": _branding_dict(org.branding),
+        "members": member_list,
         "scans": [
             {
                 "id": str(s.id),
@@ -515,6 +523,46 @@ async def get_organization(org_id: str, db: Session = Depends(get_db),
             for s in scans
         ]
     }
+
+
+@app.post("/api/organizations/{org_id}/members")
+@limiter.limit("10/minute")
+async def add_member(request: Request, org_id: str, body: OrganizationMemberRequest,
+                      db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Add an existing user (by user_id) to an organization with a role.
+    Requires the owner role — granting someone else access to the
+    organization is the most sensitive action here, more so than any single
+    thing a member once added can do.
+    """
+    try:
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    require_membership(db, current_user, org_uuid, min_role="owner")
+
+    if body.role not in ("owner", "admin", "member"):
+        raise HTTPException(400, "role must be 'owner', 'admin' or 'member'")
+
+    try:
+        target_user_id = UUID(body.user_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid user_id format")
+
+    if not db.query(User).filter_by(id=target_user_id).first():
+        raise HTTPException(404, "No user with that user_id")
+
+    existing = db.query(Membership).filter_by(user_id=target_user_id, org_id=org_uuid).first()
+    if existing:
+        existing.role = body.role
+        db.commit()
+        return {"user_id": str(target_user_id), "org_id": org_id, "role": body.role, "updated": True}
+
+    db.add(Membership(user_id=target_user_id, org_id=org_uuid, role=body.role,
+                       created_at=datetime.utcnow()))
+    db.commit()
+    return {"user_id": str(target_user_id), "org_id": org_id, "role": body.role, "updated": False}
 
 
 def _branding_dict(b: Branding | None) -> dict | None:
@@ -547,8 +595,9 @@ class BrandingRequest(BaseModel):
 async def upsert_branding(org_id: str, body: BrandingRequest, db: Session = Depends(get_db),
                            current_user: User = Depends(get_current_user)):
     """
-    Create or update white-label settings for an organization. Requires
-    membership in that organization.
+    Create or update white-label settings for an organization. Requires the
+    admin or owner role — branding is organization-wide, a plain member
+    shouldn't be able to change what every teammate's reports look like.
 
     Cosmetic only — an agency's own logo, name and accent color on the
     Pruefbericht and report UI. Nothing here changes how a scan runs.
@@ -558,7 +607,7 @@ async def upsert_branding(org_id: str, body: BrandingRequest, db: Session = Depe
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
-    require_membership(db, current_user, org_uuid)
+    require_membership(db, current_user, org_uuid, min_role="admin")
 
     org = db.query(Organization).filter_by(id=org_uuid).first()
     if not org:
@@ -610,9 +659,11 @@ class ApiKeyCreateRequest(BaseModel):
 async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """
-    Create a new API key for an organization. Requires membership in that
-    organization — this used to be the whole hole: anyone could mint a key
-    for any org_id, no proof of ownership required at all.
+    Create a new API key for an organization. Requires the admin or owner
+    role — minting a key grants a durable programmatic credential for the
+    whole org, not something a plain member should be able to do alone.
+    This endpoint used to be the whole hole: anyone could mint a key for
+    any org_id, no proof of ownership required at all.
 
     Returns the plaintext key ONCE — it is never shown or recoverable
     again after this response. Store it now; to rotate, revoke this one
@@ -623,7 +674,7 @@ async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = 
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
-    require_membership(db, current_user, org_uuid)
+    require_membership(db, current_user, org_uuid, min_role="admin")
 
     if not db.query(Organization).filter_by(id=org_uuid).first():
         raise HTTPException(404, f"Organization {body.org_id} not found")
@@ -657,14 +708,15 @@ async def get_keys(org_id: str, db: Session = Depends(get_db),
 async def delete_key(key_id: str, org_id: str, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """Revoke an API key. Soft delete — the row stays, revoked_at is set.
-    Requires membership in that organization."""
+    Requires the admin or owner role — a plain member shouldn't be able to
+    cut off a credential a teammate's CI/CD pipeline may depend on."""
     try:
         key_uuid = UUID(key_id)
         org_uuid = UUID(org_id)
     except ValueError:
         raise HTTPException(400, "Invalid id format")
 
-    require_membership(db, current_user, org_uuid)
+    require_membership(db, current_user, org_uuid, min_role="admin")
 
     if not revoke_api_key(db, key_uuid, org_uuid):
         raise HTTPException(404, "API key not found for this organization")
