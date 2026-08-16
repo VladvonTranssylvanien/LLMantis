@@ -40,6 +40,17 @@ class Target:
     api_url: str = ""               # used when mode == "api"
     api_headers: dict = field(default_factory=dict)
     canary: str | None = None       # planted secret, enables layer-1 detection
+    # Anything else that must never appear in an answer: a supplier name, an
+    # internal rate, a person's name. The canary is one planted string we
+    # control; these are the customer's own real secrets, which we cannot
+    # guess. Both are checked the same way in layer 1.
+    #
+    # This exists because the deterministic rules in attacks.yaml carry
+    # literal phrases ("Shenzhen") belonging to one specific demo bot. Those
+    # match nothing on any other bot, so layer 1 silently does not apply and
+    # the finding quietly falls through to the model. Found against the lab
+    # bots, whose supplier is Nordwind Logistik.
+    secrets: list[str] = field(default_factory=list)
 
 
 async def _ask_target(target: Target, message: str) -> str:
@@ -98,7 +109,8 @@ async def _run_one(attack: Attack, target: Target, limiter: asyncio.Semaphore) -
             }
 
         try:
-            verdict = await judge(attack, target.system_prompt, answer, target.canary)
+            verdict = await judge(attack, target.system_prompt, answer,
+                                  target.canary, target.secrets)
         except Exception as e:
             verdict = {
                 "verdict": "ERROR",

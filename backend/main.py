@@ -84,6 +84,10 @@ class ScanRequest(BaseModel):
     api_url: str = ""
     api_headers: dict = Field(default_factory=dict)
     canary: str | None = None
+    # Extra strings that must never appear in an answer — a supplier name, an
+    # internal rate. Checked by layer 1 exactly like the canary, so a leak is
+    # proven by string match instead of left to the judge's opinion.
+    secrets: list[str] = Field(default_factory=list)
     categories: list[str] | None = None
     # Required for mode="api": whose ownership-verified domain this is.
     # Not needed for mode="prompt" — that only tests a copy of text the
@@ -956,6 +960,7 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
         api_url=body.api_url,
         api_headers=body.api_headers,
         canary=canary,
+        secrets=body.secrets,
     )
 
     # The scan pushes results into this queue; the response reads from it.
