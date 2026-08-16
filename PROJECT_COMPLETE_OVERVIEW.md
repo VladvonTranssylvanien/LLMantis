@@ -32,7 +32,7 @@
 |------|------|------|--------|
 | **Project Lead** | Bogdan | Coordination, design, pitch deck, brand | ✅ |
 | **Backend Owner** | Vlad (YOU) | Scanner, judge, scoring, API, database | ✅ ~90% |
-| **Attack Engineer** | Gregor | Attack library, target bots, judge calibration | ⬜ ~20% |
+| **Attack Engineer** | Gregor | Attack library, target bots, judge calibration | ✅ ~80% |
 | **GRC/Legal** | Kwabena | Compliance, legal text, Art. 50 rules | ✅ ~85% |
 
 **Rule**: One owner per file. If two people need to edit same file, design is broken.
@@ -403,9 +403,9 @@ uvicorn backend.main:app --reload --port 8000
 6. Support Gregor with target bots if needed
 
 ### Gregor (Attack Engineer) — This Week
-1. Build 3 target bots (TeleShop vulnerable/hardened, MediClinic)
-2. Create 30 hand-labeled calibration examples
-3. Measure judge accuracy on real responses
+1. ✅ Build 3 target bots (TeleShop vulnerable/hardened, MediClinic)
+2. ✅ Create 30 hand-labeled calibration examples
+3. ✅ Measure judge accuracy on real responses
 4. Write 54 more attacks (21 → 75 target)
 
 ### Bogdan (Project Lead) — This Week
