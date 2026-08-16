@@ -9,3 +9,4 @@ dnspython==2.8.0          # backend/ownership.py - DNS TXT record verification
 sqlalchemy==2.0.52        # backend/models.py, backend/database.py
 alembic==1.13.1           # database migrations
 psycopg[binary]==3.3.4    # PostgreSQL driver for SQLAlchemy
+slowapi==0.1.10           # per-IP rate limiting on backend/main.py endpoints

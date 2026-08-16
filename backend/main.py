@@ -15,7 +15,16 @@ WHY /api/scan STREAMS
     This format is called NDJSON: newline-delimited JSON.
 """
 
-from __future__ import annotations
+# NOTE: deliberately no `from __future__ import annotations` here.
+# FastAPI's request-body detection resolves string annotations using the
+# endpoint callable's own __globals__ (see get_typed_signature in
+# fastapi/dependencies/utils.py). slowapi's rate-limit decorator wraps each
+# endpoint in a function defined inside slowapi's own module, so with
+# postponed evaluation active, FastAPI ends up resolving our Pydantic model
+# names against slowapi's globals instead of this module's — every ScanRequest
+# / OrganizationCreateRequest / etc. parameter came back as an unresolved
+# ForwardRef and got silently treated as a query parameter instead of a body.
+# Python 3.10+ supports `X | None` natively, so nothing else here needs it.
 
 import asyncio
 import json
@@ -25,10 +34,14 @@ from urllib.parse import urlparse
 from uuid import uuid4, UUID
 
 import yaml
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from . import config
@@ -43,6 +56,15 @@ from .apikeys import (
 )
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
+
+# Rate limiting, by caller IP. WHY: /api/scan makes ~21 real Mistral API
+# calls per request — unlimited access here means unlimited cost, not just
+# a DoS risk. Limits below are per-IP and reset every window; an org-aware
+# limit (per API key) can layer on top once authentication exists.
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 # ---------------------------------------------------------------- request bodies
@@ -209,7 +231,8 @@ async def list_targets():
 
 
 @app.post("/api/art50check")
-async def art50_check(request: ScanRequest):
+@limiter.limit("20/minute")
+async def art50_check(request: Request, body: ScanRequest):
     """
     Passive Art. 50 AI Act compliance check.
 
@@ -222,10 +245,10 @@ async def art50_check(request: ScanRequest):
         - Privacy link
         - Impressum (§ 5 DDG)
     """
-    if not request.api_url.strip():
+    if not body.api_url.strip():
         raise HTTPException(400, "api_url (the website URL) is required")
 
-    result = await check_art50(request.api_url)
+    result = await check_art50(body.api_url)
     return result.dict()
 
 
@@ -255,7 +278,8 @@ class OrganizationMemberRequest(BaseModel):
 
 
 @app.post("/api/ownership/challenge")
-async def ownership_challenge(request: OwnershipChallengeRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def ownership_challenge(request: Request, body: OwnershipChallengeRequest, db: Session = Depends(get_db)):
     """
     Generate a DNS verification challenge, tied to one organization + domain.
 
@@ -266,19 +290,20 @@ async def ownership_challenge(request: OwnershipChallengeRequest, db: Session = 
     /api/scan checks before allowing an active (mode="api") scan on that domain.
     """
     try:
-        org_uuid = UUID(request.org_id)
+        org_uuid = UUID(body.org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
     if not db.query(Organization).filter_by(id=org_uuid).first():
-        raise HTTPException(404, f"Organization {request.org_id} not found")
+        raise HTTPException(404, f"Organization {body.org_id} not found")
 
-    result = await create_challenge(db, org_uuid, request.domain)
+    result = await create_challenge(db, org_uuid, body.domain)
     return result.dict()
 
 
 @app.post("/api/ownership/verify")
-async def ownership_verify(request: OwnershipVerifyRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def ownership_verify(request: Request, body: OwnershipVerifyRequest, db: Session = Depends(get_db)):
     """
     Verify ownership by checking DNS TXT record against a pending challenge.
 
@@ -287,11 +312,11 @@ async def ownership_verify(request: OwnershipVerifyRequest, db: Session = Depend
     Returns: {"verified": true/false, "verified_at": "...", "error": "..."}
     """
     try:
-        org_uuid = UUID(request.org_id)
+        org_uuid = UUID(body.org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
-    result = await verify_ownership(db, org_uuid, request.domain, request.token)
+    result = await verify_ownership(db, org_uuid, body.domain, body.token)
     return result.dict()
 
 
@@ -299,7 +324,8 @@ async def ownership_verify(request: OwnershipVerifyRequest, db: Session = Depend
 
 
 @app.post("/api/organizations")
-async def create_organization(request: OrganizationCreateRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def create_organization(request: Request, body: OrganizationCreateRequest, db: Session = Depends(get_db)):
     """
     Create a new organization.
 
@@ -307,8 +333,8 @@ async def create_organization(request: OrganizationCreateRequest, db: Session = 
     """
     org = Organization(
         id=uuid4(),
-        name=request.name,
-        domain=request.domain,
+        name=body.name,
+        domain=body.domain,
         created_at=datetime.utcnow()
     )
     db.add(org)
@@ -463,7 +489,8 @@ class ApiKeyCreateRequest(BaseModel):
 
 
 @app.post("/api/keys")
-async def create_key(request: ApiKeyCreateRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def create_key(request: Request, body: ApiKeyCreateRequest, db: Session = Depends(get_db)):
     """
     Create a new API key for an organization.
 
@@ -472,16 +499,16 @@ async def create_key(request: ApiKeyCreateRequest, db: Session = Depends(get_db)
     and create a new one.
     """
     try:
-        org_uuid = UUID(request.org_id)
+        org_uuid = UUID(body.org_id)
     except ValueError:
         raise HTTPException(400, "Invalid org_id format")
 
     if not db.query(Organization).filter_by(id=org_uuid).first():
-        raise HTTPException(404, f"Organization {request.org_id} not found")
-    if not request.name.strip():
+        raise HTTPException(404, f"Organization {body.org_id} not found")
+    if not body.name.strip():
         raise HTTPException(400, "name is required")
 
-    result = create_api_key(db, org_uuid, request.name.strip())
+    result = create_api_key(db, org_uuid, body.name.strip())
     return result.dict()
 
 
@@ -577,7 +604,8 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/scan")
-async def scan(request: ScanRequest, db: Session = Depends(get_db),
+@limiter.limit("5/minute")
+async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db),
                 api_key_org: UUID | None = Depends(resolve_org_from_api_key)):
     """
     Run a scan and stream results as NDJSON.
@@ -593,16 +621,20 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
         pipeline gets its scans attributed without knowing its own org_id.
         Otherwise we use body.org_id if given, and only fall back to the
         anonymous demo org for an unidentified mode="prompt" call.
+
+    RATE LIMIT
+        5/minute per IP — each call makes ~21 real Mistral API calls, so
+        unrestricted access here is unrestricted cost, not just a DoS risk.
     """
-    if request.mode == "prompt" and not request.system_prompt.strip():
+    if body.mode == "prompt" and not body.system_prompt.strip():
         raise HTTPException(400, "system_prompt is required in prompt mode")
-    if request.mode == "api" and not request.api_url.strip():
+    if body.mode == "api" and not body.api_url.strip():
         raise HTTPException(400, "api_url is required in api mode")
 
     effective_org_id: UUID | None = api_key_org
-    if effective_org_id is None and request.org_id:
+    if effective_org_id is None and body.org_id:
         try:
-            effective_org_id = UUID(request.org_id)
+            effective_org_id = UUID(body.org_id)
         except ValueError:
             raise HTTPException(400, "Invalid org_id format")
 
@@ -610,7 +642,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
     # require verified ownership of that domain. mode="prompt" is exempt —
     # it only replays text the caller submitted themselves, never a live
     # third-party system.
-    if request.mode == "api":
+    if body.mode == "api":
         if effective_org_id is None:
             raise HTTPException(
                 403,
@@ -619,7 +651,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
                 "/api/ownership/challenge and /api/ownership/verify."
             )
 
-        domain = urlparse(request.api_url).netloc or request.api_url
+        domain = urlparse(body.api_url).netloc or body.api_url
         if not is_domain_verified(db, effective_org_id, domain):
             raise HTTPException(
                 403,
@@ -630,13 +662,13 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
 
     # If the caller did not tell us the secret, try to find it ourselves.
     # Without a canary, layer 1 of the judge cannot run at all.
-    canary = request.canary or detect_canary(request.system_prompt)
+    canary = body.canary or detect_canary(body.system_prompt)
 
     target = Target(
-        mode=request.mode,
-        system_prompt=request.system_prompt,
-        api_url=request.api_url,
-        api_headers=request.api_headers,
+        mode=body.mode,
+        system_prompt=body.system_prompt,
+        api_url=body.api_url,
+        api_headers=body.api_headers,
         canary=canary,
     )
 
@@ -649,7 +681,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
 
     async def worker():
         try:
-            report = await run_scan(target, request.categories, on_result)
+            report = await run_scan(target, body.categories, on_result)
             report_holder["report"] = report
             await queue.put({"type": "complete", "report": report})
         except Exception as e:
@@ -660,8 +692,8 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
     async def stream():
         library = load_library()
         selected = library.attacks
-        if request.categories:
-            selected = [a for a in selected if a.category in request.categories]
+        if body.categories:
+            selected = [a for a in selected if a.category in body.categories]
         yield json.dumps({"type": "start", "total": len(selected)}) + "\n"
 
         task = asyncio.create_task(worker())
@@ -680,7 +712,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db),
                 db = SessionLocal()
                 try:
                     report = report_holder["report"]
-                    await _save_scan_to_db(db, request, report, report.get("duration_s", 0), effective_org_id)
+                    await _save_scan_to_db(db, body, report, report.get("duration_s", 0), effective_org_id)
                 finally:
                     db.close()
 
