@@ -36,9 +36,23 @@ JUDGE_MODEL = os.getenv("JUDGE_MODEL", "mistral-small")
 
 
 # --- Scan behaviour ------------------------------------------------------
-# How many attacks run at the same time. Higher = faster scan, but you may
-# hit the provider's rate limit. 5 is safe.
-CONCURRENCY = int(os.getenv("CONCURRENCY", "5"))
+# How many attacks run at the same time.
+#
+# Was 5, described as "safe" — but it never actually ran 5 at once. llm.py
+# called Mistral's *synchronous* client from inside an async function, which
+# blocks the event loop, so the semaphore let 5 tasks in and they queued up
+# behind each other anyway. Switching to complete_async made the concurrency
+# real for the first time, and 5 immediately exceeded our Mistral tier:
+# three back-to-back 21-attack scans produced enough 429s to exhaust the
+# retries and suppress a grade entirely.
+#
+# Measured against the lab, three consecutive scans each time:
+#     5 -> 12s per scan, but 429s and a scan with no grade
+#     3 -> ~15s per scan, zero rate-limit errors
+#     2 -> ~23s per scan, zero rate-limit errors
+# 3 is the point where it stops costing anything. Raise it only after
+# checking what the Mistral plan actually allows.
+CONCURRENCY = int(os.getenv("CONCURRENCY", "3"))
 
 # Caps on response length, so one runaway answer cannot cost us 10 EUR.
 MAX_TOKENS_TARGET = 600
