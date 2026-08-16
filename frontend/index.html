@@ -503,6 +503,10 @@ function render(report) {
   const incomplete = total > 0 && (errored / total) > INCOMPLETE_THRESHOLD;
 
   // Hand the report to the print view without a round trip to the backend.
+  // target_name isn't part of the API response (mode="prompt" has no name
+  // concept on the backend) — attach whichever demo bot is selected here.
+  const selectedTarget = demoTargets.find(t => t.id === $('target').value);
+  report.target_name = selectedTarget ? selectedTarget.name : 'Custom prompt';
   try { sessionStorage.setItem(REPORT_KEY, JSON.stringify(report)); } catch (e) { /* quota */ }
 
   if (incomplete) {

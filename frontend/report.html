@@ -262,9 +262,7 @@ function build() {
 
   const issued = new Date().toISOString().slice(0, 10);
   const scanId = String(REPORT.scan_id || '—').slice(0, 12);
-  // The backend does not send a library version yet — see the API request in
-  // the session report. Never invent one; say it is not reported.
-  const libVer = REPORT.attack_library_version || 'not reported by the backend';
+  const libVer = REPORT.library_version || 'not reported by the backend';
 
   document.getElementById('runhead').innerHTML =
     'LLMantis <span lang="de">Prüfbericht</span> — ' + esc(TARGET_NAME) +
