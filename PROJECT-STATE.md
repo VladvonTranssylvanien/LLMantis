@@ -9,7 +9,22 @@
 
 ## 1. Where we are
 
-**Status:** week 1, track A (course submission in 7 days) — **backend/API work for
+**🔴 Course submission deadline: 21.08.2026.** Carried here from
+`PROJECT_COMPLETE_OVERVIEW.md` before that file was deleted — it was the only
+place in the repository that named the date, and it said "7 days from Aug 15",
+which reads as seven days no matter when you open it.
+
+**Team and ownership** (same source, one owner per file — if two people need to
+edit the same file, the design is broken):
+
+| Role | Name | Owns |
+|---|---|---|
+| Project Lead | Bogdan | Project structure, planning, engine work, pitch deck, frontend |
+| Backend Owner | Vlad | Scanner, judge, scoring, API, database |
+| Attack Engineer | Gregor | Attack library, target bots, judge calibration |
+| GRC / Legal | Kwabena | Compliance, legal text, Art. 50 rules |
+
+**Status:** week 1, track A — **backend/API work for
 Vlad's implementation plan is functionally complete** (P0 + P1 + the P2 items
 that don't need a registered company), **including authentication**. Remaining
 gaps are frontend UI for the newer endpoints (a deliberate choice — Bogdan owns
@@ -17,7 +32,7 @@ that next) and the 21→75 attack library.
 
 - ✅ Idea chosen and justified with market data (ECA Mapping 2025)
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
-- ✅ Repository with a working backend: FastAPI, 21 attacks, two-layer judging, scoring, HTML frontend, mock mode
+- ✅ Repository with a working backend: FastAPI, 21 attacks, two-layer judging, scoring, HTML frontend
 - ✅ Playbook and role briefs written
 - ✅ Repository renamed to `LLMantis` (Vlad, 15.08). GitHub keeps a redirect from the old name
 - ✅ Playbook, role briefs and brand merged into the engine repository
