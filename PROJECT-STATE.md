@@ -19,7 +19,7 @@ edit the same file, the design is broken):
 
 | Role | Name | Owns |
 |---|---|---|
-| Project Lead | Bogdan | Coordination, design, pitch deck, brand, frontend |
+| Project Lead | Bogdan | Project structure, planning, engine work, pitch deck, frontend |
 | Backend Owner | Vlad | Scanner, judge, scoring, API, database |
 | Attack Engineer | Gregor | Attack library, target bots, judge calibration |
 | GRC / Legal | Kwabena | Compliance, legal text, Art. 50 rules |

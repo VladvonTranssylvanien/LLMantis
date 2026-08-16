@@ -16,8 +16,25 @@
    =========================================================================== */
 
 html { scroll-behavior: smooth; }
-/* The sticky bar must not cover an anchor target when jumping to a section. */
-:target, section[id] { scroll-margin-top: 84px; }
+
+/* Anchor jumps from the menu.
+   This was a flat 84px, which counted the sticky bar but ignored the section's
+   own top padding. The anchor landed 84px down, then clamp(52px,8vw,96px) of
+   padding pushed the heading a further 52-96px, so a menu jump opened a gap of
+   well over 100px under the bar and shoved the section's content off the
+   bottom of the screen.
+   Subtracting that padding and adding a fixed 28px puts the heading 28px under
+   the bar at every viewport width, instead of at one width by accident.
+   --topbar-h is measured from the real bar at runtime (the nav collapses under
+   860px, so its height is not a constant); the value here is the fallback used
+   before that runs. */
+:root {
+  --section-pad: clamp(52px, 8vw, 96px);
+  --topbar-h: 65px;
+}
+:target, section[id] {
+  scroll-margin-top: calc(var(--topbar-h) + 28px - var(--section-pad));
+}
 
 body {
   background:
@@ -81,7 +98,7 @@ a { color: inherit; }
 }
 
 main { position: relative; z-index: 2; }
-section { max-width: 1080px; margin: 0 auto; padding: clamp(52px, 8vw, 96px) clamp(16px, 4vw, 44px); }
+section { max-width: 1080px; margin: 0 auto; padding: var(--section-pad) clamp(16px, 4vw, 44px); }
 
 .eyebrow {
   font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
@@ -389,7 +406,7 @@ const S = {
   stage4: 'Bewertung',
   stage5: 'Note + Bericht',
   stage1sub: 'Example Bot',
-  stage2sub: 'Angriff 12 von 75',
+  stage2sub: 'Angriff 12 von ' + 21,
   stage3sub: 'Antwort erhalten',
   stage4sub: 'zwei Ebenen',
   stage5sub: 'Prüfbericht',
@@ -494,7 +511,7 @@ const SERVICES = [
 ];
 
 const TEAM = [
-  { who: 'Bogdan', role: 'Koordination, Design, Positionierung' },
+  { who: 'Bogdan', role: 'Projektstruktur, Planung, Engine' },
   { who: 'Vlad',   role: 'Engine, API, Datenhaltung' },
   { who: 'Gregor', role: 'Ziel-Labor, Kalibrierung' },
   { who: 'Kwabena', role: 'GRC, rechtliche Grenzen' }
@@ -621,13 +638,34 @@ const spawnPulse = () => edges.length &&
   pulses.push({ e: edges[(Math.random() * edges.length) | 0], t: 0, sp: .012 + Math.random() * .02 });
 for (let i = 0; i < 26; i++) spawnPulse();
 
+/* Der Kopf folgt dem Zeiger.
+   Zwei Werte: wohin der Zeiger zeigt (pmx/pmy, -1..1) und wo der Kopf gerade
+   steht (cmx/cmy). Jeder Frame zieht den zweiten an den ersten heran, sonst
+   springt der Kopf statt sich zu drehen.
+   Die grossen Knoten wandern weiter als die kleinen — das ergibt Tiefe, ohne
+   eine dritte Koordinate zu erfinden. */
+const NET_AMP = 26;               // in Canvas-Einheiten, 900 breit
+let pmx = 0, pmy = 0, cmx = 0, cmy = 0;
+if (!REDUCED) addEventListener('pointermove', e => {
+  const r = cv.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const clamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
+  pmx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
+  pmy = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
+}, { passive: true });
+
 let netT = 0;
 function drawNet() {
   ctx.clearRect(0, 0, SIZE, SIZE);
   netT += 0.01;
-  if (!REDUCED) for (const n of nodes) {
-    n.x = n.ox + Math.sin(netT * n.sp + n.ph) * 3.4;
-    n.y = n.oy + Math.cos(netT * n.sp * .85 + n.ph) * 3.4;
+  if (!REDUCED) {
+    cmx += (pmx - cmx) * .06;
+    cmy += (pmy - cmy) * .06;
+    for (const n of nodes) {
+      const depth = n.r > 2 ? 1.55 : 1;
+      n.x = n.ox + Math.sin(netT * n.sp + n.ph) * 3.4 + cmx * NET_AMP * depth;
+      n.y = n.oy + Math.cos(netT * n.sp * .85 + n.ph) * 3.4 + cmy * NET_AMP * depth;
+    }
   }
   ctx.lineWidth = 1;
   for (const e of edges) {
@@ -659,19 +697,33 @@ function drawNet() {
    =========================================================================== */
 const SVGNS = 'http://www.w3.org/2000/svg';
 const pipe = $('#pipe');
+// Evenly spaced, so a box grown to fit its own text still clears its
+// neighbour and stays inside the 900-unit viewBox. The old spacing put
+// stage 1 at x=60, which leaves room for a box only 120 wide.
 const STAGES = [
-  { x: 60,  label: S.stage1, sub: S.stage1sub },
-  { x: 250, label: S.stage2, sub: S.stage2sub },
-  { x: 440, label: S.stage3, sub: S.stage3sub },
-  { x: 630, label: S.stage4, sub: S.stage4sub },
-  { x: 830, label: S.stage5, sub: S.stage5sub }
+  { x: 78,  label: S.stage1, sub: S.stage1sub },
+  { x: 264, label: S.stage2, sub: S.stage2sub },
+  { x: 450, label: S.stage3, sub: S.stage3sub },
+  { x: 636, label: S.stage4, sub: S.stage4sub },
+  { x: 822, label: S.stage5, sub: S.stage5sub }
 ];
+const BOX_MIN = 84, BOX_MAX = 150;   // 186 apart, so 150 always leaves a gap
+// How many attacks the library actually holds. This was written as the
+// literal 75 in four places while attacks/attacks.yaml held 21, so the
+// public page advertised a number the product does not have. One constant,
+// so growing the library is one edit and cannot drift again.
+const LIB_N = 21;
 
 function el(tag, attrs, text) {
   const n = document.createElementNS(SVGNS, tag);
   for (const k in attrs) n.setAttribute(k, attrs[k]);
   if (text != null) n.textContent = text;
   return n;
+}
+
+// Rendered width of an SVG <text>, or 0 if the browser cannot answer yet.
+function textLen(node) {
+  try { return node.getComputedTextLength() || 0; } catch (_) { return 0; }
 }
 
 (function buildPipe() {
@@ -682,22 +734,51 @@ function el(tag, attrs, text) {
       stroke: 'var(--border)', 'stroke-width': 2, id: 'link' + i
     }));
   }
+  // The box is sized to the text it holds, not the other way round.
+  // A fixed 84px was chosen for one German wording and the longest lines
+  // ("Angriff 12 von 21", "Note + Bericht") already spilled out of it on
+  // both sides. The page ships in three languages, so any fixed width is a
+  // guess about two of them.
+  const widthOf = (label, sub) => {
+    const measured = Math.max(textLen(label), textLen(sub));
+    // getComputedTextLength() is 0 while the SVG is not laid out yet. Falling
+    // back to a character estimate is worse than measuring but far better
+    // than a box that does not fit.
+    const w = measured > 0 ? measured
+                           : Math.max(label.textContent.length * 7.4,
+                                      sub.textContent.length * 6.4);
+    return Math.min(BOX_MAX, Math.max(BOX_MIN, Math.ceil(w) + 26));
+  };
+
   STAGES.forEach((s, i) => {
     const g = el('g', { id: 'stage' + i });
-    g.appendChild(el('rect', {
-      x: s.x - 42, y: 58, width: 84, height: 56, rx: 10,
-      fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, id: 'box' + i
-    }));
-    g.appendChild(el('text', {
+    const label = el('text', {
       x: s.x, y: 82, 'text-anchor': 'middle', fill: 'var(--text)',
       'font-size': 13, 'font-weight': 600, 'font-family': 'var(--sans)'
-    }, s.label));
-    g.appendChild(el('text', {
+    }, s.label);
+    const sub = el('text', {
       x: s.x, y: 100, 'text-anchor': 'middle', fill: 'var(--muted)',
       'font-size': 10.5, 'font-family': 'var(--mono)', id: 'sub' + i
-    }, s.sub));
+    }, s.sub);
+    g.appendChild(label);
+    g.appendChild(sub);
     pipe.appendChild(g);
+
+    s.w = widthOf(label, sub);
+    const box = el('rect', {
+      x: s.x - s.w / 2, y: 58, width: s.w, height: 56, rx: 10,
+      fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, id: 'box' + i
+    });
+    g.insertBefore(box, label);   // behind the text, not over it
   });
+
+  // The connectors were drawn before the boxes existed, so they still reach
+  // the old fixed edge. Pull them back to the real one.
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    const line = pipe.querySelector('#link' + i);
+    line.setAttribute('x1', STAGES[i].x + STAGES[i].w / 2);
+    line.setAttribute('x2', STAGES[i + 1].x - STAGES[i + 1].w / 2);
+  }
   // Zwei Bewertungsebenen unter Stufe 4
   pipe.appendChild(el('text', {
     x: STAGES[3].x, y: 138, 'text-anchor': 'middle', fill: 'var(--muted)',
@@ -737,7 +818,7 @@ function renderStatic() {
   STAGES.forEach((s, i) => { pipe.querySelector('#sub' + i).textContent = s.sub; });
   packet.setAttribute('opacity', 0);
   gradeOut.setAttribute('opacity', 1);
-  countEl.textContent = '75 / 75';
+  countEl.textContent = LIB_N + ' / ' + LIB_N;
   toggle.hidden = true;
 }
 
@@ -758,12 +839,11 @@ function frame(now) {
   packet.setAttribute('cx', from + (to - from) * local);
   packet.setAttribute('opacity', seg >= 4 ? 0 : 1);
 
-  const n = Math.min(75, Math.round(p * 75) + 1);
-  countEl.textContent = n + ' / 75';
-  pipe.querySelector('#sub1').textContent = 'Angriff ' + n + ' von 75';
+  const n = Math.min(LIB_N, Math.round(p * LIB_N) + 1);
+  countEl.textContent = n + ' / ' + LIB_N;
+  pipe.querySelector('#sub1').textContent = 'Angriff ' + n + ' von ' + LIB_N;
   gradeOut.setAttribute('opacity', seg >= 4 ? String(Math.min(1, (local * 2))) : '0');
 
-  drawNet();
   rafId = requestAnimationFrame(frame);
 }
 
@@ -802,8 +882,47 @@ if ('IntersectionObserver' in window) {
   }, { threshold: .15 }).observe($('#produkt'));
 } else { inView = true; }
 
+/* ---------------------------------------------------------------- der Kopf
+   Eigene Schleife, eigener Beobachter.
+   Vorher wurde drawNet() innerhalb von frame() aufgerufen, und frame() laeuft
+   nur, solange #produkt sichtbar ist. Der Kopf steht aber im Hero, ganz oben:
+   er bewegte sich also genau dann, wenn er aus dem Bild gescrollt war, und
+   stand still, sobald man ihn ansah. Dem Zeiger folgen kann er so nicht. */
+let netRaf = 0, netOn = false, netInView = true;
+
+function netFrame() {
+  if (!netOn) return;
+  drawNet();
+  netRaf = requestAnimationFrame(netFrame);
+}
+function netStart() {
+  if (netOn || REDUCED || !netInView || document.hidden) return;
+  netOn = true; netRaf = requestAnimationFrame(netFrame);
+}
+function netStop() { netOn = false; cancelAnimationFrame(netRaf); }
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(es => {
+    netInView = es[0].isIntersecting;
+    if (netInView) netStart(); else netStop();
+  }, { threshold: 0 }).observe(cv);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) netStop(); else netStart();
+});
+
+/* Der Ankerversatz haengt an der echten Hoehe der Leiste, und die aendert
+   sich mit der Breite — unter 860px klappt die Navigation um. */
+const topbarEl = document.querySelector('.topbar');
+const syncTopbar = () => {
+  const h = topbarEl && topbarEl.getBoundingClientRect().height;
+  if (h) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+};
+syncTopbar();
+addEventListener('resize', syncTopbar, { passive: true });
+
 if (REDUCED) { renderStatic(); drawNet(); }
-else { toggle.textContent = S.pipePause; start(); }
+else { toggle.textContent = S.pipePause; start(); netStart(); }
 </script>
 </body>
 </html>
