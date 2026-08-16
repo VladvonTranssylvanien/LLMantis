@@ -88,6 +88,7 @@
 | 6 | Rename the Notion page | this week | Bogdan |
 | 8 | **Original illustrated mark** — the geometric mark is the brand and ships as final; an illustrated one may replace it. Owner: Bogdan, no date | open | Bogdan |
 | 7 | **README §Scoring contradicts decision #8.** README documents the shipped behaviour — flat severity weights, critical cap at **D**. Prompt 3 / P0 specifies BASE + CONF_K multipliers and a cap at **C**. Update the README in the same commit as P0, or the repo documents two different scoring rules | with P0 | Vlad |
+| 9 | 🔴 **No authentication layer.** Every API endpoint trusts whatever `org_id` the caller sends — there is no login, session or proof that a caller is who they claim. This is fine for a localhost PoC only. **Hard rule: this server must never be reachable from the public internet until this is fixed.** Team to decide the approach together before that changes | before any non-localhost deployment | team decision pending |
 
 ---
 

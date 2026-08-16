@@ -18,8 +18,12 @@ Why passive only:
     This is not a breach of the provider's ToS.
 """
 
+import ipaddress
 import re
+import socket
 from typing import Optional
+from urllib.parse import urljoin, urlparse
+
 import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
@@ -59,21 +63,79 @@ WIDGET_SIGNATURES = {
 }
 
 
-async def _fetch_page(url: str, timeout: int = 10) -> tuple[Optional[str], Optional[str]]:
+class UnsafeUrlError(Exception):
+    """Raised when a URL resolves to a private/internal address — SSRF guard."""
+
+
+def _assert_public_host(url: str) -> None:
+    """
+    Refuse to fetch anything that resolves to a private, loopback,
+    link-local or otherwise non-public address.
+
+    WHY THIS EXISTS
+        This endpoint takes an arbitrary URL from an unauthenticated caller
+        and fetches it server-side. Without this check, a caller could
+        point us at http://localhost:5432, http://169.254.169.254/... (the
+        cloud metadata endpoint on AWS/GCP/Azure), or any address on our
+        own private network, and use us as a proxy to reach it — a classic
+        SSRF. We are a passive *page* checker; we only ever need to talk
+        to a public website.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise UnsafeUrlError(f"Unsupported scheme: {parsed.scheme!r}")
+    if not parsed.hostname:
+        raise UnsafeUrlError("URL has no hostname")
+
+    try:
+        addrs = socket.getaddrinfo(parsed.hostname, None)
+    except socket.gaierror as e:
+        raise UnsafeUrlError(f"Could not resolve host: {e}") from e
+
+    for family, _, _, _, sockaddr in addrs:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if (
+            ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_multicast or ip.is_reserved or ip.is_unspecified
+        ):
+            raise UnsafeUrlError(
+                f"Refusing to fetch {parsed.hostname!r} — resolves to "
+                f"non-public address {ip}"
+            )
+
+
+async def _fetch_page(url: str, timeout: int = 10, max_redirects: int = 5) -> tuple[Optional[str], Optional[str]]:
     """
     Fetch a page as an ordinary visitor (async).
 
+    Redirects are followed manually, one hop at a time, re-checking the
+    SSRF guard on every hop — a public URL redirecting to a private one
+    partway through the chain is exactly what httpx's built-in
+    follow_redirects=True would not catch for us.
+
     Returns: (html, error)
     """
+    headers = {"User-Agent": "LLMantis-Checker/1.0 (+https://llmantis.de/scanner)"}
+
     try:
-        # Identify ourselves — be transparent
-        headers = {
-            "User-Agent": "LLMantis-Checker/1.0 (+https://llmantis.de/scanner)"
-        }
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return response.text, None
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            for _ in range(max_redirects + 1):
+                _assert_public_host(url)
+                response = await client.get(url, headers=headers)
+
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        return None, "Redirect with no Location header"
+                    url = urljoin(str(response.url), location)
+                    continue
+
+                response.raise_for_status()
+                return response.text, None
+
+        return None, f"Too many redirects (>{max_redirects})"
+    except UnsafeUrlError as e:
+        return None, str(e)
     except httpx.RequestError as e:
         return None, str(e)
 
