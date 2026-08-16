@@ -142,6 +142,24 @@ would be a poor look as well as a legal risk.
 **Removing the password is one edit** — delete the `basic_auth` block in
 `deploy/Caddyfile` — but do it only after Kwabena has filled both pages.
 
+Read this before making that edit, because it is a larger change than it
+looks. The password is currently the only thing standing in front of two
+endpoints that authenticate nobody:
+
+- `/api/art50check` (`backend/main.py:379`) fetches a caller-supplied URL
+  server-side. No login, limited to 20 requests a minute per IP.
+  `backend/netguard.py` refuses loopback, private, link-local and cloud
+  metadata addresses — checked under glibc, which is what this image runs —
+  but a guard is a narrower thing than not being reachable at all.
+- `/api/scan` in `prompt` mode (`backend/main.py:865`) is anonymous on
+  purpose; that is the free demo path. Each call makes roughly 21 real Mistral
+  requests, and the limit is 5 a minute per IP. That is about 105 judge calls
+  a minute spendable by anyone with a list of addresses, against a key whose
+  free tier is 50 requests a minute in total.
+
+Neither is a reason to keep the site private forever. Both are a reason to
+decide what happens to them in the same change, instead of finding out after.
+
 ---
 
 ## What has not been tested
