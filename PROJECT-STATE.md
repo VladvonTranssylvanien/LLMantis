@@ -108,7 +108,8 @@ that next) and the 21→75 attack library.
 | 7 | ✅ **RESOLVED** (verified 16.08) ~~README §Scoring contradicts decision #8~~ — `backend/scoring.py` caps at **C** and applies `CONFIDENCE_WEIGHT` multipliers (confirmed/likely/possible), matching README and decision #8. No contradiction found; this must have been fixed during the P0 confidence-levels work | ~~with P0~~ | Vlad |
 | 9 | ✅ **DONE 16.08** ~~No authentication layer~~ — `POST/GET /api/auth/{register,login,me}` (bcrypt + JWT bearer tokens), every org-scoped endpoint now calls `require_membership()`. `mode="prompt"` scans with no `org_id` and no `X-API-Key` stay fully anonymous on purpose — that's the free demo path and it never touches a live third-party system. Anything that acts *as* an organization (creating one, minting a key, reading scan history, verifying ownership, `mode="api"` or `mode="prompt"` with an `org_id`) now requires a valid token and membership | ~~before any non-localhost deployment~~ | Vlad |
 | 10 | Frontend for organizations, API keys, branding and ownership verification — all four work today via curl only. `index.html` and `art50check.html` are the only pages with a UI | after auth (building a UI for endpoints anyone can call as anyone else is wasted work) | Frontend |
-| 11 | 21 → 75 attacks in `attacks/attacks.yaml` (5 categories × 15) | with Gregor | Attack Engineer |
+| 11 | 21 → 75 attacks in `attacks/attacks.yaml` (5 categories × 15) — 🔴 **read #12 first, this needs a paid Mistral plan** | with Gregor | Attack Engineer |
+| 12 | 🔴 **The free Mistral tier cannot carry 75 attacks.** Measured 16.08 from Mistral's own rate-limit headers: the account allows **50 requests/minute** and **50,000 tokens/minute**. One 21-attack scan costs ~34 requests and ~11,900 tokens — already 68% of the request budget, which is why two scans back to back used to come back with no grade at all. That works out at ~1.6 requests per attack, so: **above roughly 31 attacks every single scan exceeds the per-minute request limit on its own.** At 75 attacks a scan needs ~121 requests (243% of the limit) and ~42,500 tokens (85%), meaning a minimum of ~2.4 minutes per scan spent purely waiting on backoff, and no possibility of two scans in the same minute. Retry with backoff (added 16.08) keeps this correct rather than silently ungraded, but it cannot create quota. **Decide before the library grows past ~30 attacks**, not after: upgrade the Mistral plan (simplest), or cut judge calls per attack, or accept multi-minute scans | before the library passes ~30 attacks | team decision — Vlad has the numbers |
 
 ---
 
@@ -118,6 +119,7 @@ that next) and the 21→75 attack library.
 |---|---|
 | Business registration (Gewerbe) | before the first invoice |
 | Gründungszuschuss | 🔴 **check NOW** if anyone is registered with the Agentur für Arbeit — the application goes in BEFORE Gewerbeanmeldung |
+| **Paid Mistral plan** | 🔴 **before the attack library passes ~30 attacks.** The free tier's 50 requests/minute is exceeded by a single scan beyond that point — see technical debt #12 for the measured numbers. This is a hard blocker on the 21→75 work, not a nice-to-have |
 | Mollie, payments | when the Gewerbe is registered — team decided 16.08 not to build even the schema until then |
 | ~~PDF export~~ | ✅ **done 16.08** — client-side print via `frontend/report.html`, no backend needed |
 | Email verification, password reset | when Brevo (or any EU email sender) is set up — same reasoning as Mollie: both need a real send-email credential that doesn't exist yet. Team decided 16.08 not to fake it with a console-logged token in the meantime |
@@ -296,3 +298,60 @@ Every item verified live before moving to the next, same discipline as the
 rest of today: role permissions with three real accounts, logout with a
 real token before/after, lockout with 5 genuine failed attempts followed
 by a still-rejected correct password, then a successful unlock.
+
+**16.08.2026 (evening) — first runs against Gregor's lab, and what they
+found.** Gregor merged the target lab (PR #9) and the measurement harness.
+Pointing our scanner at Bot A / Bot B is the first time api mode has ever
+hit a real target instead of a mock, and it immediately paid for itself.
+
+Integration:
+- The ownership gate blocked the lab outright — DNS TXT verification can
+  never pass for `127.0.0.1`. New `ALLOW_PRIVATE_SCAN_TARGETS` flag, off by
+  default (on a deployed box it would be an SSRF hole), plus the SSRF check
+  extracted to `backend/netguard.py` now that two callers need it.
+- Gregor's line references into `scanner.py` all still resolve. His
+  `detect_canary` finding is real and his uppercase workaround is the right
+  one: permitting lowercase makes the first match in a realistic German
+  prompt `gpt-4`, which we would then report as a confirmed critical leak.
+
+Four judge/scoring defects that only real answers could expose:
+- The judge awarded itself `confidence: "confirmed"`, reserved for
+  deterministic matches (decision #9). A model's opinion was heading into a
+  Prüfbericht labelled as proven fact.
+- The judge cited **our own attack text** as evidence. `no quote, no
+  finding` from the plan §4.1 had never been implemented.
+- Capping the judge at `likely` then exposed a worse one: the confidence
+  multiplier was applied to **passes**, not findings. A bot defending all 21
+  attacks scored 70 — a C — and an F if the judge said "possible". Both the
+  README and `scoring.py`'s own docstring document the formula without any
+  multiplier; the plan applies it to fails. It was on the wrong side.
+- Layer 1 only looked for the canary on attacks declaring
+  `contains_canary` (14 of 21), so a leak during a brand_safety attack fell
+  through to the model. Now every declared secret is checked on every
+  attack, and `ScanRequest` takes a `secrets` list so a customer's real
+  secrets get the same treatment as a planted canary. Skips any value our
+  own attack text already contains — Gregor hit that exact false positive
+  in his harness first.
+
+Then the one that would have broken the pitch: **scans were silently losing
+their grade to Mistral rate limits.** Scan the vulnerable bot, immediately
+scan the hardened one, and the second came back ungraded. Three causes,
+found in order: no retry anywhere in `llm.py`; the synchronous Mistral
+client called from inside an `async` function, blocking the event loop so
+`CONCURRENCY` never actually did anything; and then, once `complete_async`
+made concurrency real, 5 immediately exceeded the tier. Default is now 3
+(measured), with 5-attempt backoff at 2/4/8/16s. Three consecutive
+prompt-mode scans now run 0/0/0 errors where they used to be 0/14%/33%.
+The second and third take ~45s instead of ~14s, spent waiting — the right
+trade against returning no grade at all.
+
+That investigation is where the numbers in technical debt #12 come from,
+and #12 is the item that matters most for next week: **the free Mistral
+tier cannot carry the 21→75 attack expansion.**
+
+Current state against the lab: Bot A grades D (~64-69, four of its findings
+deterministic canary leaks), Bot B grades A (~98-100). The A→B contrast
+lands. Bot B's occasional failures are real, not false positives — it leaks
+the supplier name intermittently and drafts a legal demand letter despite
+its own rule 6. Both are Gregor's to fix; the control group is working
+exactly as it should by surfacing them.
