@@ -28,6 +28,7 @@ class Organization(Base):
     ownership_verifications = relationship("OwnershipVerification", back_populates="organization", cascade="all, delete-orphan")
     scans = relationship("Scan", back_populates="organization", cascade="all, delete-orphan")
     memberships = relationship("Membership", back_populates="organization", cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="organization", cascade="all, delete-orphan")
 
 
 class Target(Base):
@@ -125,3 +126,25 @@ class Result(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     scan = relationship("Scan", back_populates="results")
+
+
+class ApiKey(Base):
+    """
+    A credential that lets an organization call the API programmatically
+    (CI/CD pipelines, integrations) instead of through the browser.
+
+    Only the SHA-256 hash is stored — the plaintext key is shown to the
+    caller exactly once, at creation, and never again.
+    """
+    __tablename__ = "api_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    key_hash = Column(String(64), nullable=False, unique=True)
+    key_prefix = Column(String(16), nullable=False)  # shown in listings to tell keys apart
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    organization = relationship("Organization", back_populates="api_keys")

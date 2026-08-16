@@ -37,6 +37,9 @@ from .database import SessionLocal, get_db
 from .models import Organization, Target as DBTarget, Scan as DBScan, Result as DBResult
 from .art50check import check_art50
 from .ownership import create_challenge, verify_ownership, is_domain_verified
+from .apikeys import (
+    create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
+)
 
 app = FastAPI(title="PromptGuard", version="0.1.0")
 
@@ -83,16 +86,14 @@ def _get_or_create_org(db: Session) -> Organization:
     return org
 
 
-async def _save_scan_to_db(db: Session, request: "ScanRequest", report: dict, duration_s: float):
+async def _save_scan_to_db(db: Session, request: "ScanRequest", report: dict,
+                            duration_s: float, effective_org_id: UUID | None):
     """Save scan results to the database, using the real request data."""
     try:
-        # Use the caller's organization when they gave us one (mode="api"
-        # always has one, since /api/scan enforces it). Only fall back to
-        # the anonymous demo org for mode="prompt" without an org_id.
-        if request.org_id:
-            org = db.query(Organization).filter_by(id=UUID(request.org_id)).first()
-        else:
-            org = None
+        # effective_org_id is resolved once in scan(): the API key's org
+        # takes priority over a body org_id, which takes priority over
+        # nothing at all (anonymous mode="prompt" falls back to the demo org).
+        org = db.query(Organization).filter_by(id=effective_org_id).first() if effective_org_id else None
         if org is None:
             org = _get_or_create_org(db)
 
@@ -379,6 +380,64 @@ async def get_organization(org_id: str, db: Session = Depends(get_db)):
     }
 
 
+class ApiKeyCreateRequest(BaseModel):
+    """Request to create an API key."""
+    org_id: str
+    name: str
+
+
+@app.post("/api/keys")
+async def create_key(request: ApiKeyCreateRequest, db: Session = Depends(get_db)):
+    """
+    Create a new API key for an organization.
+
+    Returns the plaintext key ONCE — it is never shown or recoverable
+    again after this response. Store it now; to rotate, revoke this one
+    and create a new one.
+    """
+    try:
+        org_uuid = UUID(request.org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    if not db.query(Organization).filter_by(id=org_uuid).first():
+        raise HTTPException(404, f"Organization {request.org_id} not found")
+    if not request.name.strip():
+        raise HTTPException(400, "name is required")
+
+    result = create_api_key(db, org_uuid, request.name.strip())
+    return result.dict()
+
+
+@app.get("/api/keys")
+async def get_keys(org_id: str, db: Session = Depends(get_db)):
+    """
+    List an organization's API keys — never the plaintext or the hash,
+    only enough to tell them apart (name, prefix, last used, revoked).
+    """
+    try:
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid org_id format")
+
+    keys = list_api_keys(db, org_uuid)
+    return {"total": len(keys), "keys": [k.dict() for k in keys]}
+
+
+@app.delete("/api/keys/{key_id}")
+async def delete_key(key_id: str, org_id: str, db: Session = Depends(get_db)):
+    """Revoke an API key. Soft delete — the row stays, revoked_at is set."""
+    try:
+        key_uuid = UUID(key_id)
+        org_uuid = UUID(org_id)
+    except ValueError:
+        raise HTTPException(400, "Invalid id format")
+
+    if not revoke_api_key(db, key_uuid, org_uuid):
+        raise HTTPException(404, "API key not found for this organization")
+    return {"revoked": True}
+
+
 @app.get("/api/scans")
 async def list_scans(db: Session = Depends(get_db)):
     """List all scans, most recent first."""
@@ -442,7 +501,8 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/scan")
-async def scan(request: ScanRequest, db: Session = Depends(get_db)):
+async def scan(request: ScanRequest, db: Session = Depends(get_db),
+                api_key_org: UUID | None = Depends(resolve_org_from_api_key)):
     """
     Run a scan and stream results as NDJSON.
 
@@ -451,31 +511,40 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db)):
         {"type": "result",   "done": 3, "total": 21, "result": {...}}
         {"type": "complete", "report": {...}, "scan_id": "..."}
         {"type": "error",    "message": "..."}
+
+    ORGANIZATION RESOLUTION
+        An X-API-Key header (if valid) always wins — that is how a CI/CD
+        pipeline gets its scans attributed without knowing its own org_id.
+        Otherwise we use body.org_id if given, and only fall back to the
+        anonymous demo org for an unidentified mode="prompt" call.
     """
     if request.mode == "prompt" and not request.system_prompt.strip():
         raise HTTPException(400, "system_prompt is required in prompt mode")
     if request.mode == "api" and not request.api_url.strip():
         raise HTTPException(400, "api_url is required in api mode")
 
+    effective_org_id: UUID | None = api_key_org
+    if effective_org_id is None and request.org_id:
+        try:
+            effective_org_id = UUID(request.org_id)
+        except ValueError:
+            raise HTTPException(400, "Invalid org_id format")
+
     # PLAYBOOK §5: active attacks (mode="api") against a real endpoint
     # require verified ownership of that domain. mode="prompt" is exempt —
     # it only replays text the caller submitted themselves, never a live
     # third-party system.
     if request.mode == "api":
-        if not request.org_id:
+        if effective_org_id is None:
             raise HTTPException(
                 403,
-                "org_id is required for mode='api'. Verify ownership of the "
-                "target domain first via /api/ownership/challenge and "
-                "/api/ownership/verify."
+                "An org_id (or a valid X-API-Key) is required for mode='api'. "
+                "Verify ownership of the target domain first via "
+                "/api/ownership/challenge and /api/ownership/verify."
             )
-        try:
-            org_uuid = UUID(request.org_id)
-        except ValueError:
-            raise HTTPException(400, "Invalid org_id format")
 
         domain = urlparse(request.api_url).netloc or request.api_url
-        if not is_domain_verified(db, org_uuid, domain):
+        if not is_domain_verified(db, effective_org_id, domain):
             raise HTTPException(
                 403,
                 f"Ownership of '{domain}' is not verified for this organization. "
@@ -535,7 +604,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db)):
                 db = SessionLocal()
                 try:
                     report = report_holder["report"]
-                    await _save_scan_to_db(db, request, report, report.get("duration_s", 0))
+                    await _save_scan_to_db(db, request, report, report.get("duration_s", 0), effective_org_id)
                 finally:
                     db.close()
 
