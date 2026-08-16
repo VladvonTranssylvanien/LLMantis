@@ -172,6 +172,7 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         "duration_s": round(time.time() - started, 1),
         "target_mode": target.mode,
         "library_version": library.version,
+        "canary": target.canary,  # the one actually used (explicit or auto-detected)
         "summary": summary,
         "results": results,
         "scoring_explanation": scoring.explain(),

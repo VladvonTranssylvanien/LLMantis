@@ -83,19 +83,30 @@ def _get_or_create_org(db: Session) -> Organization:
     return org
 
 
-async def _save_scan_to_db(db: Session, report: dict, target_mode: str, duration_s: float):
-    """Save scan results to the database."""
+async def _save_scan_to_db(db: Session, request: "ScanRequest", report: dict, duration_s: float):
+    """Save scan results to the database, using the real request data."""
     try:
-        # Get or create the demo organization
-        org = _get_or_create_org(db)
+        # Use the caller's organization when they gave us one (mode="api"
+        # always has one, since /api/scan enforces it). Only fall back to
+        # the anonymous demo org for mode="prompt" without an org_id.
+        if request.org_id:
+            org = db.query(Organization).filter_by(id=UUID(request.org_id)).first()
+        else:
+            org = None
+        if org is None:
+            org = _get_or_create_org(db)
 
-        # Create a Target record
+        # Create a Target record with what was actually submitted —
+        # not a placeholder. system_prompt is a customer trade secret
+        # (PLAYBOOK decision #5); retention defaults to 'delete_after_scan'
+        # on the model, no override here yet since there is no UI for it.
+        target_name = request.api_url or "Prompt-based target"
         db_target = DBTarget(
             id=uuid4(),
             org_id=org.id,
-            name="Anonymous Target",
-            system_prompt="",  # Will be filled by customer later
-            canary=None,
+            name=target_name[:255],
+            system_prompt=request.system_prompt,
+            canary=report.get("canary"),  # explicit or auto-detected — see scanner.run_scan
             created_at=datetime.utcnow()
         )
         db.add(db_target)
@@ -109,6 +120,7 @@ async def _save_scan_to_db(db: Session, report: dict, target_mode: str, duration
             org_id=org.id,
             library_version=report.get("library_version", "1.0"),
             duration_s=duration_s,
+            status="incomplete" if summary.get("incomplete") else "done",
             grade=summary.get("grade"),
             score=summary.get("score"),
             error_rate=report.get("error_rate", 0),
@@ -126,6 +138,7 @@ async def _save_scan_to_db(db: Session, report: dict, target_mode: str, duration
                 verdict=result.get("verdict", "ERROR"),
                 confidence=result.get("confidence", "likely"),
                 evidence=result.get("evidence", ""),
+                judge_reason=result.get("reason", ""),
                 method=result.get("method", "unknown"),
                 duration_ms=result.get("duration_ms", 0),
                 created_at=datetime.utcnow()
@@ -375,6 +388,7 @@ async def list_scans(db: Session = Depends(get_db)):
         "scans": [
             {
                 "id": str(scan.id),
+                "status": scan.status,
                 "score": scan.score,
                 "grade": scan.grade,
                 "duration_s": scan.duration_s,
@@ -403,6 +417,8 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
     return {
         "scan": {
             "id": str(scan.id),
+            "status": scan.status,
+            "library_version": scan.library_version,
             "score": scan.score,
             "grade": scan.grade,
             "duration_s": scan.duration_s,
@@ -416,6 +432,7 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db)):
                 "verdict": r.verdict,
                 "confidence": r.confidence,
                 "evidence": r.evidence,
+                "judge_reason": r.judge_reason,
                 "method": r.method,
                 "duration_ms": r.duration_ms,
             }
@@ -518,7 +535,7 @@ async def scan(request: ScanRequest, db: Session = Depends(get_db)):
                 db = SessionLocal()
                 try:
                     report = report_holder["report"]
-                    await _save_scan_to_db(db, report, request.mode, report.get("duration_s", 0))
+                    await _save_scan_to_db(db, request, report, report.get("duration_s", 0))
                 finally:
                     db.close()
 

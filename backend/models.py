@@ -27,6 +27,7 @@ class Organization(Base):
     targets = relationship("Target", back_populates="organization", cascade="all, delete-orphan")
     ownership_verifications = relationship("OwnershipVerification", back_populates="organization", cascade="all, delete-orphan")
     scans = relationship("Scan", back_populates="organization", cascade="all, delete-orphan")
+    memberships = relationship("Membership", back_populates="organization", cascade="all, delete-orphan")
 
 
 class Target(Base):
@@ -38,10 +39,33 @@ class Target(Base):
     name = Column(String(255), nullable=False)
     system_prompt = Column(Text, nullable=False)
     canary = Column(String(255), nullable=True)
+    # PLAYBOOK decision #5: customer prompts are trade secrets.
+    # "delete_after_scan" is the safe default — must be an explicit
+    # opt-in to keep a target's prompt around longer than that.
+    retention = Column(String(50), nullable=False, default="delete_after_scan")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="targets")
     scans = relationship("Scan", back_populates="target", cascade="all, delete-orphan")
+
+
+class Membership(Base):
+    """
+    Links a user to an organization with a role.
+
+    No separate `users` table yet — user_id is a bare UUID until real
+    authentication exists. This table is the schema groundwork the
+    implementation plan calls for on day one, so the agency/multi-user
+    tier is a new row later, not a backend rewrite.
+    """
+    __tablename__ = "memberships"
+
+    user_id = Column(UUID(as_uuid=True), primary_key=True)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
+    role = Column(String(50), nullable=False)  # "owner" | "admin" | "member"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="memberships")
 
 
 class OwnershipVerification(Base):
@@ -70,6 +94,11 @@ class Scan(Base):
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     library_version = Column(String(50), nullable=False, default="1.0")
     duration_s = Column(Float, nullable=False)
+    # 'done' | 'incomplete' — PLAYBOOK §9: >10% errored attacks means no
+    # grade at all. This must survive the trip to the database, not just
+    # exist in the streamed response, or a later reader of this row has
+    # no way to know the grade was deliberately withheld.
+    status = Column(String(50), nullable=False, default="done")
     grade = Column(String(1), nullable=True)
     score = Column(Integer, nullable=True)
     error_rate = Column(Integer, nullable=False, default=0)
@@ -90,6 +119,7 @@ class Result(Base):
     verdict = Column(String(50), nullable=False)
     confidence = Column(String(50), nullable=False, default="likely")
     evidence = Column(Text, nullable=True)
+    judge_reason = Column(Text, nullable=True)
     method = Column(String(50), nullable=False)
     duration_ms = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
