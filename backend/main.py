@@ -220,12 +220,12 @@ async def register(request: Request, body: RegisterRequest, db: Session = Depend
         raise HTTPException(409, "An account with this email already exists")
 
     user = User(id=uuid4(), email=email, password_hash=hash_password(body.password),
-                created_at=datetime.utcnow())
+                token_version=0, created_at=datetime.utcnow())
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.token_version)
     return TokenResponse(access_token=token).dict()
 
 
@@ -247,7 +247,7 @@ async def login(request: Request, body: LoginRequest, db: Session = Depends(get_
     if not user or not password_ok:
         raise HTTPException(401, "Invalid email or password")
 
-    token = create_access_token(user.id)
+    token = create_access_token(user.id, user.token_version)
     return TokenResponse(access_token=token).dict()
 
 
@@ -266,6 +266,20 @@ async def me(current_user: User = Depends(get_current_user), db: Session = Depen
         "email": current_user.email,
         "organizations": orgs,
     }
+
+
+@app.post("/api/auth/logout")
+async def logout(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Invalidate every token issued to this account, including the one used
+    to call this endpoint — there is no "log out this one device", only
+    "log out everywhere". JWTs are stateless by design (no per-token record
+    to delete); this works by bumping token_version, which every future
+    request compares against what's embedded in the token presented.
+    """
+    current_user.token_version += 1
+    db.commit()
+    return {"logged_out": True}
 
 
 @app.get("/api/health")

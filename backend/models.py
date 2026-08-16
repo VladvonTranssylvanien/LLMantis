@@ -60,6 +60,10 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     email = Column(String(255), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
+    # Embedded in every JWT as "tv". Bumping this invalidates every token
+    # issued before the bump, all at once — logout, without a separate
+    # table of revoked token ids to store and clean up.
+    token_version = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     memberships = relationship("Membership", back_populates="user", cascade="all, delete-orphan")

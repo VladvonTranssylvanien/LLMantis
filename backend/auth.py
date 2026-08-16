@@ -68,20 +68,21 @@ DUMMY_HASH = hash_password("no-account-has-this-password")
 
 # --------------------------------------------------------------------------- JWT
 
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, token_version: int) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
+        "tv": token_version,
         "iat": now,
         "exp": now + timedelta(hours=config.JWT_EXPIRE_HOURS),
     }
     return jwt.encode(payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> UUID:
+def decode_access_token(token: str) -> tuple[UUID, int]:
     """Raises jwt.PyJWTError (caught by the caller) if invalid or expired."""
     payload = jwt.decode(token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM])
-    return UUID(payload["sub"])
+    return UUID(payload["sub"]), int(payload.get("tv", 0))
 
 
 # --------------------------------------------------------------- FastAPI wiring
@@ -100,7 +101,7 @@ async def get_current_user(
 
     token = authorization[len("Bearer "):]
     try:
-        user_id = decode_access_token(token)
+        user_id, token_version = decode_access_token(token)
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired, log in again")
     except jwt.PyJWTError:
@@ -109,6 +110,10 @@ async def get_current_user(
     user = db.query(User).filter_by(id=user_id).first()
     if not user:
         raise HTTPException(401, "User no longer exists")
+    if token_version != user.token_version:
+        # Either this user logged out (token_version bumped) or every
+        # session was force-revoked — either way, this token predates that.
+        raise HTTPException(401, "Token revoked, log in again")
     return user
 
 
