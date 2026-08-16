@@ -1809,3 +1809,54 @@ One `MISTRAL_API_KEY` in a root `.env` produces the deliverable in a single run.
   the calibration path.
 - Whether anyone else has local uncommitted work that would conflict with
   `calibration/` appearing on `main`. Only this working tree was inspected.
+
+---
+
+## 2026-08-16 — Session 18: pushed to GitHub
+
+Branch **`gregor/calibration-set`**, commit `9a432d4`, 8 files, 2098 insertions.
+Branch rather than a direct push to `main`, per `PLAYBOOK.md:531` and the
+precedent set by PR #9, so Vlad can review before it lands.
+
+Verified after pushing: local `HEAD` and `origin/gregor/calibration-set` are the
+same object; `git merge-tree` against current `origin/main` produces **0 conflict
+markers**. The only path also present on `main` is `GREGOR_WORKLOG.md`, which is
+append-only and ours.
+
+### Secret scan before pushing
+
+Staged-content method with a decoy check, not a worktree sweep — the recursive
+sweep failed open on this machine in Session 9, and a scan that produces a
+confident "clean" while being broken is worse than no scan.
+
+| Check | Result |
+|---|---|
+| Detector validated against a decoy first | finds the key when present |
+| Azure key in staged content | absent |
+| Azure key in all history (`git log --all -p`) | **0 occurrences** |
+| `lab/.env` staged | no; still ignored |
+| `calibration/__pycache__` staged | no |
+
+### 🔴 Bot A's canary is now public
+
+`LLMANTIS-CANARY-7F3A91` appears 23 times in the pushed diff. This was flagged
+before both the commit and the push; Gregor decided to push. Recording it as a
+decision, not an accident.
+
+**Bot B's canary does not appear** — Bot B never leaked its own, so
+`LLMANTIS-CANARY-B2D4E8` is still private.
+
+`GREGOR-TARGET-LAB.md:146` says to rotate a canary if the bots go public. The
+sequencing matters: **rotating Bot A's canary invalidates the eight `clean_fail`
+items**, because the harvested answers still contain the old string. So the
+order is measure first, rotate after — rotating now would cost a re-harvest and
+a re-label of all thirty items before the number exists at all.
+
+`calibrate.py` refuses to run against a rotated canary rather than silently
+turning those eight into false negatives, so this cannot go wrong quietly.
+
+### What I did NOT verify
+
+- No PR was opened. The branch is pushed and visible; nothing requests review yet.
+- No CI was observed to run against the branch.
+- That Vlad has seen it.
