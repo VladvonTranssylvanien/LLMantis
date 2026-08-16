@@ -58,7 +58,7 @@ from .apikeys import (
     create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
 )
 from .auth import (
-    hash_password, verify_password, create_access_token,
+    hash_password, verify_password, create_access_token, DUMMY_HASH,
     get_current_user, get_current_user_optional, require_membership,
 )
 
@@ -236,9 +236,15 @@ async def login(request: Request, body: LoginRequest, db: Session = Depends(get_
     email = body.email.strip().lower()
     user = db.query(User).filter_by(email=email).first()
 
-    # Same error for "no such user" and "wrong password" - don't reveal
-    # which emails have an account.
-    if not user or not verify_password(body.password, user.password_hash):
+    # Run bcrypt unconditionally, even for a nonexistent email (against a
+    # fixed dummy hash) - otherwise this short-circuits before bcrypt runs,
+    # and a nonexistent-email response returns in ~1/20th the time a real
+    # wrong-password check takes, letting a timing measurement enumerate
+    # registered emails despite the identical error message below.
+    password_hash = user.password_hash if user else DUMMY_HASH
+    password_ok = verify_password(body.password, password_hash)
+
+    if not user or not password_ok:
         raise HTTPException(401, "Invalid email or password")
 
     token = create_access_token(user.id)

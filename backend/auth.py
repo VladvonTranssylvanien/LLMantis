@@ -55,6 +55,17 @@ def verify_password(plaintext: str, password_hash: str) -> bool:
         return False
 
 
+# A fixed hash with no matching plaintext, computed once at import time.
+# WHY: if a login checks `user and verify_password(...)`, a nonexistent
+# email short-circuits before bcrypt ever runs, returning in a few ms —
+# while a real account with the wrong password takes bcrypt's ~150-200ms.
+# That timing gap alone lets an attacker enumerate registered emails, even
+# though the error message is identical either way. Callers should run
+# verify_password(password, user.password_hash if user else DUMMY_HASH)
+# unconditionally, so both paths cost the same.
+DUMMY_HASH = hash_password("no-account-has-this-password")
+
+
 # --------------------------------------------------------------------------- JWT
 
 def create_access_token(user_id: UUID) -> str:
