@@ -1,0 +1,79 @@
+# Production stack. Not for a laptop - docker-compose.yml is the development
+# one and starts Postgres only.
+#
+#   docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d
+#
+# Two things differ from development on purpose:
+#   - Postgres and the app publish NO ports. They exist only on this network,
+#     reachable through Caddy. A published 5432 on a public IP is a database
+#     open to the internet.
+#   - Every secret comes from deploy/.env, which is gitignored. Nothing here
+#     carries a value.
+
+services:
+
+  # No container_name anywhere on purpose. A fixed name defeats Compose's own
+  # project scoping: with one, `-p something` still tries to create
+  # "llmantis-db" and collides with the development stack that already owns
+  # that name. Every command in deploy/README.md addresses services by service
+  # name, which does not need it.
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      PROVIDER: mistral
+      JUDGE_MODEL: ${JUDGE_MODEL:-mistral-small}
+      # 3 is the measured ceiling for the free Mistral tier. At 5, three
+      # back-to-back scans produced enough 429s to void a grade.
+      CONCURRENCY: ${CONCURRENCY:-3}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
+      # Off, and it must stay off here. On a server this would let a
+      # logged-in caller point a scan at 127.0.0.1 or the private network -
+      # our own database included. It exists for lab/runner.py on a laptop.
+      ALLOW_PRIVATE_SCAN_TARGETS: "false"
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      LLMANTIS_DOMAIN: ${LLMANTIS_DOMAIN}
+      LLMANTIS_USER: ${LLMANTIS_USER}
+      LLMANTIS_PASSWORD_HASH: ${LLMANTIS_PASSWORD_HASH}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means asking Let's Encrypt
+      # for new ones, and there is a rate limit on that.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

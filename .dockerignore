@@ -1,0 +1,47 @@
+# What never enters the build context.
+#
+# The Dockerfile copies named directories, so today nothing below would reach
+# the image anyway. This file exists for the day someone writes `COPY . .` -
+# at that moment .env and lab/ would be baked into a layer, and a layer is
+# permanent in whatever registry the image reaches.
+#
+# It also stops sending ~7 MB of .git and licensed brand art to the daemon on
+# every build.
+
+# Secrets, in every form they take here
+.env
+.env.*
+!.env.example
+*.env
+lab/
+credentials.json
+secrets.yaml
+*.key
+*.pem
+
+# Not needed to run the app
+.git
+.gitignore
+.github
+Brand/
+calibration/
+tools/
+docs/
+deploy/
+*.md
+docker-compose*.yml
+Dockerfile
+
+# Local Python
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Scan output: customer prompts and transcripts. Never in an image.
+results/
+scans/
+*.scan.json
