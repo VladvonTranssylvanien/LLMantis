@@ -964,3 +964,49 @@ owner.
 - Issue #7's central claim about the **AI judge's** behaviour on an empty answer
   remains untested — stated as untested in the issue itself. Only Layer 1's
   behaviour is established, by reading `judge.py`.
+
+---
+
+## 2026-08-16 — Session 9: pushed to GitHub
+
+Branch **`gregor/lab-target-bots`**, PR
+[#9](https://github.com/VladvonTranssylvanien/LLMantis/pull/9) against `main`.
+Branch rather than a direct push, per `PLAYBOOK.md:531` and Gregor's choice, so
+Vlad can review the runner before it lands.
+
+Seven files, 1467 insertions: `AGENTS.md`, `CLAUDE.md`, `GREGOR_WORKLOG.md`,
+`lab/.env.example`, `lab/bots/teleshop-a.yaml`, `lab/bots/teleshop-b.yaml`,
+`lab/runner.py`.
+
+### Secret scan before pushing — and the first scan was wrong
+
+`lab/.env` holds a live Azure key and sits inside the working tree, so this
+mattered.
+
+The first sweep, `grep -rlF "$KEY" . --exclude-dir=venv --exclude-dir=.git`,
+reported **zero files** — while `grep -rlF "$KEY" lab/` correctly found
+`lab/.env`. The recursive scan over `.` with `--exclude-dir` silently missed it
+on this system. A secret scan that fails open is worse than none, because it
+produces a confident "clean".
+
+Replaced with two checks that are actually sound:
+
+1. **Scan the staged content**, not the worktree — `git diff --cached | grep -F`
+   — since staged content is precisely what gets committed.
+2. **Validate the detector on a decoy.** Write the key to a throwaway file,
+   confirm the same grep finds it, delete it. Without this step "clean" is
+   indistinguishable from a broken matcher.
+
+Results: key absent from staged content, absent from the commit, absent from all
+history (`git log --all -p`, 0 occurrences). `lab/.env` not staged. No
+high-entropy literals in the diff. `lab/.env.example` ships with
+`LAB_AZURE_KEY=` empty.
+
+### What I did NOT verify
+
+- **Why** `grep -r` over `.` with `--exclude-dir` missed `lab/.env` on this
+  machine. Worked around rather than diagnosed. Any future secret scan should
+  use the staged-content method with a decoy check, not a worktree sweep.
+- That the PR passes any CI. None was observed to run.
+- Whether pushing `AGENTS.md` and `CLAUDE.md` conflicts with anything the other
+  contributors keep locally — both were untracked before this commit.
