@@ -12,9 +12,14 @@
 
 services:
 
+  # No container_name anywhere on purpose. A fixed name defeats Compose's own
+  # project scoping: with one, `-p something` still tries to create
+  # "llmantis-db" and collides with the development stack that already owns
+  # that name. Every command in deploy/README.md addresses services by service
+  # name, which does not need it.
+
   postgres:
     image: postgres:16-alpine
-    container_name: llmantis-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -30,7 +35,6 @@ services:
 
   app:
     build: .
-    container_name: llmantis-app
     restart: unless-stopped
     depends_on:
       postgres:
@@ -52,7 +56,6 @@ services:
 
   caddy:
     image: caddy:2.10-alpine
-    container_name: llmantis-caddy
     restart: unless-stopped
     depends_on:
       - app
