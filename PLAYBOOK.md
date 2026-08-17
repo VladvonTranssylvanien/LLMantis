@@ -124,6 +124,43 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 
 ## 3. Design system
 
+> ### 🔴 DECIDED 18.08.2026 — the product goes LIGHT. Do not revert.
+>
+> The dark theme is dropped. Bogdan's decision: the buyer is a restaurant owner as
+> much as a compliance manager, the Prüfbericht was always a light document, and
+> one theme across landing + app + report is less to carry.
+>
+> **State right now:** built and awaiting team review in `frontend/preview/` on
+> branch `design/light-preview` (see `frontend/preview/REVIEW.md`). The live pages
+> and `assets/base.css` are still dark until the swap commit. The dark tokens
+> below are therefore still *accurate* — they are not still *intended*.
+>
+> **Light tokens — every ratio computed, not estimated.** Against `--bg #F7F8F5`:
+>
+> ```css
+> --bg:#F7F8F5;        --surface:#FFFFFF;     --line:#E3E6DF;
+> --ink:#111827;       /* 16.64:1 */          --ink-muted:#5A6660;  /* 5.62:1 */
+> --brand:#1F5C0E;     /*  7.59:1 — green text and icons                        */
+> --accent:#256B10;    /*  6.18:1 as text, 6.58:1 under a white label — one
+>                          value serves both roles, so there is no second green */
+> --brand-lite:#7BE33F;/*  1.53:1 — LARGE DECORATIVE SHAPES ONLY. Never text,
+>                          never an icon, never a border on its own.            */
+> --critical:#A3200F;  /* 7.11 */  --high:#B45309; /* 4.71 */  --medium:#7A5200; /* 6.49 */
+> ```
+>
+> `#3E8F14` is **removed** — 3.83:1 on `--bg`, 4.08:1 on white, fails AA. It is a
+> live defect in `report.html` today, not a style preference.
+>
+> Accent budget is unchanged: the green is roughly **5 % of the pixels**. A light
+> page flooded with green looks like an eco brand, not a security tool.
+>
+> The seal (`assets/brand/seal.svg`) has exactly three jobs — a dated stamp on the
+> report, a quiet watermark on the landing, a compact lockup in the navbar. It
+> states **that a test happened**, never a verdict, and it is **not** given to
+> customers for their own site. That is the Badge, deferred in §6 until 10 customers.
+
+### Dark tokens — current live state, superseded by the block above
+
 ```css
 --bg:        #0A0A0B;   --surface:   #141518;   --border:  #24262B;
 --text:      #E8E8EA;   --muted:     #8A8F98;   --accent:  #7BE33F;  /* mantis green */

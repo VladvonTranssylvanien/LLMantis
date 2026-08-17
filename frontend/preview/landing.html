@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLMantis — Chatbot-Prüfung</title>
+<meta name="description" content="Wir prüfen, ob Ihr KI-Chatbot sagt, was er nicht sagen darf. Prüfbericht statt Zertifikat.">
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../assets/brand/favicon-32.png" sizes="32x32">
+<style>
+/* ── Fonts — self-hosted. No CDN, no Google Fonts (PLAYBOOK §1). ───────────── */
+@font-face{font-family:'Inter';src:url('../assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('../assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight:400;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('../assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight:500;font-display:swap}
+
+/* ── Light design system. Every ratio below was measured, not estimated. ───── */
+:root{
+  --bg:#F7F8F5;          /* warm off-white */
+  --surface:#FFFFFF;
+  --line:#E3E6DF;
+  --ink:#111827;         /* 16.6:1 on --bg */
+  --ink-muted:#5A6660;   /*  5.6:1 on --bg  AA */
+  --brand:#1F5C0E;       /*  7.6:1 on --bg  — text and icons */
+  --brand-btn:#256B10;   /*  6.6:1 with a white label */
+  --brand-lite:#7BE33F;  /*  1.5:1 — LARGE decorative shapes only. Never text,
+                            never an icon, never a border on its own. */
+  --critical:#A3200F;    /*  7.1:1 */
+  --high:#B45309;        /*  4.7:1 */
+  --medium:#7A5200;      /*  6.5:1 */
+  --pass:#1F5C0E;        /*  7.6:1 */
+  /* Aliases. The pipeline SVG is built by the lifted script, which writes
+     var(--muted) / var(--accent) / var(--border) / var(--surface-2) / var(--mono)
+     into fill and stroke attributes. Leave one of these undefined and that
+     attribute silently resolves to nothing — the shape renders black or not at all. */
+  --muted:var(--ink-muted);
+  --accent:var(--brand);
+  --border:var(--line);
+  --surface-2:#EEF6E9;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --radius:14px;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:88px}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+h1,h2,h3{letter-spacing:-.03em;line-height:1.12;margin:0}
+a{color:var(--brand)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:12px;top:12px;z-index:99;background:var(--surface);padding:10px 14px;
+  border:2px solid var(--brand);border-radius:8px}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:4px}
+
+/* ── Top bar ───────────────────────────────────────────────────────────────── */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(247,248,245,.86);
+  backdrop-filter:blur(14px) saturate(150%);border-bottom:1px solid transparent;
+  transition:border-color .2s var(--ease)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .topbar{background:var(--bg)}}
+.topbar.scrolled{border-bottom-color:var(--line)}
+.bar{display:flex;align-items:center;gap:20px;height:72px}
+.brand{display:flex;align-items:center;color:var(--brand);text-decoration:none;flex:0 0 auto}
+.brand img{height:34px;display:block}
+.nav{margin-left:auto;display:flex;gap:26px;align-items:center}
+.nav a.link{color:var(--ink-muted);text-decoration:none;font-size:15px;font-weight:500;
+  padding:6px 2px;border-bottom:2px solid transparent}
+.nav a.link:hover{color:var(--ink)}
+.nav a.link[aria-current="true"]{color:var(--brand);border-bottom-color:var(--brand)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  background:var(--brand-btn);color:#fff;text-decoration:none;font-weight:600;font-size:15px;
+  padding:11px 18px;border-radius:10px;border:0;cursor:pointer;
+  transition:transform .2s var(--ease),background .2s var(--ease)}
+.btn:hover{background:var(--brand);transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--brand);border:1.5px solid var(--line)}
+.btn.ghost:hover{background:#fff;border-color:var(--brand)}
+.menu-btn{display:none;margin-left:auto;background:transparent;border:1.5px solid var(--line);
+  color:var(--ink);border-radius:9px;padding:9px 13px;font:inherit;font-size:14px;cursor:pointer}
+
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
+.hero{position:relative;padding:70px 0 40px;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:48px;align-items:center}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--brand);margin:0 0 18px}
+h1{font-size:clamp(34px,5vw,58px);font-weight:700;max-width:15ch}
+.hero-sub{font-size:19px;color:var(--ink-muted);margin:22px 0 0;max-width:46ch}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px}
+.hero-under{font-size:14px;color:var(--ink-muted);margin-top:18px}
+.netwrap{position:relative;justify-self:center;width:min(100%,420px)}
+#net{width:100%;height:auto;display:block}
+/* The seal, large and quiet, behind the head. Decoration only — it carries no
+   claim text in this role and is hidden from assistive technology. */
+/* Centred on the head, bleeding equally on both sides. Anchored to one edge it
+   read as a clipping accident rather than a watermark. */
+.seal-mark{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:126%;opacity:.05;pointer-events:none;z-index:-1}
+.pause{position:absolute;right:0;bottom:-6px;background:var(--surface);
+  border:1px solid var(--line);color:var(--ink-muted);border-radius:8px;
+  padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}
+.pause:hover{color:var(--ink);border-color:var(--brand)}
+
+/* ── Sections ──────────────────────────────────────────────────────────────── */
+section{padding:76px 0;border-top:1px solid var(--line)}
+.h2{font-size:clamp(26px,3.4vw,38px);font-weight:700;max-width:20ch}
+.lead{font-size:18px;color:var(--ink-muted);max-width:62ch;margin:18px 0 0}
+.eyebrow-s{font-size:12px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;
+  color:var(--ink-muted);margin:0 0 14px}
+
+/* Two layers */
+.layers{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:38px}
+.layer{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px}
+.layer .tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--brand);background:#EEF6E9;border-radius:999px;
+  padding:5px 11px;margin-bottom:14px}
+.layer h3{font-size:21px;margin-bottom:10px}
+.layer p{color:var(--ink-muted);margin:0;font-size:16px}
+
+/* Pipeline */
+#pipe{width:100%;height:auto;display:block;max-width:960px;margin:34px auto 0}
+.pipe-bar{display:flex;align-items:center;gap:14px;justify-content:center;margin-top:16px;
+  font-size:14px;color:var(--ink-muted)}
+.pipe-bar button{background:var(--surface);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+
+/* ── STEP 5 — the small-business stories. Illustrations, not measurements. ─── */
+.stories{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:40px}
+.story{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:28px;position:relative}
+.story .who{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--brand);margin-bottom:12px}
+.story p{margin:0;font-size:16.5px}
+.story .cons{margin-top:16px;padding-top:16px;border-top:1px solid var(--line);
+  color:var(--ink-muted);font-size:15.5px}
+.story .cons b{color:var(--ink);font-weight:600}
+.closing{margin-top:28px;background:#EEF6E9;border:1px solid #D6E7CC;border-radius:var(--radius);
+  padding:24px 26px;font-size:17px}
+.disclaim{margin-top:16px;font-size:14px;color:var(--ink-muted);max-width:70ch}
+
+/* Legal facts */
+.facts{display:grid;gap:0;margin-top:34px;border-top:1px solid var(--line)}
+.fact{display:grid;grid-template-columns:64px 1fr;gap:22px;padding:26px 0;
+  border-bottom:1px solid var(--line)}
+.fact .n{font-size:13px;color:var(--brand);font-weight:600}
+.fact h3{font-size:19px;margin-bottom:8px}
+.fact p{margin:0;color:var(--ink-muted);font-size:16px}
+.fact .src{display:block;margin-top:10px;font-size:13px;color:var(--ink-muted)}
+.frame{margin-top:30px;background:var(--surface);border:1px solid var(--line);
+  border-left:3px solid var(--brand);border-radius:var(--radius);padding:24px 26px}
+.frame b{display:block;margin-bottom:8px}
+.frame p{margin:0;color:var(--ink-muted);font-size:16px}
+
+/* Pricing */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:38px;align-items:start}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;
+  display:flex;flex-direction:column;height:100%}
+.plan.featured{border-color:var(--brand);box-shadow:0 10px 30px -18px rgba(31,92,14,.5)}
+.plan .pname{font-size:17px;font-weight:600}
+.plan .price{font-size:38px;font-weight:700;letter-spacing:-.04em;margin:10px 0 4px}
+.plan .price small{font-size:15px;font-weight:500;color:var(--ink-muted);letter-spacing:0}
+.plan ul{list-style:none;margin:20px 0 24px;padding:0;display:grid;gap:11px;flex:1}
+.plan li{display:grid;grid-template-columns:20px 1fr;gap:10px;font-size:15.5px;color:var(--ink-muted)}
+.plan li i{color:var(--brand);font-style:normal}
+.plan li.cannot i{color:var(--ink-muted)}
+.plan li.cannot{color:var(--ink-muted)}
+.plan .req{margin:0 0 18px;font-size:14px;color:var(--ink);background:#EEF6E9;
+  border-radius:9px;padding:10px 12px}
+.vat{margin-top:20px;font-size:14px;color:var(--ink-muted)}
+.services{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:34px}
+.svc{background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);padding:26px}
+.svc h3{font-size:18px;margin-bottom:8px}
+.svc p{margin:0 0 14px;color:var(--ink-muted);font-size:15.5px}
+.svc .ask{font-size:14px;color:var(--brand);font-weight:600}
+
+/* Team */
+.team{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:34px}
+.member{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.member b{display:block;font-size:17px;margin-bottom:6px}
+.member span{color:var(--ink-muted);font-size:15px}
+
+/* Footer */
+footer{border-top:1px solid var(--line);padding:44px 0 60px;color:var(--ink-muted);font-size:14.5px}
+.foot{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.foot a{color:var(--ink-muted)}
+.foot a:hover{color:var(--brand)}
+.foot .sep{margin-left:auto}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr;gap:28px}
+  .netwrap{order:-1;width:min(100%,320px)}
+  .layers,.stories,.services{grid-template-columns:1fr}
+  .plans{grid-template-columns:1fr}
+  .team{grid-template-columns:1fr 1fr}
+  .menu-btn{display:block}
+  .nav{position:absolute;left:0;right:0;top:72px;background:var(--surface);
+    border-bottom:1px solid var(--line);flex-direction:column;align-items:stretch;
+    gap:0;padding:8px 24px 16px;display:none}
+  .nav[data-open="true"]{display:flex}
+  .nav a.link{padding:12px 0;border-bottom:1px solid var(--line)}
+  .nav .btn{margin-top:12px}
+  .fact{grid-template-columns:1fr;gap:6px}
+}
+
+/* ── Motion is opt-out, and the opt-out is real. ───────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#produkt">Zum Inhalt springen</a>
+
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="#top" aria-label="LLMantis">
+      <img src="../assets/brand/lockup.svg" alt="LLMantis">
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menü</button>
+    <nav class="nav" id="nav" aria-label="Hauptnavigation">
+      <a class="link" href="#produkt" data-s="navProduct">Was ist das</a>
+      <a class="link" href="#warum"   data-s="navWhy">Warum</a>
+      <a class="link" href="#preise"  data-s="navPricing">Preise</a>
+      <a class="link" href="#ueber-uns" data-s="navAbout">Über uns</a>
+      <a class="btn" href="/static/art50check.html" data-s="navCta">Kostenlos prüfen</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <div class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow" data-s="heroEyebrow"></p>
+        <h1 data-s="heroTitle"></h1>
+        <p class="hero-sub" data-s="heroSub"></p>
+        <div class="hero-cta">
+          <a class="btn" href="/static/art50check.html" data-s="heroCta1"></a>
+          <a class="btn ghost" href="#produkt" data-s="heroCta2"></a>
+        </div>
+        <p class="hero-under" data-s="heroUnder"></p>
+      </div>
+      <div class="netwrap">
+        <img class="seal-mark" src="../assets/brand/seal.svg" alt="" aria-hidden="true">
+        <canvas id="net" width="900" height="900" role="img" data-s-alt="netAlt"></canvas>
+        <button class="pause" id="netPause" aria-pressed="false">Animation anhalten</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="produkt">
+    <div class="wrap">
+      <h2 class="h2" data-s="prodTitle"></h2>
+      <p class="lead" data-s="prodLead"></p>
+
+      <h3 class="h2" style="font-size:24px;margin-top:52px" data-s="layersTitle"></h3>
+      <div class="layers">
+        <!-- ids lay1/lay2/sub1 are NOT used here: the pipeline script creates elements
+             with exactly those ids inside the #pipe SVG. Duplicating them would be
+             invalid, and pipe.querySelector would be a coin flip. -->
+        <div class="layer">
+          <span class="tag" data-s="layerFreeTag"></span>
+          <h3 data-s="layerFreeName"></h3>
+          <p data-s="layerFreeBody"></p>
+        </div>
+        <div class="layer">
+          <span class="tag" data-s="layerPaidTag"></span>
+          <h3 data-s="layerPaidName"></h3>
+          <p data-s="layerPaidBody"></p>
+        </div>
+      </div>
+
+      <h3 class="h2" style="font-size:24px;margin-top:60px" data-s="pipeTitle"></h3>
+      <p class="lead" data-s="pipeDesc"></p>
+      <svg id="pipe" viewBox="0 0 960 190" role="img" data-s-alt="pipeCaption"></svg>
+      <div class="pipe-bar">
+        <button id="pipeToggle" aria-pressed="false"></button>
+        <span id="pipeCount" class="mono"></span>
+      </div>
+      <p class="disclaim" data-s="pipeCaption"></p>
+    </div>
+  </section>
+
+  <!-- ══ STEP 5 — why a small business would need this ══════════════════════ -->
+  <section id="warum">
+    <div class="wrap">
+      <p class="eyebrow-s">Vier Situationen</p>
+      <h2 class="h2">Warum sollte ich das brauchen?</h2>
+      <p class="lead">Vier kurze Geschichten. Keine davon braucht einen Hacker — es reicht,
+        dass der Bot zu hilfsbereit ist.</p>
+
+      <div class="stories">
+        <article class="story">
+          <div class="who">Restaurant</div>
+          <p>Ihr Buchungs-Bot bestätigt einen Tisch für zwanzig Personen am Samstag.
+             Einen Tisch für zwanzig haben Sie nicht. Der Gast steht mit der Bestätigung
+             auf dem Handy vor der Tür.</p>
+          <!-- REVIEW: Kwabena — Air Canada, CRT, Februar 2024 -->
+          <p class="cons"><b>Sie sind an das gebunden, was Ihr Bot sagt.</b> Air Canada hat
+             2024 vor einem Tribunal argumentiert, der Chatbot sei ein eigenständiges System.
+             Das Gericht ist dem nicht gefolgt.</p>
+        </article>
+
+        <article class="story">
+          <div class="who">Friseursalon</div>
+          <p>Jemand fragt am Telefon nach den Terminen von morgen, und der Bot liest den
+             Namen und die Uhrzeit einer anderen Kundin vor.</p>
+          <!-- REVIEW: Kwabena — Art. 33 DSGVO, 72 Stunden -->
+          <p class="cons"><b>Das ist eine Datenpanne</b>, und die Frist, sie zu melden,
+             beträgt 72 Stunden (Art. 33 DSGVO). Dass es niemand so gemeint hat, ändert
+             daran nichts.</p>
+        </article>
+
+        <article class="story">
+          <div class="who">Physiotherapie-Praxis</div>
+          <p>Ein Patient beschreibt dem Terminbot Schmerzen in der Brust, und der Bot
+             schlägt vor, was er dagegen nehmen kann.</p>
+          <p class="cons"><b>Ihr Bot hat gerade in Ihrem Namen einen medizinischen Rat
+             gegeben.</b></p>
+        </article>
+
+        <article class="story">
+          <div class="who">Handwerksbetrieb</div>
+          <p>Der Bot erfindet 30 % Rabatt — oder nennt einen Festpreis für einen Auftrag,
+             den nie jemand gesehen hat.</p>
+          <p class="cons"><b>Ihr Kunde hält jetzt ein schriftliches Angebot in der Hand.</b></p>
+        </article>
+      </div>
+
+      <!-- REVIEW: Kwabena — Art. 50 AI Act, Geltung seit 02.08.2026 -->
+      <p class="closing">Seit dem 2. August 2026 verlangt Artikel 50 der KI-Verordnung,
+        dass Menschen erfahren, wenn sie mit einer KI sprechen. Auch der kleinste Bot.
+        Ein Bot, der sich dazu überreden lässt, das zu bestreiten, erfüllt das nicht.</p>
+
+      <p class="disclaim">Die vier Situationen oben sind <strong>Beispiele</strong>, keine
+        Messergebnisse. Sie beschreiben, was ein Sprachmodell tun kann — nicht, wie häufig
+        es das in einer bestimmten Branche tut.</p>
+    </div>
+  </section>
+
+  <section id="grc">
+    <div class="wrap">
+      <p class="eyebrow-s" data-s="grcEyebrow"></p>
+      <h2 class="h2" data-s="grcTitle"></h2>
+      <p class="lead" data-s="grcLead"></p>
+      <div class="facts" id="facts"></div>
+      <div class="frame">
+        <b data-s="grcFrameLead"></b>
+        <p data-s="grcFrameBody"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="preise">
+    <div class="wrap">
+      <h2 class="h2" data-s="priceTitle"></h2>
+      <p class="lead" data-s="priceLead"></p>
+      <div class="plans" id="plans"></div>
+      <p class="vat" data-s="priceVat"></p>
+      <div class="services" id="services"></div>
+    </div>
+  </section>
+
+  <section id="ueber-uns">
+    <div class="wrap">
+      <h2 class="h2" data-s="aboutTitle"></h2>
+      <p class="lead" data-s="aboutLead"></p>
+      <div class="team" id="team"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span data-s="footCopy"></span>
+    <a href="../impressum.html">Impressum</a>
+    <a href="../datenschutz.html">Datenschutzerklärung</a>
+    <span class="sep" data-s="footNote"></span>
+  </div>
+</footer>
+
+<script>
+
+'use strict';
+
+/* ===========================================================================
+   ALLE SICHTBAREN TEXTE — ein Block.
+   Eine englische Fassung ist ein Austausch dieses Objekts, sonst nichts.
+   Sprachregel: PLAYBOOK §8 — UI englisch, Marketing-Copy deutsch (Ausnahme
+   dokumentiert im Sessionbericht).
+   =========================================================================== */
+const S = {
+  navProduct: 'Was ist das',
+  navWhy:     'Warum',
+  navPricing: 'Preise',
+  navAbout:   'Über uns',
+  navCta:     'Kostenlos prüfen',
+
+  slogan:      'Wissen, was Ihr Chatbot wirklich sagt.',
+  heroEyebrow: 'OWASP Top 10 für LLM',
+  heroTitle:   'Ihr Chatbot lässt sich überreden.',
+  heroSub:     'LLMantis führt dokumentierte Angriffe gegen Ihren Bot aus, lässt jede ' +
+               'Antwort von einem separaten Modell bewerten und liefert einen Prüfbericht — ' +
+               'jeder Befund mit dem wörtlichen Zitat, das ihn belegt. Kein Zitat, kein Befund.',
+  heroCta1:    'Kostenlose Prüfung starten',
+  heroCta2:    'So funktioniert es',
+  heroUnder:   'Der Art.-50-Check ist kostenlos und passiv — er sendet Ihrem Bot keine Nachricht.',
+  netAlt:      'Der LLMantis-Kopf, gezeichnet als neuronales Netz',
+
+  prodTitle: 'Fünf Schritte, und Sie sehen jeden davon',
+  prodLead:  'Was passiert, wenn Sie den Knopf drücken. Die Darstellung unten zeigt den ' +
+             'Ablauf schematisch — sie ersetzt keinen echten Prüflauf.',
+  pipeBar:   'llmantis — Ablauf einer Prüfung',
+  pipeTitle: 'Schematischer Ablauf einer LLMantis-Prüfung',
+  pipeDesc:  'Fünf Stufen: Ziel, Angriffe aus der Bibliothek, Antwort des Bots, ' +
+             'Bewertung in zwei Ebenen, Note und Prüfbericht.',
+  pipeCaptionLabel: 'Illustration des Prüfablaufs — keine Live-Daten.',
+  pipeCaption: 'Namen und Zahlen sind erfunden. Einen echten Befund sehen Sie erst in Ihrem eigenen Prüfbericht.',
+  pipePause: 'Pause',
+  pipePlay:  'Abspielen',
+
+  stage1: 'Ziel',
+  stage2: 'Angriffe',
+  stage3: 'Antwort',
+  stage4: 'Bewertung',
+  stage5: 'Note + Bericht',
+  stage1sub: 'Example Bot',
+  stage2sub: 'Angriff 12 von ' + 21,
+  stage3sub: 'Antwort erhalten',
+  stage4sub: 'zwei Ebenen',
+  stage5sub: 'Prüfbericht',
+  layer1: 'Ebene 1 — Canary, deterministisch',
+  layer2: 'Ebene 2 — Judge, mit Zitat',
+
+  layersTitle:   'Zwei Ebenen, und nur eine berührt Ihren Bot',
+  layerFreeTag:  'Kostenlos · keine Freigabe nötig',
+  layerFreeName: 'Art.-50-Check',
+  layerFreeBody: 'Ein einziger Abruf Ihrer öffentlichen Seite. Gibt es ein Chat-Widget, und ' +
+                 'weist es darauf hin, dass es eine KI ist? Wir senden Ihrem Bot dabei keine ' +
+                 'einzige Nachricht.',
+  layerPaidTag:  'Kostenpflichtig · Eigentumsnachweis erforderlich',
+  layerPaidName: 'Red Team',
+  layerPaidBody: 'Die vollständige Bibliothek über fünf OWASP-LLM-Kategorien — Prompt ' +
+                 'Injection, Datenabfluss, Jailbreak, überschrittene Handlungsvollmacht, ' +
+                 'Markensicherheit. Aktive Prüfung, deshalb weisen Sie vorher nach, dass das ' +
+                 'Ziel Ihnen gehört. Jeder Befund mit Beleg und konkreter Empfehlung.',
+
+  grcEyebrow: 'Warum überhaupt',
+  grcTitle:   'Drei Dinge, die bereits gelten',
+  grcLead:    'Keine Vorschrift verlangt, einen Chatbot testen zu lassen. Was gilt, ist ' +
+              'Folgendes — und dafür wollen Sie im Zweifel etwas in der Hand haben.',
+  grcFrameLead: 'Was wir verkaufen, ist ein Nachweis.',
+  grcFrameBody: 'Dokumentierte Sorgfalt: Sie haben geprüft, Sie wissen, was gefunden wurde, ' +
+                'und Sie können zeigen, was Sie daraufhin geändert haben. Das ist es, was ' +
+                'gegenüber Aufsicht, Versicherung und Kundschaft zählt.',
+
+  priceTitle: 'Preise',
+  priceLead:  'Der Einstieg kostet nichts und verlangt kein Konto.',
+  priceVat:   'Alle Preise verstehen sich zzgl. MwSt.',
+
+  aboutTitle: 'Über uns',
+  aboutLead:  'Vier Leute, ein Produkt. Wir prüfen zuerst unseren eigenen Bot und ' +
+              'veröffentlichen, was dabei herauskommt. Der gesamte Stack liegt in der EU — ' +
+              'auch das Modell, das die Antworten bewertet, weil es Ihre Systemprompts liest.',
+
+  footCopy: '© 2026 LLMantis',
+  footNote: 'Prüfbericht, keine Zertifizierung.'
+};
+
+/* Die drei belegbaren Aussagen. Jede mit Quelle; nichts darüber hinaus.
+   Jeder Satz mit § oder Art. ist im DOM mit <!-- REVIEW: Kwabena --> markiert. */
+const FACTS = [
+  { n: '01',
+    h: 'Ihr Bot muss sagen, dass er eine KI ist',
+    p: 'Art. 50(1) der KI-Verordnung gilt seit dem 2. August 2026: Nutzerinnen und Nutzer ' +
+       'müssen spätestens bei der ersten Interaktion erfahren, dass sie mit einer KI ' +
+       'sprechen — außer es ist offensichtlich. Ein Bot, der sich dazu überreden lässt, das ' +
+       'zu bestreiten, erfüllt das nicht mehr.',
+    s: 'Verordnung (EU) 2024/1689, Art. 50(1); Bußgeldrahmen Art. 99' },
+  { n: '02',
+    h: 'Was Ihr Bot sagt, sagen Sie',
+    p: 'Das Civil Resolution Tribunal in British Columbia entschied im Februar 2024 gegen ' +
+       'Air Canada: Die Argumentation, der Chatbot sei eine eigenständige Rechtsperson, ' +
+       'wurde zurückgewiesen. Das Unternehmen haftete für die Auskunft seines Bots.',
+    s: 'Moffatt v. Air Canada, BC Civil Resolution Tribunal, Februar 2024' },
+  { n: '03',
+    h: 'Ein Datenabfluss startet eine Frist',
+    p: 'Gibt Ihr Bot Daten einer anderen Person preis, ist das eine Verletzung des Schutzes ' +
+       'personenbezogener Daten. Die Meldung an die Aufsichtsbehörde hat dann binnen 72 ' +
+       'Stunden zu erfolgen. Die Uhr läuft ab Kenntnis — nicht ab Aufklärung.',
+    s: 'Art. 33 DSGVO' }
+];
+
+const PLANS = [
+  { name: 'Art.-50-Check', price: '0 €', unit: '', featured: false,
+    cta: 'Jetzt prüfen', href: '/static/art50check.html',
+    items: [
+      { t: 'Passive Prüfung einer öffentlichen Seite' },
+      { t: 'Ein einziger Abruf, keine Nachricht an den Bot' },
+      { t: 'Keine Freigabe, kein Konto nötig' },
+      { t: 'Prüft die Seite — öffnet den Chat nicht und testet sein Verhalten nicht', k: 'cannot' }
+    ] },
+  { name: 'Starter', price: '29 €', unit: '/ Prüfung', featured: true,
+    cta: 'Prüfung starten', href: '/scan',
+    items: [
+      { t: 'Vollständige Angriffsbibliothek gegen einen Bot' },
+      { t: 'Prompt-Modus: Sie fügen Ihren eigenen Systemprompt ein' },
+      { t: 'Prüfbericht als PDF' },
+      { t: 'Note, Befunde mit wörtlichem Beleg, Empfehlungen' }
+    ] },
+  { name: 'Business', price: '199 €', unit: '/ Monat', featured: false,
+    cta: 'Business anfragen', href: 'mailto:kontakt@llmantis.de?subject=Business',
+    items: [
+      { t: 'Alles aus Starter' },
+      { t: 'Prüfung eines Live-Endpunkts' },
+      { t: 'Erneute Prüfung nach Änderungen, mit Verlauf' },
+      { t: 'Mehrere Bots' },
+      { t: 'Eigentumsnachweis für das Ziel erforderlich', k: 'req' }
+    ] }
+];
+
+const SERVICES = [
+  { h: 'Individuelle Prüfung', p: 'Ein Mensch prüft ein konkretes System und schreibt den ' +
+      'Bericht dazu. Umfang und Aufwand klären wir vorher gemeinsam. Kein Warenkorb, keine ' +
+      'Onlinebuchung.', mail: 'kontakt@llmantis.de', subject: 'Individuelle Prüfung' },
+  { h: 'Remediation', p: 'Wir arbeiten die Befunde mit Ihnen ab: Systemprompt härten, ' +
+      'Leitplanken einziehen, danach erneut prüfen, damit die Änderung belegt ist. Das ist ' +
+      'Arbeit nach Aufwand, kein Produkt mit zugesichertem Ergebnis.',
+    mail: 'kontakt@llmantis.de', subject: 'Remediation' }
+];
+
+const TEAM = [
+  { who: 'Bogdan', role: 'Projektstruktur, Planung, Engine' },
+  { who: 'Vlad',   role: 'Engine, API, Datenhaltung' },
+  { who: 'Gregor', role: 'Ziel-Labor, Kalibrierung' },
+  { who: 'Kwabena', role: 'GRC, rechtliche Grenzen' }
+];
+
+/* ------------------------------------------------------------------ render */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+document.querySelectorAll('[data-s]').forEach(el => { el.textContent = S[el.dataset.s] || ''; });
+document.querySelectorAll('[data-s-alt]').forEach(el => {
+  el.setAttribute('aria-label', S[el.dataset.sAlt] || '');
+});
+
+$('#facts').innerHTML = FACTS.map(f =>
+  // REVIEW: Kwabena — jeder Satz mit § oder Art. in diesem Block
+  '<div class="fact"><span class="n">' + f.n + '</span><div>' +
+  '<h3>' + esc(f.h) + '</h3><p>' + esc(f.p) + '</p>' +
+  '<p class="src">' + esc(f.s) + '</p></div></div>').join('');
+
+$('#plans').innerHTML = PLANS.map(p =>
+  '<div class="plan' + (p.featured ? ' featured' : '') + '">' +
+    '<div class="pname">' + esc(p.name) + '</div>' +
+    '<div class="price">' + esc(p.price) + '<small> ' + esc(p.unit) + '</small></div>' +
+    '<div class="vat">zzgl. MwSt.</div>' +
+    '<ul>' + p.items.map(i =>
+      '<li class="' + (i.k || '') + '">' + esc(i.t) + '</li>').join('') + '</ul>' +
+    '<div class="foot"><a class="btn' + (p.featured ? '' : ' btn--ghost') + '" href="' +
+      esc(p.href) + '">' + esc(p.cta) + '</a></div>' +
+  '</div>').join('');
+
+$('#services').innerHTML = SERVICES.map(s =>
+  '<div class="service"><div class="head"><h3>' + esc(s.h) + '</h3>' +
+  '<span class="onreq">auf Anfrage</span></div>' +
+  '<p>' + esc(s.p) + '</p>' +
+  '<a class="mail" href="mailto:' + esc(s.mail) + '?subject=' + encodeURIComponent(s.subject) +
+  '">' + esc(s.mail) + '</a></div>').join('');
+
+$('#team').innerHTML = TEAM.map(m =>
+  '<div class="member"><div class="who">' + esc(m.who) + '</div>' +
+  '<div class="role">' + esc(m.role) + '</div></div>').join('');
+
+/* ------------------------------------------------------------ mobile menu */
+$('#menuBtn').addEventListener('click', () => {
+  const open = $('#nav').classList.toggle('open');
+  $('#menuBtn').setAttribute('aria-expanded', String(open));
+});
+$('#nav').addEventListener('click', e => {
+  if (e.target.tagName === 'A') {
+    $('#nav').classList.remove('open');
+    $('#menuBtn').setAttribute('aria-expanded', 'false');
+  }
+});
+
+/* aria-current on the section actually in view. */
+const navLinks = [...document.querySelectorAll('.nav a.link')];
+const ratios = new Map();
+function syncCurrent() {
+  let best = null, bestR = 0;
+  ratios.forEach((r, id) => { if (r > bestR) { bestR = r; best = id; } });
+  navLinks.forEach(a => {
+    if (best && a.getAttribute('href') === '#' + best) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
+  });
+}
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => ratios.set(en.target.id, en.intersectionRatio));
+    syncCurrent();
+  }, { threshold: [0, .25, .5, .75, 1], rootMargin: '-84px 0px -45% 0px' });
+  navLinks.forEach(a => {
+    const el = document.querySelector(a.getAttribute('href'));
+    if (el) io.observe(el);
+  });
+}
+
+/* ===========================================================================
+   Der Kopf als neuronales Netz. Die Knoten werden zur Laufzeit aus dem echten
+   Logo-Pfad abgetastet — die Grafik IST die Markengeometrie.
+   =========================================================================== */
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const HEAD  = 'M 50 29 C 44 27, 30 26, 18 27 C 12 27.5, 9 31, 10 37 C 12 51, 22 68, 34 78 C 38 82, 44 86, 50 87 C 56 86, 62 82, 66 78 C 78 68, 88 51, 90 37 C 91 31, 88 27.5, 82 27 C 70 26, 56 27, 50 29 Z M 18.5 31.28 a 14 8.5 50 1 0 18 21.44 a 14 8.5 50 1 0 -18 -21.44 Z M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18 21.44 Z';
+const ANT_L = 'M 44 31 C 36 22, 24 12, 6 2 C 21 13, 34 24, 46.5 34.5 Z';
+const ANT_R = 'M 56 31 C 64 22, 76 12, 94 2 C 79 13, 66 24, 53.5 34.5 Z';
+
+const cv = $('#net'), ctx = cv.getContext('2d'), SIZE = 900;
+
+const nodes = (function sample() {
+  const off = document.createElement('canvas');
+  off.width = off.height = SIZE;
+  const o = off.getContext('2d');
+  o.setTransform(SIZE / 100, 0, 0, SIZE / 100, 0, 0);
+  o.fillStyle = '#fff';
+  o.fill(new Path2D(HEAD), 'evenodd');
+  o.fill(new Path2D(ANT_L));
+  o.fill(new Path2D(ANT_R));
+  const data = o.getImageData(0, 0, SIZE, SIZE).data;
+  const pts = [], STEP = 15;
+  for (let y = 0; y < SIZE; y += STEP)
+    for (let x = 0; x < SIZE; x += STEP)
+      if (data[(y * SIZE + x) * 4 + 3] > 128) {
+        const jx = x + (Math.random() - .5) * STEP * 1.1;
+        const jy = y + (Math.random() - .5) * STEP * 1.1;
+        pts.push({ x: jx, y: jy, ox: jx, oy: jy, ph: Math.random() * 6.28,
+                   sp: .4 + Math.random() * .7, r: Math.random() < .12 ? 2.6 : 1.35 });
+      }
+  return pts;
+})();
+
+// Kanten einmal berechnen. Nachbarschaftssuche pro Frame über ~900 Knoten ist
+// genau das, was einen Laptop zum Schmelzen bringt.
+const EDGE_MAX = 34, edges = [];
+for (let i = 0; i < nodes.length; i++)
+  for (let j = i + 1; j < nodes.length; j++) {
+    const dx = nodes[i].ox - nodes[j].ox, dy = nodes[i].oy - nodes[j].oy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < EDGE_MAX * EDGE_MAX) edges.push({ a: i, b: j, d: Math.sqrt(d2) });
+  }
+
+const pulses = [];
+const spawnPulse = () => edges.length &&
+  pulses.push({ e: edges[(Math.random() * edges.length) | 0], t: 0, sp: .012 + Math.random() * .02 });
+for (let i = 0; i < 26; i++) spawnPulse();
+
+/* Der Kopf folgt dem Zeiger.
+   Zwei Werte: wohin der Zeiger zeigt (pmx/pmy, -1..1) und wo der Kopf gerade
+   steht (cmx/cmy). Jeder Frame zieht den zweiten an den ersten heran, sonst
+   springt der Kopf statt sich zu drehen.
+   Die grossen Knoten wandern weiter als die kleinen — das ergibt Tiefe, ohne
+   eine dritte Koordinate zu erfinden. */
+const NET_AMP = 26;               // in Canvas-Einheiten, 900 breit
+let pmx = 0, pmy = 0, cmx = 0, cmy = 0;
+if (!REDUCED) addEventListener('pointermove', e => {
+  const r = cv.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const clamp = v => v < -1 ? -1 : v > 1 ? 1 : v;
+  pmx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
+  pmy = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
+}, { passive: true });
+
+let netT = 0;
+function drawNet() {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  netT += 0.01;
+  if (!REDUCED) {
+    cmx += (pmx - cmx) * .06;
+    cmy += (pmy - cmy) * .06;
+    for (const n of nodes) {
+      const depth = n.r > 2 ? 1.55 : 1;
+      n.x = n.ox + Math.sin(netT * n.sp + n.ph) * 3.4 + cmx * NET_AMP * depth;
+      n.y = n.oy + Math.cos(netT * n.sp * .85 + n.ph) * 3.4 + cmy * NET_AMP * depth;
+    }
+  }
+  ctx.lineWidth = 1.15;
+  for (const e of edges) {
+    const a = nodes[e.a], b = nodes[e.b];
+    ctx.strokeStyle = 'rgba(31, 92, 14, ' + ((1 - e.d / EDGE_MAX) * .55).toFixed(3) + ')';
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  for (const n of nodes) {
+    ctx.fillStyle = 'rgba(123, 227, 63, .38)';
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 2.6, 0, 6.284); ctx.fill();
+    ctx.fillStyle = n.r > 2 ? 'rgba(31, 92, 14, .95)' : 'rgba(31, 92, 14, .6)';
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 6.284); ctx.fill();
+  }
+  if (!REDUCED) for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    p.t += p.sp;
+    if (p.t >= 1) { pulses.splice(i, 1); spawnPulse(); continue; }
+    const a = nodes[p.e.a], b = nodes[p.e.b];
+    ctx.fillStyle = 'rgba(31, 92, 14, ' + (Math.sin(p.t * Math.PI) * .95).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t, 2.4, 0, 6.284);
+    ctx.fill();
+  }
+}
+
+/* ===========================================================================
+   Der Prüfablauf, schematisch. Fünf Stufen, SVG, kein Fremdcode.
+   Läuft nicht, wenn der Tab verborgen ist oder die Sektion aus dem Bild
+   gescrollt wurde — eine Endlosschleife auf einer Marketingseite ist ein
+   Batteriefehler. Pausierbar: WCAG 2.2.2.
+   =========================================================================== */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const pipe = $('#pipe');
+// Evenly spaced, so a box grown to fit its own text still clears its
+// neighbour and stays inside the 900-unit viewBox. The old spacing put
+// stage 1 at x=60, which leaves room for a box only 120 wide.
+const STAGES = [
+  { x: 78,  label: S.stage1, sub: S.stage1sub },
+  { x: 264, label: S.stage2, sub: S.stage2sub },
+  { x: 450, label: S.stage3, sub: S.stage3sub },
+  { x: 636, label: S.stage4, sub: S.stage4sub },
+  { x: 822, label: S.stage5, sub: S.stage5sub }
+];
+const BOX_MIN = 84, BOX_MAX = 150;   // 186 apart, so 150 always leaves a gap
+// How many attacks the library actually holds. This was written as the
+// literal 75 in four places while attacks/attacks.yaml held 21, so the
+// public page advertised a number the product does not have. One constant,
+// so growing the library is one edit and cannot drift again.
+const LIB_N = 21;
+
+function el(tag, attrs, text) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+// Rendered width of an SVG <text>, or 0 if the browser cannot answer yet.
+function textLen(node) {
+  try { return node.getComputedTextLength() || 0; } catch (_) { return 0; }
+}
+
+(function buildPipe() {
+  // Verbindungen
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    pipe.appendChild(el('line', {
+      x1: STAGES[i].x + 42, y1: 86, x2: STAGES[i + 1].x - 42, y2: 86,
+      stroke: 'var(--border)', 'stroke-width': 2, id: 'link' + i
+    }));
+  }
+  // The box is sized to the text it holds, not the other way round.
+  // A fixed 84px was chosen for one German wording and the longest lines
+  // ("Angriff 12 von 21", "Note + Bericht") already spilled out of it on
+  // both sides. The page ships in three languages, so any fixed width is a
+  // guess about two of them.
+  const widthOf = (label, sub) => {
+    const measured = Math.max(textLen(label), textLen(sub));
+    // getComputedTextLength() is 0 while the SVG is not laid out yet. Falling
+    // back to a character estimate is worse than measuring but far better
+    // than a box that does not fit.
+    const w = measured > 0 ? measured
+                           : Math.max(label.textContent.length * 7.4,
+                                      sub.textContent.length * 6.4);
+    return Math.min(BOX_MAX, Math.max(BOX_MIN, Math.ceil(w) + 26));
+  };
+
+  STAGES.forEach((s, i) => {
+    const g = el('g', { id: 'stage' + i });
+    const label = el('text', {
+      x: s.x, y: 82, 'text-anchor': 'middle', fill: 'var(--text)',
+      'font-size': 13, 'font-weight': 600, 'font-family': 'var(--sans)'
+    }, s.label);
+    const sub = el('text', {
+      x: s.x, y: 100, 'text-anchor': 'middle', fill: 'var(--muted)',
+      'font-size': 10.5, 'font-family': 'var(--mono)', id: 'sub' + i
+    }, s.sub);
+    g.appendChild(label);
+    g.appendChild(sub);
+    pipe.appendChild(g);
+
+    s.w = widthOf(label, sub);
+    const box = el('rect', {
+      x: s.x - s.w / 2, y: 58, width: s.w, height: 56, rx: 10,
+      fill: 'var(--surface)', stroke: 'var(--border)', 'stroke-width': 1.5, id: 'box' + i
+    });
+    g.insertBefore(box, label);   // behind the text, not over it
+  });
+
+  // The connectors were drawn before the boxes existed, so they still reach
+  // the old fixed edge. Pull them back to the real one.
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    const line = pipe.querySelector('#link' + i);
+    line.setAttribute('x1', STAGES[i].x + STAGES[i].w / 2);
+    line.setAttribute('x2', STAGES[i + 1].x - STAGES[i + 1].w / 2);
+  }
+  // Zwei Bewertungsebenen unter Stufe 4
+  pipe.appendChild(el('text', {
+    x: STAGES[3].x, y: 138, 'text-anchor': 'middle', fill: 'var(--muted)',
+    'font-size': 10, 'font-family': 'var(--mono)', id: 'lay1'
+  }, S.layer1));
+  pipe.appendChild(el('text', {
+    x: STAGES[3].x, y: 154, 'text-anchor': 'middle', fill: 'var(--muted)',
+    'font-size': 10, 'font-family': 'var(--mono)', id: 'lay2'
+  }, S.layer2));
+  // Das wandernde Paket
+  pipe.appendChild(el('circle', { cx: -20, cy: 86, r: 6, fill: 'var(--accent)', id: 'packet' }));
+  // Note am Ende
+  pipe.appendChild(el('text', {
+    x: STAGES[4].x, y: 40, 'text-anchor': 'middle', fill: 'var(--accent)',
+    'font-size': 22, 'font-weight': 700, 'font-family': 'var(--sans)', id: 'gradeOut', opacity: 0
+  }, 'B'));
+})();
+
+const packet = pipe.querySelector('#packet');
+const gradeOut = pipe.querySelector('#gradeOut');
+const toggle = $('#pipeToggle');
+const countEl = $('#pipeCount');
+
+function setStage(active) {
+  STAGES.forEach((s, i) => {
+    const box = pipe.querySelector('#box' + i);
+    box.setAttribute('stroke', i === active ? 'var(--accent)' : 'var(--border)');
+    box.setAttribute('fill', i === active ? 'var(--surface-2)' : 'var(--surface)');
+  });
+  pipe.querySelector('#lay1').setAttribute('fill', active === 3 ? 'var(--accent)' : 'var(--muted)');
+  pipe.querySelector('#lay2').setAttribute('fill', active === 3 ? 'var(--medium)' : 'var(--muted)');
+}
+
+/* Statische Fassung: dieselben fünf Stufen, kein Frame, kein Timer. */
+function renderStatic() {
+  setStage(-1);
+  STAGES.forEach((s, i) => { pipe.querySelector('#sub' + i).textContent = s.sub; });
+  packet.setAttribute('opacity', 0);
+  gradeOut.setAttribute('opacity', 1);
+  countEl.textContent = LIB_N + ' / ' + LIB_N;
+  toggle.hidden = true;
+}
+
+let running = false, t0 = 0, rafId = 0;
+const CYCLE = 9000;
+
+function frame(now) {
+  if (!running) return;
+  if (!t0) t0 = now;
+  const p = ((now - t0) % CYCLE) / CYCLE;
+
+  const seg = Math.min(4, Math.floor(p * 5));
+  setStage(seg);
+
+  const local = (p * 5) - seg;
+  const from = STAGES[Math.max(0, seg)].x;
+  const to   = STAGES[Math.min(4, seg + 1)].x;
+  packet.setAttribute('cx', from + (to - from) * local);
+  packet.setAttribute('opacity', seg >= 4 ? 0 : 1);
+
+  const n = Math.min(LIB_N, Math.round(p * LIB_N) + 1);
+  countEl.textContent = n + ' / ' + LIB_N;
+  pipe.querySelector('#sub1').textContent = 'Angriff ' + n + ' von ' + LIB_N;
+  gradeOut.setAttribute('opacity', seg >= 4 ? String(Math.min(1, (local * 2))) : '0');
+
+  rafId = requestAnimationFrame(frame);
+}
+
+function start() {
+  if (running || REDUCED) return;
+  running = true; t0 = 0;
+  toggle.textContent = S.pipePause;
+  toggle.setAttribute('aria-pressed', 'false');
+  rafId = requestAnimationFrame(frame);
+}
+function stop() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  toggle.textContent = S.pipePlay;
+  toggle.setAttribute('aria-pressed', 'true');
+}
+
+let userPaused = false;
+let inView = false;
+toggle.addEventListener('click', () => {
+  userPaused = running;
+  if (running) stop(); else start();
+});
+
+// Nicht laufen, wenn der Tab verborgen ist.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { cancelAnimationFrame(rafId); running = false; }
+  else if (!userPaused && inView) start();
+});
+
+// Nicht laufen, wenn die Sektion aus dem Bild ist.
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(es => {
+    inView = es[0].isIntersecting;
+    if (inView && !userPaused && !document.hidden) start(); else if (!inView) stop();
+  }, { threshold: .15 }).observe($('#produkt'));
+} else { inView = true; }
+
+/* ---------------------------------------------------------------- der Kopf
+   Eigene Schleife, eigener Beobachter.
+   Vorher wurde drawNet() innerhalb von frame() aufgerufen, und frame() laeuft
+   nur, solange #produkt sichtbar ist. Der Kopf steht aber im Hero, ganz oben:
+   er bewegte sich also genau dann, wenn er aus dem Bild gescrollt war, und
+   stand still, sobald man ihn ansah. Dem Zeiger folgen kann er so nicht. */
+let netRaf = 0, netOn = false, netInView = true;
+
+function netFrame() {
+  if (!netOn) return;
+  drawNet();
+  netRaf = requestAnimationFrame(netFrame);
+}
+function netStart() {
+  if (netOn || REDUCED || !netInView || document.hidden) return;
+  netOn = true; netRaf = requestAnimationFrame(netFrame);
+}
+function netStop() { netOn = false; cancelAnimationFrame(netRaf); }
+
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(es => {
+    netInView = es[0].isIntersecting;
+    if (netInView) netStart(); else netStop();
+  }, { threshold: 0 }).observe(cv);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) netStop(); else netStart();
+});
+
+/* Der Ankerversatz haengt an der echten Hoehe der Leiste, und die aendert
+   sich mit der Breite — unter 860px klappt die Navigation um. */
+const topbarEl = document.querySelector('.topbar');
+const syncTopbar = () => {
+  const h = topbarEl && topbarEl.getBoundingClientRect().height;
+  if (h) document.documentElement.style.setProperty('--topbar-h', h + 'px');
+};
+syncTopbar();
+addEventListener('resize', syncTopbar, { passive: true });
+
+if (REDUCED) { renderStatic(); drawNet(); }
+else { toggle.textContent = S.pipePause; start(); netStart(); }
+
+
+/* ── Added for the light preview ─────────────────────────────────────────── */
+
+/* A hairline appears under the bar only once the page has actually moved. */
+const _bar = document.querySelector('.topbar');
+const _onScroll = () => _bar.classList.toggle('scrolled', scrollY > 8);
+addEventListener('scroll', _onScroll, { passive: true }); _onScroll();
+
+/* STEP 3 asks for a pause control on the head. The original has none — the
+   loop was driven by visibility alone, so a user who wanted it to stop had
+   no way to say so. userNetPaused outranks the observer in both directions. */
+let userNetPaused = false;
+const _netBtn = $('#netPause');
+if (_netBtn) {
+  if (REDUCED) _netBtn.hidden = true;          /* nothing is moving to pause */
+  _netBtn.addEventListener('click', () => {
+    userNetPaused = !userNetPaused;
+    _netBtn.setAttribute('aria-pressed', String(userNetPaused));
+    _netBtn.textContent = userNetPaused ? 'Animation abspielen' : 'Animation anhalten';
+    if (userNetPaused) netStop(); else netStart();
+  });
+  const _netStart = netStart;
+  netStart = function () { if (!userNetPaused) _netStart(); };
+}
+
+</script>
+</body>
+</html>
