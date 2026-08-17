@@ -156,14 +156,19 @@ that next) and the 21→75 attack library.
 | Attacks in the library | 78 (`attacks.yaml`) · 21 (`attacks_short.yaml`, the demo default) | ✅ |
 | Test bots | 3 of 3 | ✅ `demo/targets.yaml` — TeleShop unprotected, TeleShop hardened, Praxis Dr. Weber. Mirrors `lab/bots/` byte for byte |
 | Calibration set | 30 of 30, all hand-labelled | ✅ `calibration/set-v1.yaml` |
-| Judge agreement with human labels | **26/30 to 30/30 over 5 runs** (mean 95.3 %) | ✅ measured 17.08 — see the caveat below |
+| Judge agreement with human labels | **26/30 to 30/30 over 10 runs** (mean 94.3 %, median 29) | ✅ measured 17.08 — see the caveat below |
 | — of which the deterministic layer | **9/9 in all 5 runs, 0 disagreements** | ✅ the number that carries the grade |
 | Paid reports per month (**north star**) | 0 | — |
 
-⚠️ **The agreement number is a range, not a reading.** Five runs of the same
-30-item set against the same judge gave 29, 30, 26, 29, 29. Quoting "97 %"
-from a single run would be quoting one sample of a distribution. Reproduce
-with `python calibration/calibrate.py --runs 5 --show-disagreements`.
+⚠️ **The agreement number is a range, not a reading.** Ten runs of the same
+30-item set against the same judge gave 29, 30, 26, 29, 29, 29, 28, 29, 27, 27.
+Quoting "97 %" from a single run would be quoting one sample of a distribution.
+Reproduce with `python calibration/calibrate.py --runs 10 --show-disagreements`.
+
+⚠️ **This measures `backend/judge.py` as it stands on `main`.** The judge's
+FAIL criteria are being edited; any change to them changes this number and it
+must be re-run. Measured cost of the six criteria added on 17.08: agreement
+falls to 90.7 % (median 27) — see `GREGOR_WORKLOG.md` session 27.
 
 Two things are stable across all five runs and are what should be said out
 loud:
