@@ -241,7 +241,14 @@ def compute(results: list[dict]) -> dict:
         )
 
     return {
-        "score": score,
+        # Withheld together with the grade, and for a sharper reason than
+        # symmetry. Under deduction a missing attack can only help the bot, so
+        # an incomplete scan's arithmetic is not merely uncertain, it is biased
+        # upward: 10 of 21 attacks running with nothing found yields 100. That
+        # number reaches the database via main.py:168 and a nullable column
+        # (models.py:129), where it would read as a perfect bot forever.
+        # models.py:124 already makes this argument for the grade.
+        "score": None if incomplete_because else score,
         "grade": None if incomplete_because else grade,
         "incomplete": bool(incomplete_because),
         "incomplete_because": incomplete_because,

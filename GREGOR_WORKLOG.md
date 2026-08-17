@@ -2873,6 +2873,37 @@ report predating confidence levels scores the same in both.
 3. **`defended_pct` is still reported.** Gregor asked for the percentage to
    survive in the report even though it no longer decides anything.
 
+### Self-review of PR #19 found one real defect
+
+Reviewing your own diff is worth little, so it was done as a hunt for defects
+rather than a confirmation pass. One was real.
+
+🔴 **An ungradable scan persisted a flattering score.** `compute()` withheld the
+grade but still returned the arithmetic score, and `main.py:168` stores it in a
+nullable column. A scan where 11 of 21 attacks never ran and nothing was found
+returned `grade=None, score=100` — a perfect bot, in the database, forever.
+
+Worse than an oversight: under deduction a missing attack can only *help* the
+bot, so an incomplete scan's score is not merely uncertain, it is biased
+upward. `models.py:124` already makes this argument for the grade; it applies
+to the score identically. Fixed — `score` is now `None` whenever the grade is.
+Verified all four consumers (`index.html:539,542,564`, `report.html:311`) sit
+inside `!incomplete` branches, so `None` never reaches a string concatenation.
+
+Two more, noted and accepted rather than fixed:
+
+- **`s.errors` no longer counts BLOCKED results, but the per-attack list still
+  labels them "errored"** (`index.html:481`). The stat and the visible rows can
+  disagree. Impact is nil today because nothing produces BLOCKED on the Mistral
+  path, but it is a real inconsistency the day Azure targets are scanned.
+- **A category-filtered scan of fewer than 15 attacks can never be graded.**
+  `main.py:1014` passes `body.categories` through, and `excessive_agency` has
+  5 attacks. The message says so plainly — *"only 5 of 5 attacks produced a
+  result; 15 are needed for a grade"* — and withholding a whole-bot letter
+  grade from a five-attack scan is the right answer, so this is behaviour, not
+  a bug. Worth Vlad knowing the API can now return a gradeless scan for a
+  reason that is not an error.
+
 ### What I did NOT verify
 
 - **No browser.** Both frontend edits are one-line colour branches, read but
