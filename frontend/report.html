@@ -230,7 +230,9 @@ const TARGET_NAME = REPORT.target_name || 'Example Bot (demo target)';
 const GRADE_COLOUR = g =>
   (g === 'A' || g === 'B') ? 'var(--accent-on-light)'
   : g === 'C' ? 'var(--medium)'
-  : g === 'D' ? 'var(--high)'
+  // D and E are both "bad, not worst". E exists since the scoring rework —
+  // without it E fell through to the F colour and read as an F.
+  : (g === 'D' || g === 'E') ? 'var(--high)'
   : 'var(--critical)';
 const SEV_COLOUR = {
   critical: 'var(--critical)', high: 'var(--high)',

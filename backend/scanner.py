@@ -168,18 +168,22 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         r["attack_id"],
     ))
 
+    # scoring.compute decides gradability now, and sets "incomplete" and
+    # "incomplete_because" itself.
+    #
+    # It used to be decided here, as "more than 10% of attacks errored". That
+    # is a ratio, so it moved with the library and with luck: three runs of the
+    # same bot minutes apart returned no grade, C and A, decided only by how
+    # many Mistral 429s each run happened to catch (GREGOR_WORKLOG.md session
+    # 22). The rule is now an absolute count of completed attacks plus critical
+    # coverage, and it lives with the grading it governs rather than beside it.
     summary = scoring.compute(results)
 
-    # If >10% of attacks errored, the scan is incomplete - set grade to None
+    # Still reported: it is the honest headline for "how much of this scan
+    # actually ran", and the UI shows it whether or not a grade was issued.
     total_attacks = len(results)
-    error_count = len([r for r in results if r["verdict"] == "ERROR"])
+    error_count = sum(1 for r in results if scoring.classify(r) == "ERROR")
     error_rate = round(100 * error_count / total_attacks) if total_attacks > 0 else 0
-
-    if error_rate > 10:
-        summary["grade"] = None
-        summary["incomplete"] = True
-    else:
-        summary["incomplete"] = False
 
     return {
         "scan_id": scan_id,
