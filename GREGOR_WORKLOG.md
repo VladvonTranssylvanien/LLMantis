@@ -2747,6 +2747,74 @@ longer depends on library size" is only true in general with grouping.
 
 ---
 
+## 2026-08-17 — Session 24: the file whitelist is gone; PR #18 opened
+
+### `AGENTS.md` §4 replaced — every file is now in scope
+
+Gregor's instruction: the work has moved into the backend and the scanner, so
+the whitelist no longer fits. §4 "File Whitelist" is replaced by §4 "Every File
+Is In Scope — So Report What You Touched".
+
+The whitelist was doing a real job — it stopped this agent silently colliding
+with Vlad, Kwabena or Bogdan. Removing it does not remove the collision risk,
+it moves the responsibility onto reporting, so the replacement section requires:
+
+* the **paths** changed at the end of every response that modified the
+  repository, including creates, deletes and renames, and an explicit "nothing
+  changed" when that is the case
+* concrete collision checks before editing — `git status`/`git diff` for
+  someone else's uncommitted work, `git fetch && git log origin/main` for
+  movement since the file was read, `git log -3 -- <path>` for who has been
+  working there, and a grep for whatever is about to change
+* naming the owner out loud when an edit reaches into their area
+* preferring a branch and a PR over pushing to `main` while others are working
+
+⚠️ **This overrides `PLAYBOOK.md` §11 invariant 2** ("Nobody edits files outside
+their zone") for this agent only. That invariant still binds everyone else, and
+the other contributors have not necessarily been told — recorded in §4 itself so
+it cannot be discovered by surprise later.
+
+`AGENTS.md` is gitignored (`.gitignore:3`), so this change is local to Gregor's
+machine and does not reach the other contributors' agents.
+
+### Also added to §3: `PITCH-PLAN.md`
+
+It was referenced nowhere in `AGENTS.md` despite being the plan the work now
+follows. Added with Gregor's qualification that its task names (T0-1, T1-3, …)
+are an AI suggestion and not binding — he chooses what he works on.
+
+### PR #18 — brand_safety severity rebalance
+
+Gregor's edit, ten attacks re-rated, `critical` 21 → 15 of 78. Branched rather
+than pushed to `main` because Vlad is working in the repository.
+[PR #18](https://github.com/VladvonTranssylvanien/LLMantis/pull/18),
+`MERGEABLE`/`CLEAN`, one file. GitHub returned HTTP 503 three times before the
+PR would open — worth knowing it was the API, not the request.
+
+The PR body carries the point Vlad needs: severity is currently one weight among
+several (`scoring.py:78`), but under the proposed deduction model it is what
+*decides* a grade. Measured effect on our three bots: **none** — A and C are
+already floored at 0 and B has no brand_safety finding, so it is untested
+against a bot it would actually affect.
+
+### Correction — `attacks.yaml` version is already 2.0
+
+Problem #5 in the tomorrow list recorded `version:` as still `"1.4"` after the
+21 → 78 growth. **It reads `"2.0"` and has since before this session** —
+committed by someone else, verified with `git show HEAD:attacks/attacks.yaml`.
+The list was stale. `attacks_short.yaml` is still `"1.4"`, which is correct: it
+is the old corpus.
+
+### What I did NOT verify
+
+- Whether the other contributors' agents have their own instruction files that
+  still assert the zone rule. Only this machine's `AGENTS.md` was changed.
+- Whether Vlad has seen PR #18. Opened, not acknowledged.
+- The severity rebalance has never been run against a live scan — the numbers
+  in the PR re-map new severities onto answers scanned under the old ones.
+
+---
+
 # Start here tomorrow
 
 ## The deliverable is done. The new headline is that the grade is not stable.
@@ -2773,7 +2841,7 @@ python lab/harness/scan_bots.py
 | 2 | **Score = % of attacks defended, so a bigger library raises a leaking bot's grade.** Bot A: F on 21 attacks, C on 78, same answers | Vlad (`scoring.py:98`) | A customer improves their grade by asking for more attacks. Choosing a corpus does not fix it |
 | 3 | The demo beat is currently "C -> no grade", not "D -> A" | team | On `attacks_short.yaml` it is "F -> A" and it works. This is the strongest argument for the short corpus |
 | 4 | Grading has no resolution in the middle on 78 attacks — A and C both land on C | team | This was the question Bot C was built to answer (`GREGOR-TARGET-LAB.md:76`). On 21 attacks the answer is good: F / D / A |
-| 5 | `version:` still "1.4" for a 78-attack corpus | Gregor | Every stored scan report is ambiguous between two different libraries |
+| 5 | ~~`version:` still "1.4"~~ | — | **Withdrawn.** `attacks.yaml` reads `version: "2.0"` and has since before session 24 |
 | 6 | Bot B leaks the supplier 2/5 on gpt-4.1-mini (Azure) | Gregor | The control group is not clean on that path; `cal-019`. It was clean on all three Mistral scans |
 | 7 | Frontend cannot send `secrets` (`index.html:425-429`) | frontend | A demo scan is blind to supplier and internal-note leaks. Bot A's 12 and Bot C's 13 confirmed findings needed it |
 | 8 | 8 of 78 attacks blocked by Azure's content filter | team | Applies to the Azure lab path, not the Mistral prompt-mode path measured in session 22 |
