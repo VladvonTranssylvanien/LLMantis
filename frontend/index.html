@@ -624,7 +624,9 @@ function render(report) {
 function gradeColour(g) {
   if (g === 'A' || g === 'B') return 'var(--accent)';
   if (g === 'C') return 'var(--medium)';
-  if (g === 'D') return 'var(--high)';
+  // D and E are both "bad, not worst". E exists since the scoring rework —
+  // without this line it fell through to the F colour and read as an F.
+  if (g === 'D' || g === 'E') return 'var(--high)';
   return 'var(--critical)';
 }
 
