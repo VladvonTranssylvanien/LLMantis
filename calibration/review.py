@@ -46,8 +46,14 @@ REPO = Path(__file__).resolve().parent.parent
 DEFAULT_SET = REPO / "calibration" / "set-v1.yaml"
 
 FIELD_ORDER = ["id", "attack_id", "category", "bot_file", "model", "kind",
-               "source", "bot_response", "draft_label", "draft_note",
-               "human_label", "note"]
+               "source", "criterion", "bot_response", "draft_label",
+               "draft_note", "human_label", "note"]
+
+# render() writes only the fields it knows, so anything absent from
+# FIELD_ORDER is silently dropped the first time a set is saved. `criterion`
+# was added to v2 to record which judge rule an item exercises, and vanished
+# on the first keystroke of review until it was listed here. Any future field
+# must be added above or it will not survive a review session.
 
 BOLD, DIM, RED, GREEN, YELLOW, RESET = (
     "\033[1m", "\033[2m", "\033[31m", "\033[32m", "\033[33m", "\033[0m")
@@ -58,6 +64,24 @@ def load(path: Path) -> list[dict]:
     if not isinstance(items, list) or not items:
         sys.exit(f"{path}: expected a non-empty list of calibration items")
     return items
+
+
+def leading_comment(path: Path) -> str:
+    """The comment block at the top of the file, so saving does not delete it.
+
+    render() rebuilds the file from the parsed items, and YAML comments do not
+    survive parsing. set-v2.yaml opens with the explanation of what it is and
+    where its answers came from — provenance a reader needs when looking at the
+    file alone. Without this it was erased by the first keystroke of a review
+    session, silently, because the round-trip check only compares item fields.
+    """
+    kept: list[str] = []
+    for line in path.read_text(encoding="utf-8").split("\n"):
+        if line.startswith("#") or not line.strip():
+            kept.append(line)
+        else:
+            break
+    return "\n".join(kept).rstrip("\n")
 
 
 def attack_messages() -> dict[str, str]:
@@ -109,8 +133,10 @@ def render(items: list[dict]) -> str:
     return "\n".join(out)
 
 
-def save(path: Path, items: list[dict]) -> None:
+def save(path: Path, items: list[dict], header: str = "") -> None:
     text = render(items)
+    if header:
+        text = header + "\n\n" + text
     # Never leave a half-written set behind: parse what we are about to write
     # before replacing a file that holds hand-made labels.
     #
@@ -119,7 +145,7 @@ def save(path: Path, items: list[dict]) -> None:
     # (judge.py:117) - so a renderer that silently reflowed one would change
     # the result of the measurement.
     reparsed = yaml.safe_load(text)
-    if len(reparsed) != len(items):
+    if not isinstance(reparsed, list) or len(reparsed) != len(items):
         sys.exit("Refusing to save: the rendered file does not round-trip.")
     for before, after in zip(items, reparsed):
         for key in ("id", "bot_response", "human_label", "note", "draft_label"):
@@ -179,6 +205,7 @@ def main() -> None:
         sys.exit(f"No such calibration set: {args.set_file}")
 
     items = load(args.set_file)
+    header = leading_comment(args.set_file)
     attacks = attack_messages()
     queue = [i for i, it in enumerate(items)
              if (args.relabel or not it.get("human_label"))
@@ -223,10 +250,10 @@ def main() -> None:
 
         # Saved every item, not at the end: a review interrupted by a closed
         # terminal must not lose forty minutes of human judgement.
-        save(args.set_file, items)
+        save(args.set_file, items, header)
         pos += 1
 
-    save(args.set_file, items)
+    save(args.set_file, items, header)
     done = sum(1 for it in items if it.get("human_label"))
     agreed = sum(1 for it in items
                  if it.get("human_label") and it["human_label"] == it.get("draft_label"))
