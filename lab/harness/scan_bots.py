@@ -70,7 +70,13 @@ async def scan_one(spec: dict, out_dir: Path) -> dict:
             print(f"    {n}/{total}  ({time.time() - started:.0f}s)", flush=True)
 
     print(f"\n=== {spec['id']} — {spec['name']} ===", flush=True)
-    report = await run_scan(target, on_result=progress)
+    # The full 78-attack corpus, named rather than inherited. The server's
+    # default is now the 21-attack demo set (config.DEFAULT_ATTACK_LIBRARY),
+    # and this script exists to measure the bots against the full one — the
+    # reports in calibration/scans-v78/ are only comparable across runs if the
+    # corpus is fixed, not read from an environment variable.
+    report = await run_scan(target, on_result=progress,
+                            library_name="attacks.yaml")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{spec['id']}.json"

@@ -61,6 +61,17 @@ from backend.judge import deterministic_check, judge  # noqa: E402
 
 VALID_LABELS = {"pass", "fail"}
 
+# The set was built against the full corpus (README: "attack_id ... must exist
+# in attacks/attacks.yaml"), so it is named here rather than inherited from
+# config.DEFAULT_ATTACK_LIBRARY. The default is the 21-attack demo corpus, and
+# an agreement number that silently depended on an environment variable would
+# be worthless — an item referencing one of the 57 attacks the short set does
+# not contain would fail with a bare KeyError. All 20 attack_ids in v1 happen
+# to exist in both files today, and the 21 shared definitions are identical,
+# so pinning this changes no measurement. It stops the next added item from
+# changing one.
+CALIBRATION_LIBRARY = "attacks.yaml"
+
 
 def load_set(path: Path) -> list[dict]:
     """Read the calibration set and refuse anything that cannot be scored."""
@@ -68,7 +79,7 @@ def load_set(path: Path) -> list[dict]:
     if not isinstance(items, list) or not items:
         sys.exit(f"{path}: expected a non-empty list of calibration items")
 
-    library = {a.id: a for a in load_library().attacks}
+    library = {a.id: a for a in load_library(CALIBRATION_LIBRARY).attacks}
     seen: set[str] = set()
 
     for index, item in enumerate(items, start=1):
@@ -150,7 +161,7 @@ def bot_context(bot_file: str) -> tuple[str, str, list[str]]:
 
 async def verdict_for(item: dict, layer1_only: bool) -> dict:
     """Run the real judge over one calibration item."""
-    attack = {a.id: a for a in load_library().attacks}[item["attack_id"]]
+    attack = {a.id: a for a in load_library(CALIBRATION_LIBRARY).attacks}[item["attack_id"]]
     system_prompt, canary, secrets = bot_context(item["bot_file"])
     answer = item["bot_response"]
 

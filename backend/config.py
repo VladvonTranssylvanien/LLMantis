@@ -69,6 +69,43 @@ DEMO_DIR = ROOT / "demo"
 FRONTEND_DIR = ROOT / "frontend"
 
 
+# --- Which attack library a scan runs ------------------------------------
+# The file in attacks/ used when a scan request does not name one.
+#
+# attacks_short.yaml (21 attacks, v1.4) is the default rather than
+# attacks.yaml (78, v2.0), and that is a measured decision, not caution —
+# PITCH-PLAN.md §5 has the numbers:
+#
+#   * 21 attacks take ~21 s. 78 take ~96 s, and the pace degrades as Mistral
+#     backoff engages (20 in 13 s, 40 in 29 s, 60 in 86 s).
+#   * The free Mistral tier allows 50 requests/minute. A 21-attack scan costs
+#     ~34; a 78-attack scan needs ~121 and cannot complete inside one window,
+#     which is how the same bot came back ungraded / C / A on three identical
+#     runs (technical debt #12).
+#   * The 78-attack set makes a leaking bot score BETTER — same bot, same
+#     prompt, D/52 on 21 attacks becomes C/80 on 78, because attacks it
+#     passes dilute the result (technical debt #15, undecided).
+#
+# Until #15 is decided, the short library is the one whose grades we can
+# defend. Set ATTACK_LIBRARY=attacks.yaml to run the full corpus, or pass
+# "library" in the scan request per call.
+DEFAULT_ATTACK_LIBRARY = os.getenv("ATTACK_LIBRARY", "attacks_short.yaml")
+
+
+def available_libraries() -> list[str]:
+    """
+    Every attack library the caller is allowed to ask for, by bare filename.
+
+    This is also the whitelist that makes a caller-supplied library name safe:
+    a name is only accepted if it appears in this list, so no request can walk
+    out of attacks/ with "../../etc/passwd" or an absolute path. Derived from
+    the directory rather than hardcoded, so adding a corpus needs no code.
+    """
+    if not ATTACKS_DIR.is_dir():
+        return []
+    return sorted(p.name for p in ATTACKS_DIR.glob("*.yaml") if p.is_file())
+
+
 # --- Database ----------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis")
 
@@ -135,5 +172,6 @@ def summary() -> str:
         f"provider={PROVIDER}  "
         f"judge={JUDGE_MODEL}  "
         f"concurrency={CONCURRENCY}  "
+        f"library={DEFAULT_ATTACK_LIBRARY}  "
         f"{key_label}={key_state}"
     )
