@@ -128,14 +128,16 @@ async def _run_one(attack: Attack, target: Target, limiter: asyncio.Semaphore) -
 
 
 async def run_scan(target: Target, categories: list[str] | None = None,
-                   on_result=None) -> dict:
+                   on_result=None, library_name: str | None = None) -> dict:
     """
     Run a full scan and return the report.
 
-    categories  optional filter, e.g. ["data_leakage"] to run a subset
-    on_result   optional async callback after each attack, for live progress
+    categories    optional filter, e.g. ["data_leakage"] to run a subset
+    on_result     optional async callback after each attack, for live progress
+    library_name  which corpus in attacks/ to run; None uses
+                  config.DEFAULT_ATTACK_LIBRARY
     """
-    library = load_library()
+    library = load_library(library_name)
     attacks = library.attacks
     if categories:
         attacks = [a for a in attacks if a.category in categories]
@@ -184,6 +186,7 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         "duration_s": round(time.time() - started, 1),
         "target_mode": target.mode,
         "library_version": library.version,
+        "library_name": library.name,
         "canary": target.canary,  # the one actually used (explicit or auto-detected)
         "summary": summary,
         "results": results,

@@ -45,7 +45,9 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from . import config
-from .attacks import load_library, reload_library
+from .attacks import (
+    load_library, reload_library, resolve_library_name, UnknownLibraryError,
+)
 from .scanner import Target, detect_canary, run_scan
 from .database import SessionLocal, get_db
 from .models import (
@@ -89,6 +91,11 @@ class ScanRequest(BaseModel):
     # proven by string match instead of left to the judge's opinion.
     secrets: list[str] = Field(default_factory=list)
     categories: list[str] | None = None
+    # Which corpus in attacks/ to run. None means the deployment's default
+    # (config.DEFAULT_ATTACK_LIBRARY — the 21-attack set, for the reasons
+    # recorded there). Validated against a whitelist before the scan starts,
+    # so this cannot be used to read a file outside attacks/.
+    library: str | None = None
     # Required for mode="api": whose ownership-verified domain this is.
     # Not needed for mode="prompt" — that only tests a copy of text the
     # caller submitted themselves, never a live third-party endpoint.
@@ -328,23 +335,37 @@ async def health():
         "provider": config.PROVIDER,
         "config": config.summary(),
         "attacks_loaded": len(library.attacks),
+        "library": library.name,
+        "library_version": library.version,
+        "libraries_available": config.available_libraries(),
     }
 
 
 @app.get("/api/attacks")
-async def list_attacks():
-    """The library, for the UI to display before a scan runs."""
-    library = load_library()
+async def list_attacks(library: str | None = None):
+    """
+    The library, for the UI to display before a scan runs.
+
+    ?library= names a corpus in attacks/; omitted, it returns the same
+    default a scan would run, so the count shown before a scan matches the
+    count the scan actually sends.
+    """
+    try:
+        lib = load_library(library)
+    except UnknownLibraryError as e:
+        raise HTTPException(400, str(e))
     return {
-        "total": len(library.attacks),
+        "library": lib.name,
+        "version": lib.version,
+        "total": len(lib.attacks),
         "categories": [
             {
                 "id": cid,
                 "label": meta.get("label", cid),
                 "description": meta.get("description", ""),
-                "count": len(library.by_category(cid)),
+                "count": len(lib.by_category(cid)),
             }
-            for cid, meta in library.categories.items()
+            for cid, meta in lib.categories.items()
         ],
         "attacks": [
             {
@@ -353,7 +374,7 @@ async def list_attacks():
                 "severity": a.severity,
                 "message": a.message,
             }
-            for a in library.attacks
+            for a in lib.attacks
         ],
     }
 
@@ -362,13 +383,22 @@ async def list_attacks():
 @limiter.limit("5/minute")
 async def reload_attacks(request: Request):
     """
-    Re-read attacks.yaml without restarting the server. Not org-scoped and
-    doesn't touch or reveal customer data, so no login required — the
-    attack library is shared, global, non-secret content. Rate-limited
-    only to stop it being spammed.
+    Re-read the attack libraries from disk without restarting the server.
+
+    Drops every cached corpus, not just the default one — the reason to call
+    this is that files on disk changed, and we cannot know which.
+
+    Not org-scoped and doesn't touch or reveal customer data, so no login
+    required — the attack library is shared, global, non-secret content.
+    Rate-limited only to stop it being spammed.
     """
     library = reload_library()
-    return {"status": "reloaded", "total": len(library.attacks)}
+    return {
+        "status": "reloaded",
+        "library": library.name,
+        "version": library.version,
+        "total": len(library.attacks),
+    }
 
 
 @app.get("/api/targets")
@@ -895,6 +925,15 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
     if body.mode == "api" and not body.api_url.strip():
         raise HTTPException(400, "api_url is required in api mode")
 
+    # Resolve the library HERE, not inside the stream. Once StreamingResponse
+    # has been returned the status is already 200 and a bad library name could
+    # only be reported as an "error" event inside the body — a failed scan
+    # dressed as a successful request. Validate while we can still say 400.
+    try:
+        library_name = resolve_library_name(body.library)
+    except UnknownLibraryError as e:
+        raise HTTPException(400, str(e))
+
     effective_org_id: UUID | None = api_key_org
     if effective_org_id is None and body.org_id:
         try:
@@ -972,7 +1011,8 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
 
     async def worker():
         try:
-            report = await run_scan(target, body.categories, on_result)
+            report = await run_scan(target, body.categories, on_result,
+                                    library_name=library_name)
             report_holder["report"] = report
             await queue.put({"type": "complete", "report": report})
         except Exception as e:
@@ -981,11 +1021,18 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
             await queue.put(None)  # sentinel: nothing more is coming
 
     async def stream():
-        library = load_library()
+        # Same library the worker will run — resolved once above, so the
+        # count in the "start" event cannot disagree with what actually runs.
+        library = load_library(library_name)
         selected = library.attacks
         if body.categories:
             selected = [a for a in selected if a.category in body.categories]
-        yield json.dumps({"type": "start", "total": len(selected)}) + "\n"
+        yield json.dumps({
+            "type": "start",
+            "total": len(selected),
+            "library": library.name,
+            "library_version": library.version,
+        }) + "\n"
 
         task = asyncio.create_task(worker())
         try:

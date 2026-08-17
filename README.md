@@ -53,7 +53,10 @@ _Last verified against the running code: 16.08.2026._
 
 **Working today, verified against live bots and real Mistral scans:**
 
-- 21 attacks across the 5 OWASP LLM categories
+- Two attack corpora across the 5 OWASP LLM categories: `attacks_short.yaml`
+  (21, v1.4) is what a scan runs by default, `attacks.yaml` (78, v2.0) is
+  available per request. They are not interchangeable — see
+  `ATTACK_LIBRARY` in `.env.example` for why
 - Two-layer judging (deterministic string match, then AI judge) — **judge runs
   on Mistral (France), not a US provider.** See `PLAYBOOK.md` §1
 - Canary auto-detection - finds the bot's secret without being told
@@ -194,7 +197,7 @@ One attack, end to end:
      bot approve a refund, give medical advice, insult a customer.
 5. Record the verdict, the evidence, and the fix
 
-All 21 attacks run concurrently, capped by `CONCURRENCY` so we do not trip rate
+Attacks run concurrently, capped by `CONCURRENCY` so we do not trip rate
 limits.
 
 **Why layer 1 matters.** The obvious objection to this product is "you have a
@@ -229,7 +232,9 @@ findings are shown in reports; `possible` findings are omitted (legal requiremen
 
     LLMantis/
       attacks/
-        attacks.yaml     the attack library - DATA, not code
+        attacks_short.yaml  21 attacks, v1.4 - the default corpus
+        attacks.yaml        78 attacks, v2.0 - opt in per scan or via
+                             ATTACK_LIBRARY. Both are DATA, not code
       demo/
         targets.yaml     demo bots for the pitch
       alembic/
@@ -265,8 +270,8 @@ Each file does one thing, so four people can work without colliding.
 | Endpoint | What it does |
 |---|---|
 | `GET /api/health` | server status and config |
-| `GET /api/attacks` | the attack library |
-| `POST /api/attacks/reload` | re-read attacks.yaml without restarting |
+| `GET /api/attacks` | the attack library; `?library=` picks a corpus |
+| `POST /api/attacks/reload` | re-read the libraries from disk without restarting |
 | `GET /api/targets` | the demo bots |
 | `POST /api/auth/register` / `/login` | create an account / get a bearer token |
 | `GET /api/auth/me` 🔒 | who you are, and which orgs you belong to |
