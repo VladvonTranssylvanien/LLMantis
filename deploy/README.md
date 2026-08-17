@@ -6,6 +6,16 @@ Only Caddy publishes a port.
 Everything below was run against the real images before it was written down.
 Where a step is untested on the server itself, it says so.
 
+> ## 🔴 Read this first: our box is not the box this describes
+>
+> Everything after this box assumes an **empty server**, which is how it was
+> written and how it was tested. The machine LLMantis actually runs on is not
+> empty, so **sections 1, 2 and 4 do not apply to it.** For that machine, read
+> [the section at the bottom](#how-llmantisde-is-actually-deployed) instead.
+>
+> The generic instructions are kept because they are correct for a fresh box,
+> and because the day this moves to its own server they are what you want.
+
 ---
 
 ## Before you touch the server
@@ -170,6 +180,137 @@ loopback scan target with `ALLOW_PRIVATE_SCAN_TARGETS=false` (403, where the
 development setting gives 200). `deploy/Caddyfile` passes `caddy validate` on
 caddy:2.10-alpine.
 
-**Not tested by anyone yet:** the certificate issue, the Basic-Auth prompt in a
-real browser, and the whole thing on the actual Hetzner box. Those only happen
-once, on the server, with the real domain.
+**Since 17.08 this is out of date in one direction and still true in another.**
+The certificate did issue, and the stack does run on the real box — see the
+last section for what was measured there. What nobody has done yet:
+
+- opened the site in a real browser and met the Basic-Auth prompt. Every check
+  so far was `curl`
+- run this on an **empty** server, which is what sections 1-4 describe. Our box
+  was not empty, so those sections have never been executed as written
+- checked the ports from another machine. The compose file publishes none for
+  the database and `docker ps` agrees, but that is a config file describing an
+  intention, not evidence about the network
+
+---
+
+## How llmantis.de is actually deployed
+
+Written 17.08 immediately after doing it, because none of it is derivable from
+this repository.
+
+### The box was already occupied
+
+`llmantis.de` runs on a Hetzner box that **already hosted another project**:
+a Caddy container in `/srv` that also serves `phishing.workshop.bogdanorel.de`.
+It holds ports 80 and 443.
+
+That single fact invalidates section 4 above. Starting our own Caddy from
+`docker-compose.prod.yml` would have fought for those ports and taken the
+workshop site down with it. So on this machine:
+
+- **only `postgres` and `app` are started** from our compose file
+- the **existing** Caddy in `/srv` is the front, and gets one extra site block
+- our `app` joins that Caddy's network so it can be proxied to
+
+```
+/srv/docker-compose.yml       the pre-existing Caddy (not ours, do not replace)
+/srv/caddy/Caddyfile          its config — our site block was appended
+/srv/homepage/                the coming-soon page and the workshop site
+/srv/llmantis/                this repository, cloned
+/srv/secrets/                 credentials, deliberately OUTSIDE the git tree
+```
+
+### What makes it work
+
+`/srv/llmantis/docker-compose.override.yml` — server-local, and ignored by
+`.gitignore` on purpose:
+
+```yaml
+services:
+  app:
+    networks: [default, web]
+networks:
+  web:
+    external: true
+    name: srv_default        # the network the existing Caddy stack owns
+```
+
+Started with both files, and **naming the two services explicitly** so the
+caddy service in `docker-compose.prod.yml` never starts:
+
+```bash
+cd /srv/llmantis
+docker compose -f docker-compose.prod.yml -f docker-compose.override.yml \
+  --env-file deploy/.env up -d --build postgres app
+```
+
+The block appended to `/srv/caddy/Caddyfile`:
+
+```
+llmantis.de, www.llmantis.de {
+	basic_auth {
+		orel <bcrypt hash>
+	}
+	header {
+		X-Robots-Tag "noindex, nofollow, noarchive"
+		-Server
+	}
+	reverse_proxy llmantis-app-1:8000
+}
+```
+
+`llmantis-app-1` is the container name Compose derives from the directory
+(`/srv/llmantis`) plus the service name. If the directory is ever renamed, this
+proxy target breaks.
+
+### Deploying a change
+
+```bash
+ssh orel@37.27.250.224
+cd /srv/llmantis && git pull --ff-only
+docker compose -f docker-compose.prod.yml -f docker-compose.override.yml \
+  --env-file deploy/.env up -d --build app
+# only when a migration landed:
+docker compose -f docker-compose.prod.yml -f docker-compose.override.yml \
+  --env-file deploy/.env exec app alembic upgrade head
+```
+
+Touching the Caddyfile needs a validate first and a reload after — a reload
+does not interrupt the workshop site, a restart would:
+
+```bash
+docker exec srv-caddy-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker exec srv-caddy-1 caddy reload  --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+### Credentials
+
+All of it was generated **on the server** and never left it. The site login is
+in `/srv/secrets/llmantis-basic-auth.txt`, mode 600.
+
+`/srv/secrets/` is outside the git work tree deliberately. The first attempt
+put those files in `/srv/llmantis/deploy/`, inside a clone of a **public**
+repository, where `git status` listed them as untracked and one `git add -A`
+away from being published. Untracked is not ignored.
+
+### After any deploy, check the neighbour
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://phishing.workshop.bogdanorel.de/
+```
+
+Our changes share a web server with someone else's live site. A 200 there is
+part of "the deploy worked", not a separate concern.
+
+### Verified on the live domain, 17.08
+
+```
+https://llmantis.de/            401 without credentials, 200 with
+http://llmantis.de/             308 to https
+X-Robots-Tag                    noindex, nofollow, noarchive; no Server header
+container ports                 app 8000/tcp, postgres 5432/tcp — no host binding
+migrations                      9 on an empty database, alembic check clean
+a real scan through the domain  C/81, library 2.0, grade issued, 131s
+workshop site                   still 200
+```
