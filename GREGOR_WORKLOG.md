@@ -2922,6 +2922,89 @@ Two more, noted and accepted rather than fixed:
 
 ---
 
+## 2026-08-17 — Session 26: T0-1 — the agreement number is a range, not a reading
+
+`PITCH-PLAN.md` T0-1 asks for the number and for it to be recorded. The
+measurement existed (session 22, 29/30). Re-running it on current `main` gave
+**28/30, and on different items** — cal-021 and cal-028 rather than cal-023.
+So the number was never one number.
+
+### 🔴 The judge is not deterministic. Five runs, same set, same judge:
+
+```
+per run:   29/30   30/30   26/30   29/30   29/30      mean 143/150 = 95.3 %
+range:     26/30 to 30/30
+```
+
+| run | agreement | false positives | false negatives |
+|---|---|---|---|
+| 1 | 29/30 | 1 | 0 |
+| 2 | 30/30 | 0 | 0 |
+| 3 | **26/30** | 3 | **1** |
+| 4 | 29/30 | 1 | 0 |
+| 5 | 29/30 | 1 | 0 |
+
+Five items disagreed at least once — `cal-021`, `cal-023`, `cal-024`,
+`cal-026`, `cal-028` — and **none disagreed in every run**. Session 16
+predicted cal-021 and cal-023 by name; both appear, and three others joined
+them.
+
+Quoting "97 %" from one run would have been quoting one sample of a
+distribution as if it were the distribution. This is the same lesson
+`matrix.py` learned about model cells and had to relearn here.
+
+### ⭐ Two things ARE stable, and they are the ones worth saying
+
+1. **The deterministic layer agreed with a human on every item it can see, in
+   every run: 9/9, zero disagreements, five times out of five.** Only a
+   `confirmed` finding may drive a grade to F (`PLAYBOOK.md:466`) — so the
+   harshest grade we issue is the part that does not wobble. That is a
+   stronger claim than a headline percentage, and it survives the variance
+   rather than being embarrassed by it.
+2. **Every disagreement is a borderline item, and nearly all are false
+   positives** — 0 to 3 per run, with a single false negative in one run.
+   The judge errs toward flagging, which is the direction `judge.py:29`
+   instructs.
+
+### `calibrate.py --runs N` added
+
+One command now produces the range instead of a reading. It prints every run
+in full — a summary alone cannot distinguish a stable 28 from a 27/29 that
+averaged to 28 — then a stability block naming which items are unstable and
+how often.
+
+**A real bug in the first version, found by running it:** one `asyncio.run()`
+per run died with `RuntimeError: Event loop is closed` partway through run 2.
+The Mistral client keeps a connection pool bound to the loop that created it.
+All runs now share a single `asyncio.run`. Worth remembering: the failure was
+invisible in a one-run invocation, which is the only way it had ever been used.
+
+### Recorded in `PROJECT-STATE.md` — Bogdan's file
+
+It read "Calibration set 0 of 30 🔴" and "Judge agreement not measured 🔴",
+both months behind the repo. Updated, along with three neighbouring rows that
+were also stale (attack count 21 of 75, and the test-bot row still naming
+MediClinic). The range and both stable findings are recorded there with the
+reproduce command, so the pitch does not have to trust this worklog.
+
+### What I did NOT verify
+
+- **Five runs is a small sample for a range.** 26/30 appeared once; whether
+  the true floor is lower is unknown. What is established is that the number
+  moves, not the shape of the distribution.
+- **Why run 3 was bad** was not investigated. It produced the only false
+  negative of the five, and a false negative on a calibration set is more
+  interesting than a false positive because the set is meant to catch exactly
+  that. Which item it was is in the log but was not chased down.
+- Whether temperature or a seed is settable on `mistral-small` through
+  `backend/llm.py`, which would be the obvious way to reduce the spread.
+  Not looked at — that is Vlad's file and a design question, not a fix to
+  apply unasked.
+- The other `PROJECT-STATE.md` §7 rows (sites checked, north star) were left
+  alone; they are not mine to measure.
+
+---
+
 # Start here tomorrow
 
 ## The deliverable is done. The new headline is that the grade is not stable.
