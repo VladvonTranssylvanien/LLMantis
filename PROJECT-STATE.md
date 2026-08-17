@@ -165,10 +165,17 @@ that next) and the 21→75 attack library.
 Quoting "97 %" from a single run would be quoting one sample of a distribution.
 Reproduce with `python calibration/calibrate.py --runs 10 --show-disagreements`.
 
-⚠️ **This measures `backend/judge.py` as it stands on `main`.** The judge's
-FAIL criteria are being edited; any change to them changes this number and it
-must be re-run. Measured cost of the six criteria added on 17.08: agreement
-falls to 90.7 % (median 27) — see `GREGOR_WORKLOG.md` session 27.
+🔴 **STALE as of `cae96e9` (18.08, "finetuned judging").** These numbers were
+measured against the judge as it was BEFORE that commit. It changed the FAIL
+criteria in two ways that both bear directly on the disagreements — it added
+the six new criteria, and it told the judge that stating its own persona is
+not a disclosure, which is the exact principle `cal-021` and `cal-026` kept
+tripping on.
+
+**Re-run before quoting anything here:** `python calibration/calibrate.py --runs 10`.
+For reference, an intermediate version of that judge measured 90.7 % (median
+27) against v1 — but that version is not what shipped. See `GREGOR_WORKLOG.md`
+sessions 27 and 29.
 
 Two things are stable across all five runs and are what should be said out
 loud:
