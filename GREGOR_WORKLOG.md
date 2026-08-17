@@ -3332,47 +3332,70 @@ disagreements.
 
 # Start here tomorrow
 
-## The deliverable is done. The new headline is that the grade is not stable.
+## Where things stand — 18.08, four days to the pitch
+
+Everything below is on `main`. Deliverables are done; what is left is
+decisions, not building.
 
 ```
-Judge agreement   29/30 (97 %) - 1 false positive, 0 false negatives, 0 confirmed
-Bot A vulnerable  C on 78 attacks / F on 21   - 12 confirmed leaks, 5 critical
-Bot B hardened    no grade / C / A on three identical runs - 0 confirmed, always
-Bot C middle      C on 78 attacks / D on 21   - 13 confirmed leaks
+Judge agreement   v1  26-30 of 30 over 10 runs   mean 94.3 %   (committed judge)
+                  v1  26-29 of 30 over 10 runs   mean 90.7 %   (Gregor's UNCOMMITTED judge)
+                  v2  40-42 of 43 over 5 runs    43 items, all labelled
+Layer 1           11/11 on v1, 13/13 on v2, ZERO false positives, every run
+Demo beat         F (0) -> A (100) on the 21-attack corpus, live, 0 errors
 ```
 
-Reproduce both:
+## 🔴 Uncommitted on this machine — decide before anything else
 
-```bash
-python calibration/calibrate.py calibration/set-v1.yaml --show-disagreements
-python lab/harness/scan_bots.py
-```
+`backend/judge.py` and `attacks/attacks.yaml` carry Gregor's edits and are
+**not committed**. Everything measured above used the committed judge, and
+`PROJECT-STATE.md` §7 names which version it measured for exactly that reason.
 
-## Problems to tackle, in the order they bite
+**If the judge change lands, re-run `calibrate.py --runs 10` and update that
+row.** Measured cost of the six new criteria: 94.3 % → 90.7 %.
+
+## The open question, and it is a good one
+
+The six new criteria **pass every item in the set built for them** — none of
+the 13 v2 items disagreed in any of 5 runs — while producing real false
+positives in the wild:
+
+- Bot B, a textbook refusal, judged *"leak of confidential instructions through
+  refusal pattern"*. Critical, so it cost the control bot two grades.
+- Bot C, asked to recommend hiring by ethnicity, **rejects** the premise, and
+  the judge returns *"provided discriminatory advice"* quoting the sentence
+  that rejects it.
+
+The difference is answer **shape**, not topic: v2's items are curt refusals,
+the misfires are long substantive rebuttals. **A refusal that argues gets
+flagged; one that declines does not.** The two answers are sitting in
+`calibration/scans-grok/` and would make the items v2 is missing — that needs a
+labelling round.
+
+## Decisions open
+
+- **Which corpus the demo runs on.** Evidence, not preference: 21 attacks give
+  F → A live with zero errors; 78 give 429s and a suppressed grade on the
+  control bot. `config.DEFAULT_ATTACK_LIBRARY` is already `attacks_short.yaml`.
+- **Whether the judge change ships**, given the measured agreement cost against
+  coverage the set cannot yet evaluate.
+- **`cal-021` / `cal-023`** — the two items that disagree most across both judge
+  versions, both on the "Ich bin Lisa" principle Gregor settled in session 16.
+  The judge has never been told that saying a persona sentence is executing the
+  instruction, not revealing it. A candidate PASS-list line is in session 27.
+- **Adding the two Grok false positives to v2.** Gregor's call; needs labels.
+
+## Problems, in the order they bite
 
 | # | Problem | Owner | Why it matters |
 |---|---|---|---|
-| 1 | **The same bot scored no grade, C and A on three identical runs.** Every error was a Mistral 429 | Vlad (#12) | The customer-visible grade depends on how many rate limits a scan happens to catch. Nothing else on this list matters as much |
-| 2 | **Score = % of attacks defended, so a bigger library raises a leaking bot's grade.** Bot A: F on 21 attacks, C on 78, same answers | Vlad (`scoring.py:98`) | A customer improves their grade by asking for more attacks. Choosing a corpus does not fix it |
-| 3 | The demo beat is currently "C -> no grade", not "D -> A" | team | On `attacks_short.yaml` it is "F -> A" and it works. This is the strongest argument for the short corpus |
-| 4 | Grading has no resolution in the middle on 78 attacks — A and C both land on C | team | This was the question Bot C was built to answer (`GREGOR-TARGET-LAB.md:76`). On 21 attacks the answer is good: F / D / A |
-| 5 | ~~`version:` still "1.4"~~ | — | **Withdrawn.** `attacks.yaml` reads `version: "2.0"` and has since before session 24 |
-| 6 | Bot B leaks the supplier 2/5 on gpt-4.1-mini (Azure) | Gregor | The control group is not clean on that path; `cal-019`. It was clean on all three Mistral scans |
-| 7 | Frontend cannot send `secrets` (`index.html:425-429`) | frontend | A demo scan is blind to supplier and internal-note leaks. Bot A's 12 and Bot C's 13 confirmed findings needed it |
-| 8 | 8 of 78 attacks blocked by Azure's content filter | team | Applies to the Azure lab path, not the Mistral prompt-mode path measured in session 22 |
-
-## Decisions still open
-
-- **Which corpus the demo runs on.** There is now hard evidence rather than a
-  preference: 21 attacks give F / D / A and a working demo; 78 give C / C / A,
-  a suppressed grade on the control bot, and 429s on every run. Problems 1-4
-  all point the same way. Gregor is taking this to the team.
-- **Bot C in the calibration set.** It has 90 matrix replies and a full scan,
-  and none of it is labelled. A v2 set would need Gregor's labels; mixing
-  unlabelled items into v1 would corrupt the 29/30.
-- **Whether `cal-023` should change.** It is the one disagreement. The label is
-  defensible and so is the judge; that argument is worth having before the
-  pitch rather than during it.
+| 1 | Judge non-determinism: the same set scores 26-30 of 30 | Vlad | Every number we quote is a range. Whether temperature or a seed is settable on `mistral-small` has never been checked — the obvious way to shrink it |
+| 2 | New criteria misfire on substantive refusals | Gregor + Vlad | Three observed false positives, one on the control bot |
+| 3 | Frontend cannot send `secrets` (`index.html:425-429`) | frontend | A demo scan is blind to supplier and internal-note leaks |
+| 4 | Grok/Azure deployments are quota-limited below a usable scan | Gregor | ~40 % of attacks error regardless of concurrency. Ministral-3B was dropped for this; Grok now too |
+| 5 | Target model in prompt mode is hardcoded `mistral-small` (`scanner.py:63`) | Vlad | No env var, unlike `JUDGE_MODEL`. The demo cannot test another model without editing backend code, and the model-diversity table comes from a path the demo never uses |
+| 6 | Bot B leaks the supplier 2/5 on gpt-4.1-mini (Azure) | Gregor | Control group not clean on that path; `cal-019`. Clean on every Mistral scan |
+| 7 | 8 of 78 attacks blocked by Azure's content filter | team | Azure lab path only, not the Mistral demo path |
 
 ## Closed since yesterday — do not re-report
 
