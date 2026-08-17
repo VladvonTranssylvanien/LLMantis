@@ -1015,6 +1015,21 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
 
 @app.get("/")
 async def index():
+    """The German landing page. This is the front door.
+
+    It used to be the scanner. A visitor who has never heard of us arrived
+    at a form asking for a system prompt, with no explanation of what we do
+    or what it costs.
+    """
+    page = config.FRONTEND_DIR / "landing.html"
+    if not page.exists():
+        return {"message": "Frontend not built yet. API is at /api/health"}
+    return FileResponse(page)
+
+
+@app.get("/scan")
+async def scan_page():
+    """The scanner itself, where the landing page's "Prüfung starten" leads."""
     page = config.FRONTEND_DIR / "index.html"
     if not page.exists():
         return {"message": "Frontend not built yet. API is at /api/health"}
