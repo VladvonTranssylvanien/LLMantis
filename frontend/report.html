@@ -248,7 +248,12 @@ function build() {
   const results = REPORT.results || [];
   const errored = s.errors != null ? s.errors : results.filter(r => r.verdict === 'ERROR').length;
   const total   = s.total  != null ? s.total  : results.length;
-  const incomplete = total > 0 && (errored / total) > 0.10;
+  // The backend already decided this and withheld the grade if it applied
+  // (scanner.run_scan). Recomputing the 10% rule here could only disagree
+  // with the side that owns it — see the same fix in index.html.
+  const incomplete = s.incomplete != null
+    ? !!s.incomplete
+    : (total > 0 && (errored / total) > 0.10);
 
   const allFails = results.filter(r => r.verdict === 'FAIL');
   // Project rule: a finding without an evidence quote does not appear at all.
@@ -306,6 +311,12 @@ function build() {
       '<div><b>' + s.failed + '</b><span>succeeded</span></div>' +
       '<div><b>' + s.passed + '</b><span>defended</span></div>' +
       '<div><b>' + s.critical_failures + '</b><span>critical</span></div>' +
+      // Shown only when it is non-zero, so a clean scan reads exactly as
+      // before. When it is non-zero it has to be here: "checks run" is now
+      // every attack sent, so succeeded + defended no longer adds up to it,
+      // and a reader doing that subtraction deserves the missing term named
+      // rather than having to find the section at the bottom of the page.
+      (errored ? '<div><b>' + errored + '</b><span>not scored</span></div>' : '') +
       '<div><b>' + total + '</b><span>checks run</span></div>' +
       '</div></div></div>';
   }
@@ -327,12 +338,21 @@ function build() {
 
   const cats = Object.keys(s.by_category || {});
   if (cats.length) {
+    // "Not scored" is its own column on purpose. Succeeded used to be derived
+    // as total - passed, which silently counted every errored attack as an
+    // attack that beat the bot — a vulnerability claim with no evidence
+    // behind it, in the one document a customer pays for.
     h += '<section><h2 class="sec">Result by category</h2><table>' +
-      '<thead><tr><th>Category</th><th>Defended</th><th>Succeeded</th><th>Checks</th></tr></thead><tbody>';
+      '<thead><tr><th>Category</th><th>Defended</th><th>Succeeded</th>' +
+      '<th>Not scored</th><th>Checks</th></tr></thead><tbody>';
     for (const c of cats) {
       const v = s.by_category[c];
+      const vFailed = v.failed != null ? v.failed : (v.total - v.passed);
+      const vErrors = v.errors != null ? v.errors : 0;
       h += '<tr><td>' + esc(nice(c)) + '</td><td class="num">' + v.passed +
-           '</td><td class="num">' + (v.total - v.passed) + '</td><td class="num">' + v.total + '</td></tr>';
+           '</td><td class="num">' + vFailed +
+           '</td><td class="num">' + (vErrors || '—') +
+           '</td><td class="num">' + v.total + '</td></tr>';
     }
     h += '</tbody></table></section>';
   }

@@ -500,7 +500,15 @@ function render(report) {
   const results = report.results || [];
   const errored = s.errors != null ? s.errors : results.filter(r => r.verdict === 'ERROR').length;
   const total   = s.total  != null ? s.total  : results.length;
-  const incomplete = total > 0 && (errored / total) > INCOMPLETE_THRESHOLD;
+  // Trust the backend's own verdict when it sends one. It applies the same
+  // 10% rule in scanner.run_scan and is the side that actually withholds the
+  // grade, so recomputing the threshold here could only ever disagree with
+  // it — and did: the backend rounds the percentage before comparing, so a
+  // scan with 8 errors of 78 issued a grade the page then hid behind a "no
+  // grade issued" banner. One rule, one owner.
+  const incomplete = s.incomplete != null
+    ? !!s.incomplete
+    : (total > 0 && (errored / total) > INCOMPLETE_THRESHOLD);
 
   // Hand the report to the print view without a round trip to the backend.
   // target_name isn't part of the API response (mode="prompt" has no name
@@ -559,13 +567,22 @@ function render(report) {
   $('cats').innerHTML = '';
   Object.keys(s.by_category || {}).forEach((name, i) => {
     const c   = s.by_category[name];
-    const pct = c.total ? Math.round(100 * c.passed / c.total) : 0;
+    // Percentage over what was actually SCORED, not over what ran. An attack
+    // that errored is not evidence the bot failed it, and counting it as one
+    // would read as a vulnerability we never observed. The errored count is
+    // shown separately instead of being folded into either side.
+    const cScored = c.scored != null ? c.scored : c.total;
+    const cErrors = c.errors != null ? c.errors : 0;
+    const pct = cScored ? Math.round(100 * c.passed / cScored) : 0;
     const col = pct === 100 ? 'var(--accent)' : 'var(--critical)';
     const div = document.createElement('div');
     div.className = 'cat';
     div.innerHTML =
       '<h4>' + esc(nice(name)) + '</h4>' +
-      '<div class="m">' + c.passed + '/' + c.total + ' defended</div>' +
+      '<div class="m">' + (cScored
+        ? c.passed + '/' + cScored + ' defended' +
+          (cErrors ? ' · ' + cErrors + ' not scored' : '')
+        : 'not scored — all ' + cErrors + ' checks failed to run') + '</div>' +
       '<div class="mini"><i style="background:' + col + '"></i></div>';
     $('cats').appendChild(div);
     // Fill after paint so the bar animates instead of jumping. 60 ms stagger.
