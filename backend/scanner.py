@@ -29,6 +29,7 @@ import httpx
 from . import config, scoring
 from .attacks import Attack, load_library
 from .judge import judge
+from .llm import openai_compatible_chat
 
 
 @dataclass
@@ -75,34 +76,16 @@ async def _ask_target(target: Target, message: str) -> str:
                 "real deployment; there is nothing to attack without one."
             )
 
-        headers = {"Content-Type": "application/json"}
-        if config.TARGET_AUTH == "bearer":
-            headers["Authorization"] = f"Bearer {config.TARGET_KEY}"
-        else:
-            headers["api-key"] = config.TARGET_KEY
-
-        async with httpx.AsyncClient(timeout=config.LLM_TIMEOUT_S) as client:
-            response = await client.post(
-                config.TARGET_URL,
-                headers=headers,
-                json={
-                    "model": config.TARGET_MODEL,
-                    "max_tokens": config.MAX_TOKENS_TARGET,
-                    "messages": [
-                        {"role": "system", "content": target.system_prompt},
-                        {"role": "user", "content": message},
-                    ],
-                },
-            )
-
-        if response.status_code != 200:
-            # Pass the provider's own message through: it distinguishes quota
-            # from a wrong deployment name from a content-filter block.
-            raise TargetError(
-                f"target HTTP {response.status_code}: {response.text[:400]}"
-            )
-
-        choice = response.json()["choices"][0]
+        # Shared with the judge's provider so the target inherits the same
+        # measured 429 backoff. Without it every rate-limited attack becomes an
+        # ERROR immediately, which is what suppressed grades before 171b06b.
+        choice = await openai_compatible_chat(
+            url=config.TARGET_URL, key=config.TARGET_KEY,
+            auth=config.TARGET_AUTH, model=config.TARGET_MODEL,
+            system=target.system_prompt, user=message,
+            max_tokens=config.MAX_TOKENS_TARGET,
+            timeout=config.LLM_TIMEOUT_S, what="target",
+        )
         answer = choice["message"].get("content") or ""
 
         # An empty answer must NEVER be returned as a reply.

@@ -134,25 +134,32 @@ async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> 
 # ---------------------------------------------------------------------------
 
 
-async def _azure_chat(system: str, user: str, model: str, max_tokens: int) -> str:
+async def openai_compatible_chat(*, url: str, key: str, auth: str, model: str,
+                                 system: str, user: str, max_tokens: int,
+                                 timeout: int, what: str) -> dict:
     """
-    Azure AI Foundry, and anything else that speaks OpenAI chat completions.
+    POST one message to an OpenAI-compatible chat-completions endpoint.
 
-    Deliberately raw httpx rather than an SDK: the same three lines then serve
-    Azure OpenAI, Azure AI model inference and any OpenAI-compatible gateway,
-    and the full url comes from config so we are not guessing a path format.
+    Serves both the judge (via _azure_chat) and the target under attack (via
+    scanner._ask_target). They were near-identical copies; sharing them means
+    the RETRY_* backoff measured against real 429s protects BOTH. The target
+    path had no retry at all when it was first written, which would have handed
+    every rate-limited attack straight to ERROR -- the exact failure Vlad fixed
+    in 171b06b and the reason this backoff exists.
+
+    Returns the raw choices[0] dict, not just the text, so the caller can see
+    finish_reason. An empty answer means different things to the judge and to a
+    scan, so neither interpretation belongs in here.
+
+    Deliberately raw httpx rather than an SDK: the same code then serves Azure
+    OpenAI, Azure AI model inference and any OpenAI-compatible gateway, and the
+    full url comes from config so we are not guessing a path format.
     """
-    if not config.AZURE_URL or not config.AZURE_KEY:
-        raise LLMError(
-            "PROVIDER=azure but AZURE_URL or AZURE_KEY is empty in .env\n"
-            "AZURE_URL is the full chat-completions url from the deployment page."
-        )
-
     headers = {"Content-Type": "application/json"}
-    if config.AZURE_AUTH == "bearer":
-        headers["Authorization"] = f"Bearer {config.AZURE_KEY}"
+    if auth == "bearer":
+        headers["Authorization"] = f"Bearer {key}"
     else:
-        headers["api-key"] = config.AZURE_KEY
+        headers["api-key"] = key
 
     payload = {
         "model": model,
@@ -164,36 +171,50 @@ async def _azure_chat(system: str, user: str, model: str, max_tokens: int) -> st
     }
 
     last_error: Exception | None = None
-    async with httpx.AsyncClient(timeout=config.LLM_TIMEOUT_S) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(RETRY_ATTEMPTS):
             try:
-                response = await client.post(config.AZURE_URL, headers=headers,
-                                             json=payload)
+                response = await client.post(url, headers=headers, json=payload)
             except httpx.RequestError as e:
                 # A transport failure is retryable; the last one propagates.
                 if attempt == RETRY_ATTEMPTS - 1:
-                    raise LLMError(f"Azure request failed: {e}") from e
+                    raise LLMError(f"{what} request failed: {e}") from e
                 last_error = e
                 await asyncio.sleep(_retry_delay(attempt))
                 continue
 
             if response.status_code in RETRY_STATUSES and attempt < RETRY_ATTEMPTS - 1:
-                last_error = LLMError(f"Azure HTTP {response.status_code}")
+                last_error = LLMError(f"{what} HTTP {response.status_code}")
                 await asyncio.sleep(_retry_delay(attempt, response.headers))
                 continue
 
             if response.status_code != 200:
-                # Pass Azure's own message through. It distinguishes quota from
-                # a wrong deployment name from a content-filter block, and
-                # hiding it costs an hour of guessing.
+                # Pass the provider's own message through. It distinguishes
+                # quota from a wrong deployment name from a content-filter
+                # block, and hiding it costs an hour of guessing.
                 raise LLMError(
-                    f"Azure HTTP {response.status_code}: {response.text[:400]}"
+                    f"{what} HTTP {response.status_code}: {response.text[:400]}"
                 )
 
-            data = response.json()
-            return (data["choices"][0]["message"].get("content") or "")
+            return response.json()["choices"][0]
 
-    raise LLMError(f"Azure unreachable after {RETRY_ATTEMPTS} attempts: {last_error}")
+    raise LLMError(f"{what} unreachable after {RETRY_ATTEMPTS} attempts: {last_error}")
+
+
+async def _azure_chat(system: str, user: str, model: str, max_tokens: int) -> str:
+    """Azure AI Foundry, and anything else that speaks OpenAI chat completions."""
+    if not config.AZURE_URL or not config.AZURE_KEY:
+        raise LLMError(
+            "PROVIDER=azure but AZURE_URL or AZURE_KEY is empty in .env\n"
+            "AZURE_URL is the full chat-completions url from the deployment page."
+        )
+
+    choice = await openai_compatible_chat(
+        url=config.AZURE_URL, key=config.AZURE_KEY, auth=config.AZURE_AUTH,
+        model=model, system=system, user=user, max_tokens=max_tokens,
+        timeout=config.LLM_TIMEOUT_S, what="Azure",
+    )
+    return choice["message"].get("content") or ""
 
 
 # ---------------------------------------------------------------------------
