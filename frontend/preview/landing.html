@@ -97,15 +97,19 @@ a{color:inherit}
 /* No axis is drawn up front. The hairline that runs down the page IS the band,
    frozen where it stopped on the first scroll — so there is never a moment
    with two vertical lines on screen. */
-/* Drawn on the runway, not on the whole layer: the line ends where the pinned
-   sections end instead of running on through the footer. */
-.shell[data-band-frozen="true"] .runway::after{content:'';position:absolute;
-  top:0;bottom:0;left:var(--axis-x,60%);width:1px;background:var(--accent-line);
-  pointer-events:none;z-index:3}
+/* On the base layer so it exists from the very top of the page - drawn on the
+   runway it was simply below the fold on the first screen, which is why it
+   vanished the moment the band froze. Its height is written from JS so it
+   still ends with the pinned sections rather than running into the footer.
+   left is a PIXEL value: the chips live in a centred max-width container, and
+   a percentage of the viewport does not track that container. */
+.shell[data-band-frozen="true"] .layer--base::after{content:'';position:absolute;
+  top:0;height:var(--axis-h,100%);left:var(--axis-x,60%);width:1px;
+  background:var(--accent-line);pointer-events:none;z-index:3}
 /* The clone carries a copy of the runway, so it drew a second axis; and the
    band itself is still a 1px sliver at a drifting position, which was a third.
    Exactly one line survives: the axis on the base layer. */
-.layer--reveal .runway::after{display:none}
+.layer--reveal .layer--base::after{display:none}
 .shell[data-band-frozen="true"] .layer--reveal{display:none}
 /* --axis-x, not --reveal-pos: the growing rectangle's centre necessarily
    drifts toward the middle of the screen as it widens, and the axis must not
@@ -873,19 +877,32 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
      the moment the layout changes. */
   const chipCentre = () => {
     const chip = document.querySelector('.pane--a .chip');
-    if (!chip) return cur;
+    if (!chip) return null;
     const r = chip.getBoundingClientRect();
-    return (r.left + r.width / 2) / innerWidth;
+    return r.left + r.width / 2;          /* pixels, not a fraction */
   };
+  /* Re-measured rather than remembered: a stored percentage drifted off the
+     chips by ~12px as soon as the viewport width changed. */
+  const placeAxis = () => {
+    const x = chipCentre();
+    const run = document.getElementById('runway');
+    if (x == null || !run) return;
+    shell.style.setProperty('--axis-x', x + 'px');
+    shell.style.setProperty('--axis-h', (run.offsetTop + run.offsetHeight) + 'px');
+  };
+  addEventListener('resize', () => {
+    if (shell.dataset.bandFrozen === 'true') placeAxis();
+  }, { passive: true });
 
   const freeze = () => {
     if (shell.dataset.bandFrozen === 'true') return;
     shell.dataset.bandFrozen = 'true';
     clearTimeout(idleTimer);
     cancelAnimationFrame(raf); raf = 0;
-    cur = tgt = chipCentre();       /* land on the chips, then hold */
+    const x = chipCentre();
+    if (x != null) cur = tgt = x / innerWidth;   /* land on the chips, then hold */
     write();
-    shell.style.setProperty('--axis-x', (cur * 100) + '%');
+    placeAxis();
     collapse();                     /* back to the 1px hairline */
     removeEventListener('pointermove', onMove);
   };
@@ -896,6 +913,7 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     if (shell.dataset.bandFrozen !== 'true') return;
     delete shell.dataset.bandFrozen;
     shell.style.removeProperty('--axis-x');
+    shell.style.removeProperty('--axis-h');
     cur = tgt = START;
     write();
     addEventListener('pointermove', onMove, { passive: true });
@@ -966,6 +984,16 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
     const raw = (innerHeight - r.top) / innerHeight;
     const p = clamp01((raw - HOLD) / (1 - HOLD));
 
+    /* Before the growth begins the section must BE the hairline, not a
+       full-width block waiting behind the fold. With the clip left at 0 the
+       green pane simply scrolled into view underneath the line. */
+    if (p <= 0 && shell.dataset.bandFrozen === 'true') {
+      const ax = parseFloat(getComputedStyle(shell).getPropertyValue('--axis-x'));
+      if (!Number.isNaN(ax)) {
+        pin.style.setProperty('--hw-left', (ax - 0.5) + 'px');
+        pin.style.setProperty('--hw-right', (innerWidth - ax - 0.5) + 'px');
+      }
+    }
     if (p <= 0 || p >= 1) {
       if (active) {
         active = false;
