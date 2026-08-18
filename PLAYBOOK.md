@@ -131,9 +131,16 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 > ones, so there is nothing left to review separately. `assets/base.css` still
 > holds the dark set but **no page links it any more**: `art50check.html` was the
 > last one, and it joined the light system by inlining the same foundation the
-> other five carry. It held no colour literal of its own, so nothing in its own
-> rules had to be rewritten. base.css is now dead weight and can be deleted the
-> day somebody wants to.
+> other five carry. It held no HEX literal of its own — which is not the same as
+> holding no literal, and the first attempt at this said it was: five `rgba()`
+> washes are literals no token reaches, and two of them were the off-palette
+> lime, so two of its own rules DID have to be rewritten. The same sweep missed
+> the `<img>` asset: the page went on loading `mark.svg`, whose single colour is
+> that same lime, at 1.44:1 on the light topbar. **A colour sweep that reads only
+> CSS is not a colour sweep** — the greens in this product live in CSS, in `rgba()`,
+> and inside SVG files that no token can reach.
+>
+> base.css is now dead weight and can be deleted the day somebody wants to.
 >
 > The app first shipped light on its own palette (`#F7F8F5 / #111827 / #256B10`)
 > while the landing shipped on another. Both differences turned out to be hue and

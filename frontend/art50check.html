@@ -75,7 +75,14 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shine), var(--glass-lift);
+  /* NOT `var(--glass-shine), var(--glass-lift)`. box-shadow's grammar is
+     `none | <shadow>#` — `none` is legal only as the SOLE value, so the pair
+     failed to parse and the WHOLE declaration was dropped: .glass computed
+     box-shadow:none on every page, and nobody noticed because the hairline
+     border stayed. Measured in Chrome: shine+lift -> "none", lift alone ->
+     "rgba(18,18,16,.18) 0 8px 24px -14px". If a token can hold `none`, it
+     cannot sit in a comma list. */
+  box-shadow: var(--glass-lift);
 }
 /* Without this a browser with no backdrop-filter paints a see-through panel
    and the text behind shows through the text on top. Opaque is safe failure. */
@@ -186,7 +193,6 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
      ground the inset shine reads as a smudge, so it is dropped. */
   --glass-bg:rgba(242,241,235,.86);
   --glass-border:#DFDED9;
-  --glass-shine:none;
   --glass-lift:0 8px 24px -14px rgba(18,18,16,.18);
   --glass-fallback:#FFFFFF;
 
@@ -356,10 +362,16 @@ input:focus-visible {
 /* These sit on .panel = --surface = #FFFFFF. Only .ok changed, and only
    because #7BE33F is an off-palette GREEN sitting under #116B2E text — the
    one thing the single-green decision actually reaches. It is now the accent
-   at the alpha that reproduces the lime tint's weight (1.055 -> 1.060 off
-   white), not the accent at .1.
-   .bad and .warn keep their source hex. It belongs to the dark palette, but
-   at 10% over white it is a pale red and a pale amber, which is exactly the
+   at the alpha that reproduces the lime tint's weight, not the accent at .1:
+   the lime sits at 1.0547 off white and this lands at 1.051. An earlier
+   version of this comment said 1.060 — that is the figure for .038, and .037
+   shipped. Exact arithmetic puts .037 at 1.0534, but Chrome quantises alpha
+   to 8 bits (.037 * 255 = 9.4 -> 9/255 = .0353), so 1.051 is what renders and
+   1.051 is what this says.
+   .bad and .warn keep their source hex. .bad's #FF6B6B is base.css's dark
+   --critical; .warn's #FFC107 is in NO palette at all — the dark --medium is
+   #FFC53D, so that wash never matched its own theme either. What matters is
+   that at 10% over white both are a pale red and a pale amber, which is the
    wash convention the rest of the light system uses (#FDF6E3 1.079,
    #FFF8E5 1.060, #FDF1E7 1.110). Re-mixing them from --critical/--medium was
    tried and reverted: it produced 1.185 and 1.157 — heavier than any other
@@ -401,7 +413,11 @@ input:focus-visible {
   white-space: nowrap; padding: 3px 9px; border-radius: 999px;
 }
 /* Same pair, same reasoning as .v-badge above: the green moves because it is
-   off-palette, the red stays because a 10% pale red is the convention. */
+   off-palette, the red stays because a 10% pale red is the convention.
+   Note that these two rules are DEAD: no line of this page's JavaScript ever
+   emits .r-status or .r-check — renderResult only ever writes .v-badge,
+   .v-quote, .v-meta, .r-empty, .w-shot and .q-label. Kept in step with
+   .v-badge so the pair does not diverge if something starts emitting them. */
 .r-status.pass { color: var(--accent); background: rgba(17, 107, 46, .037); }
 .r-status.fail { color: var(--critical); background: rgba(255, 107, 107, .1); }
 
@@ -426,7 +442,12 @@ footer.site .sp { margin-left: auto; }
 
 <header class="topbar glass">
   <a class="brand" href="/">
-    <img src="/static/assets/brand/mark.svg" alt="" width="26" height="26">
+    <!-- mark-ink.svg, not mark.svg. mark.svg holds one colour, #7BE33F, which
+         was right while this page was dark (10.7:1 on #171A1F) and is 1.44:1 on
+         the light topbar — a lime mantis beside a #116B2E wordmark. The commit
+         that turned this page light swept the CSS literals and missed the ASSET,
+         which is the same class of miss and the more visible one. -->
+    <img src="/static/assets/brand/mark-ink.svg" alt="" width="26" height="26">
     <span class="name"><span class="ll">LL</span>Mantis</span>
   </a>
   <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>

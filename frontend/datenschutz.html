@@ -77,7 +77,14 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shine), var(--glass-lift);
+  /* NOT `var(--glass-shine), var(--glass-lift)`. box-shadow's grammar is
+     `none | <shadow>#` — `none` is legal only as the SOLE value, so the pair
+     failed to parse and the WHOLE declaration was dropped: .glass computed
+     box-shadow:none on every page, and nobody noticed because the hairline
+     border stayed. Measured in Chrome: shine+lift -> "none", lift alone ->
+     "rgba(18,18,16,.18) 0 8px 24px -14px". If a token can hold `none`, it
+     cannot sit in a comma list. */
+  box-shadow: var(--glass-lift);
 }
 /* Without this a browser with no backdrop-filter paints a see-through panel
    and the text behind shows through the text on top. Opaque is safe failure. */
@@ -188,7 +195,6 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
      ground the inset shine reads as a smudge, so it is dropped. */
   --glass-bg:rgba(242,241,235,.86);
   --glass-border:#DFDED9;
-  --glass-shine:none;
   --glass-lift:0 8px 24px -14px rgba(18,18,16,.18);
   --glass-fallback:#FFFFFF;
 
