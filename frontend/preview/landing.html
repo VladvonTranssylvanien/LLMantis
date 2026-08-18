@@ -78,15 +78,18 @@ a{color:inherit}
   --faint:rgba(246,246,244,.6);--hairline:rgba(246,246,244,.34);
   --accent:#F6F6F4;--accent-line:rgba(246,246,244,.45);--accent-soft:rgba(246,246,244,.14);
   --ground:transparent}
-.layer--reveal .step,.layer--reveal .col,.layer--reveal .plan,.layer--reveal .who,
-.layer--reveal .rail .status,.layer--reveal .rail .talk{background:transparent}
+.layer--reveal .step,.layer--reveal .col,.layer--reveal .plan,.layer--reveal .who{
+  background:var(--band)}
+/* Those grids draw their 1px rules as the CONTAINER background showing through
+   a 1px gap. Make the cells transparent and the container background floods the
+   whole block instead of the gaps - a pale rectangle over the band. */
 .layer--reveal .rv{opacity:1;transform:none}
 /* the hairline axis itself, drawn on the base layer */
 .layer--base::before{content:'';position:absolute;top:0;bottom:0;left:var(--reveal-pos);
   width:1px;background:var(--accent-line);pointer-events:none;z-index:0}
-/* the head stays above both layers: a cloned canvas paints nothing, and a
-   blank hole in the band would read as a defect rather than an effect */
-.netwrap{z-index:3}
+/* The head no longer needs to sit above the band: the reveal layer is given a
+   second canvas of its own and the same geometry is painted into it with an
+   inverted palette, so the head shows through the band like everything else. */
 
 /* ── header ──────────────────────────────────────────────────────────────── */
 header{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--ground)}
@@ -137,7 +140,7 @@ h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
 .hero-row{display:grid;grid-template-columns:minmax(0,1fr) 40%;gap:clamp(24px,4vw,60px);
   align-items:center}
 .netwrap{position:relative;justify-self:center;width:min(100%,440px)}
-#net{width:100%;height:auto;display:block}
+.netwrap canvas{width:100%;height:auto;display:block}
 .pause{position:absolute;right:0;bottom:-4px;background:none;border:1px solid var(--hairline);
   color:var(--muted);padding:5px 11px;font-family:var(--mono);font-size:11px;
   letter-spacing:.07em;text-transform:uppercase;cursor:pointer}
@@ -549,8 +552,8 @@ if (!REDUCED) addEventListener('pointermove', e => {
 }, { passive: true });
 
 let netT = 0;
-function drawNet() {
-  ctx.clearRect(0, 0, SIZE, SIZE);
+function drawNet(g, P) {
+  g.clearRect(0, 0, SIZE, SIZE);
   netT += 0.01;
   if (!REDUCED) {
     cmx += (pmx - cmx) * .06;
@@ -561,27 +564,27 @@ function drawNet() {
       n.y = n.oy + Math.cos(netT * n.sp * .85 + n.ph) * 3.4 + cmy * NET_AMP * depth;
     }
   }
-  ctx.lineWidth = 1.15;
+  g.lineWidth = 1.15;
   for (const e of edges) {
     const a = nodes[e.a], b = nodes[e.b];
-    ctx.strokeStyle = 'rgba(17, 107, 46, ' + ((1 - e.d / EDGE_MAX) * .5).toFixed(3) + ')';
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    g.strokeStyle = P.edge(((1 - e.d / EDGE_MAX) * .5).toFixed(3));
+    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
   }
   for (const n of nodes) {
-    ctx.fillStyle = 'rgba(17, 107, 46, .10)';
-    ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 2.6, 0, 6.284); ctx.fill();
-    ctx.fillStyle = n.r > 2 ? 'rgba(18, 18, 16, .92)' : 'rgba(17, 107, 46, .7)';
-    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 6.284); ctx.fill();
+    g.fillStyle = P.halo;
+    g.beginPath(); g.arc(n.x, n.y, n.r * 2.6, 0, 6.284); g.fill();
+    g.fillStyle = n.r > 2 ? P.node : P.dot;
+    g.beginPath(); g.arc(n.x, n.y, n.r, 0, 6.284); g.fill();
   }
   if (!REDUCED) for (let i = pulses.length - 1; i >= 0; i--) {
     const p = pulses[i];
     p.t += p.sp;
     if (p.t >= 1) { pulses.splice(i, 1); spawnPulse(); continue; }
     const a = nodes[p.e.a], b = nodes[p.e.b];
-    ctx.fillStyle = 'rgba(17, 107, 46, ' + (Math.sin(p.t * Math.PI) * .95).toFixed(3) + ')';
-    ctx.beginPath();
-    ctx.arc(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t, 2.4, 0, 6.284);
-    ctx.fill();
+    g.fillStyle = P.pulse((Math.sin(p.t * Math.PI) * .95).toFixed(3));
+    g.beginPath();
+    g.arc(a.x + (b.x - a.x) * p.t, a.y + (b.y - a.y) * p.t, 2.4, 0, 6.284);
+    g.fill();
   }
 }
 
@@ -592,11 +595,40 @@ function drawNet() {
    Batteriefehler. Pausierbar: WCAG 2.2.2.
    =========================================================================== */
 
+/* Ink on paper, and the same head inverted for inside the band. Without the
+   second target the band would slide over the hero and the head would simply
+   not be there - a hole exactly where the brand is. */
+const PAL_INK = {
+  edge: a => 'rgba(17, 107, 46, ' + a + ')',
+  halo: 'rgba(17, 107, 46, .10)',
+  node: 'rgba(18, 18, 16, .92)',
+  dot:  'rgba(17, 107, 46, .7)',
+  pulse: a => 'rgba(17, 107, 46, ' + a + ')'
+};
+const PAL_INV = {
+  edge: a => 'rgba(246, 246, 244, ' + Math.min(1, a * 1.6).toFixed(3) + ')',
+  halo: 'rgba(246, 246, 244, .12)',
+  node: 'rgba(246, 246, 244, .98)',
+  dot:  'rgba(246, 246, 244, .8)',
+  pulse: a => 'rgba(246, 246, 244, ' + a + ')'
+};
+let ctxInv = null;
+function attachInvertedHead(layer) {
+  const holder = layer.querySelector('.netwrap');
+  if (!holder) return;
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  c.setAttribute('aria-hidden', 'true');
+  holder.appendChild(c);
+  ctxInv = c.getContext('2d');
+}
+
 let netRaf = 0, netOn = false, netInView = true;
 
 function netFrame() {
   if (!netOn) return;
-  drawNet();
+  drawNet(ctx, PAL_INK);
+  if (ctxInv) drawNet(ctxInv, PAL_INV);
   netRaf = requestAnimationFrame(netFrame);
 }
 function netStart() {
@@ -665,6 +697,7 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     clone.querySelectorAll('canvas, .pause').forEach(el => el.remove());
     clone.querySelectorAll('a, button').forEach(el => el.setAttribute('tabindex', '-1'));
     shell.appendChild(clone);
+    attachInvertedHead(clone);   /* the band gets its own head, drawn inverted */
   };
 
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
@@ -769,7 +802,7 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
 /* ── pause control for the head ──────────────────────────────────────────── */
 let userPaused = false;
 const pb = $('#netPause');
-if (REDUCED) { pb.hidden = true; drawNet(); }
+if (REDUCED) { pb.hidden = true; drawNet(ctx, PAL_INK); }
 else {
   pb.addEventListener('click', () => {
     userPaused = !userPaused;
