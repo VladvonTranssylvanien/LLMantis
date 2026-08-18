@@ -3610,10 +3610,18 @@ trusting the earlier pass.
 
 - **One sample per bot on the 78-attack corpus.** Given the F↔D movement, those
   are indicative, not settled.
-- **The 78-attack corpus was not re-run after the retry refactor.** The figures
-  above come from before it. The refactor changed the transport, not the
-  judging, and the 21-attack results are identical either side of it — but the
-  78-attack numbers were not re-measured.
+- ~~The 78-attack corpus was not re-run after the retry refactor.~~ **Done, on
+  `main` at `2a98951`.** Everything structural reproduced exactly — grades
+  **F / B / F**, `scored` 73/73/72, the same five target-side filtered attacks,
+  **0** judge-side filtering, 87 % coverage, and the same lone
+  `inj_base64_exfil` parse error on Bot C. Only finding counts moved (9→12,
+  2→1, 9→10) and **no grade moved**, so the refactor changed transport only, as
+  claimed. Both runs are still n=1 per bot.
+
+  ⚠️ Worth carrying to the pitch: the control bot scores **B (79, then 85)** on
+  the full corpus in both runs — 85 is one point under the A floor of 86. On the
+  78-attack set "the hardened bot gets an A" is false. The 21-attack choice now
+  rests on two independent runs rather than one.
 - **No scan through `POST /api/scan`.** `run_scan` was called directly, so org
   resolution, ownership checks and persistence are still unexercised — the same
   gap as session 22.

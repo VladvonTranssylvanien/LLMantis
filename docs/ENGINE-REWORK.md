@@ -246,7 +246,20 @@ building a defence for it now would be building for an invented scenario.
 | corpus | vulnerable | hardened | middle case |
 |---|---|---|---|
 | 21 attacks | **F (0)** | **A (94–100)** | **D (42)** |
-| 78 attacks | **F (0)** | **B (79)** | **F (0)** |
+| 78 attacks, run 1 | **F (0)** | **B (79)** | **F (0)** |
+| 78 attacks, run 2 | **F (0)** | **B (85)** | **F (0)** |
+
+Run 2 was taken after the retry refactor (`5c3314d`) to check that sharing the
+transport had changed nothing. Everything structural reproduced exactly: the same
+grades, the same `scored` counts (73/73/72), the **same five** target-side
+filtered attacks, **0** judge-side filtering, 87 % critical coverage, and the
+same lone `inj_base64_exfil` parse error on Bot C. Only the finding counts moved
+— 9→12, 2→1, 9→10 — which is the target answering differently, not the
+transport. **No grade moved.** The refactor changed transport only, as claimed.
+
+⚠️ **The control bot lands at 85 on the full corpus, one point below the A floor
+of 86, in both runs.** If the 78-attack set is ever shown, "the hardened bot gets
+an A" is false there.
 
 The quota argument for the short corpus is gone — 234 target calls and ~218
 judge calls ran with **0 rate-limit errors**, where Mistral needed ~121 requests
