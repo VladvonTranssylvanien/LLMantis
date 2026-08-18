@@ -84,7 +84,8 @@ app.add_middleware(SlowAPIMiddleware)
 
 class ScanRequest(BaseModel):
     """What the browser sends when you press Scan."""
-    mode: str = Field(default="prompt", description="'prompt' or 'api'")
+    mode: str = Field(default="prompt",
+                      description="'model' (or its old alias 'prompt'), or 'api'")
     system_prompt: str = ""
     api_url: str = ""
     api_headers: dict = Field(default_factory=dict)
@@ -100,8 +101,9 @@ class ScanRequest(BaseModel):
     # so this cannot be used to read a file outside attacks/.
     library: str | None = None
     # Required for mode="api": whose ownership-verified domain this is.
-    # Not needed for mode="prompt" — that only tests a copy of text the
-    # caller submitted themselves, never a live third-party endpoint.
+    # Not needed for mode="model"/"prompt". That mode does now reach a live
+    # endpoint, but it is OUR endpoint, fixed in config and never supplied by
+    # the caller — so there is no third party whose permission is at stake.
     org_id: str | None = None
 
 
@@ -1005,8 +1007,11 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
         5/minute per IP — each call makes ~21 real Mistral API calls, so
         unrestricted access here is unrestricted cost, not just a DoS risk.
     """
-    if body.mode == "prompt" and not body.system_prompt.strip():
-        raise HTTPException(400, "system_prompt is required in prompt mode")
+    # "model" and its old alias "prompt" both send the system prompt to the
+    # target on every request, so both require one. Naming only "prompt" here
+    # let a mode="model" scan through with an empty prompt.
+    if body.mode in ("model", "prompt") and not body.system_prompt.strip():
+        raise HTTPException(400, f"system_prompt is required in {body.mode} mode")
     if body.mode == "api" and not body.api_url.strip():
         raise HTTPException(400, "api_url is required in api mode")
 

@@ -58,6 +58,7 @@ sys.path.insert(0, str(REPO))
 from backend import config  # noqa: E402
 from backend.attacks import load_library  # noqa: E402
 from backend.judge import deterministic_check, judge  # noqa: E402
+from backend.llm import LLMError  # noqa: E402
 
 VALID_LABELS = {"pass", "fail"}
 
@@ -188,7 +189,24 @@ async def verdict_for(item: dict, layer1_only: bool) -> dict:
 async def run(items: list[dict], layer1_only: bool) -> list[dict]:
     results = []
     for item in items:
-        got = await verdict_for(item, layer1_only)
+        try:
+            got = await verdict_for(item, layer1_only)
+        except LLMError as e:
+            # One unjudgeable item must not destroy the other 29.
+            #
+            # This is not hypothetical: with the judge on Azure, the provider's
+            # content filter rejects the judge REQUEST on some items -- the
+            # attack text and the bot's answer are the very material the filter
+            # objects to. The run used to die on the first one with a traceback.
+            #
+            # An unjudgeable item is reported as ERROR and excluded from the
+            # agreement count. It is not agreement and it is not disagreement:
+            # counting it either way would be inventing a verdict the judge
+            # never gave.
+            reason = str(e)
+            kind = "content_filter" if "content_filter" in reason else "provider_error"
+            got = {"verdict": "ERROR", "confidence": "n/a", "method": kind,
+                   "reason": reason[:300], "evidence": ""}
         results.append({**item, "judge": got})
     return results
 
@@ -324,15 +342,25 @@ def main() -> None:
         print("Layer 1 only - deterministic checks, no model, no network.")
     else:
         # Fail here with the real reason rather than 30 identical LLMErrors.
-        if config.PROVIDER not in ("mistral",):
+        #
+        # Read the real registry instead of naming providers here. This check
+        # hardcoded ("mistral",) and duly rejected PROVIDER=azure the first time
+        # the judge moved -- a guard that goes stale every time the engine
+        # changes is a guard that blocks correct runs.
+        from backend.llm import _PROVIDERS
+        if config.PROVIDER not in _PROVIDERS:
             sys.exit(
                 f"PROVIDER is '{config.PROVIDER}', which backend/llm.py does not "
-                f"register (it knows only 'mistral'). Set PROVIDER=mistral and "
-                f"MISTRAL_API_KEY in the repo root .env, or pass --layer1-only."
+                f"register. Known: {', '.join(sorted(_PROVIDERS))}. "
+                f"Set it in the repo root .env, or pass --layer1-only."
             )
-        if not config.MISTRAL_API_KEY:
-            sys.exit("PROVIDER=mistral but MISTRAL_API_KEY is empty.")
-        print(f"Judge: {config.JUDGE_MODEL} via {config.PROVIDER} (EU).")
+        missing = {
+            "mistral": not config.MISTRAL_API_KEY and "MISTRAL_API_KEY",
+            "azure": not (config.AZURE_URL and config.AZURE_KEY) and "AZURE_URL/AZURE_KEY",
+        }.get(config.PROVIDER)
+        if missing:
+            sys.exit(f"PROVIDER={config.PROVIDER} but {missing} is empty.")
+        print(f"Judge: {config.JUDGE_MODEL} via {config.PROVIDER}.")
 
     if args.runs < 1:
         sys.exit("--runs must be at least 1")

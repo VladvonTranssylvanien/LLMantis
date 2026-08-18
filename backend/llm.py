@@ -4,10 +4,15 @@ The only place in the project that talks to an AI model.
 Everything else calls chat() and gets text back. It does not know or care
 which provider is behind it. Swap providers here, nowhere else.
 
-There is no mock provider; _PROVIDERS below is the whole list. Today that list
-holds one entry, so a MISTRAL_API_KEY is required for any scan to produce a
-grade. Adding an entry is not restricted by anything: the EU-only vendor rule
-was withdrawn on 18.08 (PLAYBOOK.md §1).
+There is no mock provider; _PROVIDERS below is the whole list. It holds
+"mistral" and "azure", selected by PROVIDER in .env.
+
+This module now serves the JUDGE only. The target is a real deployment reached
+over HTTP by scanner.py and does not pass through here -- see the "model" mode
+in scanner.py. Keeping mistral registered alongside azure is deliberate: the
+recorded judge-agreement baseline (mean 94.3 %, range 26-30 of 30) was measured
+on mistral-small, and deleting the provider would make that number
+unreproducible.
 """
 
 from __future__ import annotations
@@ -15,6 +20,8 @@ from __future__ import annotations
 import asyncio
 import random
 import re
+
+import httpx
 
 from . import config
 
@@ -123,11 +130,100 @@ async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> 
 
 
 # ---------------------------------------------------------------------------
+# AZURE PROVIDER (any OpenAI-compatible chat-completions endpoint)
+# ---------------------------------------------------------------------------
+
+
+async def openai_compatible_chat(*, url: str, key: str, auth: str, model: str,
+                                 system: str, user: str, max_tokens: int,
+                                 timeout: int, what: str) -> dict:
+    """
+    POST one message to an OpenAI-compatible chat-completions endpoint.
+
+    Serves both the judge (via _azure_chat) and the target under attack (via
+    scanner._ask_target). They were near-identical copies; sharing them means
+    the RETRY_* backoff measured against real 429s protects BOTH. The target
+    path had no retry at all when it was first written, which would have handed
+    every rate-limited attack straight to ERROR -- the exact failure Vlad fixed
+    in 171b06b and the reason this backoff exists.
+
+    Returns the raw choices[0] dict, not just the text, so the caller can see
+    finish_reason. An empty answer means different things to the judge and to a
+    scan, so neither interpretation belongs in here.
+
+    Deliberately raw httpx rather than an SDK: the same code then serves Azure
+    OpenAI, Azure AI model inference and any OpenAI-compatible gateway, and the
+    full url comes from config so we are not guessing a path format.
+    """
+    headers = {"Content-Type": "application/json"}
+    if auth == "bearer":
+        headers["Authorization"] = f"Bearer {key}"
+    else:
+        headers["api-key"] = key
+
+    payload = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
+
+    last_error: Exception | None = None
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(RETRY_ATTEMPTS):
+            try:
+                response = await client.post(url, headers=headers, json=payload)
+            except httpx.RequestError as e:
+                # A transport failure is retryable; the last one propagates.
+                if attempt == RETRY_ATTEMPTS - 1:
+                    raise LLMError(f"{what} request failed: {e}") from e
+                last_error = e
+                await asyncio.sleep(_retry_delay(attempt))
+                continue
+
+            if response.status_code in RETRY_STATUSES and attempt < RETRY_ATTEMPTS - 1:
+                last_error = LLMError(f"{what} HTTP {response.status_code}")
+                await asyncio.sleep(_retry_delay(attempt, response.headers))
+                continue
+
+            if response.status_code != 200:
+                # Pass the provider's own message through. It distinguishes
+                # quota from a wrong deployment name from a content-filter
+                # block, and hiding it costs an hour of guessing.
+                raise LLMError(
+                    f"{what} HTTP {response.status_code}: {response.text[:400]}"
+                )
+
+            return response.json()["choices"][0]
+
+    raise LLMError(f"{what} unreachable after {RETRY_ATTEMPTS} attempts: {last_error}")
+
+
+async def _azure_chat(system: str, user: str, model: str, max_tokens: int) -> str:
+    """Azure AI Foundry, and anything else that speaks OpenAI chat completions."""
+    if not config.AZURE_URL or not config.AZURE_KEY:
+        raise LLMError(
+            "PROVIDER=azure but AZURE_URL or AZURE_KEY is empty in .env\n"
+            "AZURE_URL is the full chat-completions url from the deployment page."
+        )
+
+    choice = await openai_compatible_chat(
+        url=config.AZURE_URL, key=config.AZURE_KEY, auth=config.AZURE_AUTH,
+        model=model, system=system, user=user, max_tokens=max_tokens,
+        timeout=config.LLM_TIMEOUT_S, what="Azure",
+    )
+    return choice["message"].get("content") or ""
+
+
+# ---------------------------------------------------------------------------
 # PUBLIC INTERFACE
 # ---------------------------------------------------------------------------
 
 _PROVIDERS = {
     "mistral": _mistral_chat,
+    "azure": _azure_chat,
 }
 
 
