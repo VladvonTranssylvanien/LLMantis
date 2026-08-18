@@ -56,10 +56,14 @@ venv/
 #
 # The app loads brand assets only from frontend/assets/brand/. Nothing in a
 # build may reference Brand/ at all.
-Brand/Screenshot*.png
-Brand/mantis-transparent-background/
-Brand/LLMantis/
-Brand/*.zip
+#
+# This is an allowlist, not a list of patterns, because the list of patterns
+# already failed. New_Logo.png was added on 2026-08-18, matched none of
+# Screenshot* / mantis-* / LLMantis/ / *.zip, and reached the public remote
+# carrying the owner's real name in a Canva XMP block. A new filename cannot
+# outrun an allowlist; it walks straight past a list of names.
+Brand/*
+!Brand/llmantis-*.svg
 
 # tool output
 art50-results.csv
