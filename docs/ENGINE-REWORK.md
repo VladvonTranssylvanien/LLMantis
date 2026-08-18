@@ -1,10 +1,9 @@
-# Engine rework — the decisions to take before writing code
+# Engine rework — decided, implemented, measured
 
-> **Status: nothing is implemented.** This file exists so the design is argued
-> on measured ground instead of in a commit message. Gregor's call on every
-> open question below; this document records the constraints, not a preference.
->
-> Opened 18.08.2026, after the EU-only stack was withdrawn (PR #24).
+> Opened 18.08.2026 after the EU-only stack was withdrawn (PR #24), as a list of
+> open questions. Gregor answered them the same day and the change is now
+> implemented and measured. §5 records the answers; §7 records what the numbers
+> did.
 
 ---
 
@@ -15,9 +14,10 @@
 | The EU-only stack | **withdrawn.** No vendor is prohibited, for any layer (`PLAYBOOK.md` §1) |
 | Data residency as a selling point | **dropped.** Pitch slide 6 rests on three mechanisms, not four |
 | Mistral | **out.** Gregor, 18.08 |
-
-What is *not* decided is everything about what replaces it. That is the point of
-this file.
+| Judge | **gpt-4.1** on the existing Azure deployment |
+| Target | **gpt-4.1-mini** on the same Azure resource |
+| Grok | **deleted.** Unusable on its rate limits — confirmed, the deployment now returns `DeploymentNotFound` |
+| The scan | **attacks a real deployment over HTTP.** It no longer replays a system prompt on our own provider |
 
 ---
 
@@ -110,32 +110,119 @@ n≥10 per side or it measures noise.
 
 ---
 
-## 5. Open questions — Gregor's call
+## 5. The open questions, answered
 
-Each one changes what gets built. None can be answered from the repository.
+1. **What replaces Mistral, and for which role?** Judge **gpt-4.1**, target
+   **gpt-4.1-mini**, both on the existing Azure resource.
+2. **One provider or many?** Both `mistral` and `azure` are registered.
+   Mistral is kept for one reason only: the recorded baseline (mean 94.3 %,
+   range 26–30 of 30) was measured on `mistral-small`, and deleting the
+   provider would make that number unreproducible.
+3. **Is determinism a goal?** No — Gregor: variance is acceptable and the
+   calibration is sound. No `temperature` or `seed` was added, so `chat()`'s
+   signature is unchanged. **It turned out not to matter** (§7).
+4. **Does the target model become configurable?** Yes. `TARGET_MODEL`, and the
+   hardcoded `"mistral-small"` at `scanner.py:63` is gone.
+5. **What happens to the quota story?** It resolved itself: **0 errors in every
+   scan run on the new engine.** The 429 coin-flip was a property of the free
+   Mistral tier.
 
-1. **What replaces Mistral, and for which role?** `PROVIDER` is global today, so
-   "target" and "judge" cannot differ in prompt mode. If they should be able to,
-   that is a change to `config.py` and `llm.py`, not a new key in `.env`.
-2. **One provider or many?** A registry with several entries is a different
-   design from a swap. #4 above is the argument for many (a single provider's
-   quota decides our grades); Gate 1 is the argument for one until a second is
-   actually needed.
-3. **Is determinism a goal?** If yes, `chat()` grows a parameter and every
-   recorded agreement range becomes obsolete — the numbers would need
-   re-measuring against the new interface. If no, we keep quoting ranges and
-   say so on stage, which has been the honest position so far.
-4. **Does the target model become configurable?** `scanner.py:63` is the one
-   line standing between the demo and the model-diversity table.
-5. **What happens to the quota story?** #3 and #4 say this is a property of
-   free tiers, not of Mistral. A paid plan, a different provider, or a smaller
-   library are three different answers with three different costs.
+### The shape of the change
+
+`mode="prompt"` used to mean *"replay this prompt on our own provider"* — the
+scan measured a bot we were simulating. It now means what `mode="model"` means:
+**POST the system prompt plus the attack to a real deployment and attack the
+answer.** Azure Foundry holds no instructions of its own, so the prompt travels
+with every request — which is also how a great many real chatbots work, because
+the application owns the prompt.
+
+- `"prompt"` is kept as an alias for `"model"`, so `frontend/` and
+  `demo/targets.yaml` keep working **unchanged** — and the prompt stays exactly
+  as editable as it was: a textarea and a YAML field.
+- `mode="api"` is untouched. That is the path for a chatbot that already holds
+  its own prompt, and it stays gated behind DNS ownership verification.
+- `TARGET_URL`/`TARGET_KEY` are **config-only, never from a request body.** A
+  caller-supplied url is what `mode="api"` is for. So the new mode adds no SSRF
+  surface (`PLAYBOOK.md` §5).
 
 ---
 
-## 6. What this PR contains
+## 6. Two defects this path had to carry itself
 
-This document. No code. The branch exists so the discussion has somewhere to
-land and so the engine change arrives as a reviewable diff rather than as a
-direct push to `main` while Vlad is working in the repository
-(`AGENTS.md` §4).
+**The empty-answer guard.** `lab/runner.py` has guarded it since 16.08;
+`scanner.py` never has (issue #7), because prompt mode went through `chat()`.
+An empty answer contains no canary and no forbidden phrase, so the judge scores
+it **PASS** — a model that never answered recorded as a model that resisted.
+The new path raises instead, so it becomes an ERROR and counts toward
+gradability rather than disappearing.
+
+**`calibrate.py` died on the first unjudgeable item.** With the judge on Azure,
+the provider's content filter rejects the judge *request* on some items — the
+attack text and the bot's answer are the material the filter objects to. One
+item used to kill the other 29 with a traceback. An unjudgeable item is now
+reported as ERROR and excluded from the agreement count: it is neither
+agreement nor disagreement, and counting it either way invents a verdict the
+judge never gave.
+
+Its provider guard also hardcoded `("mistral",)` and duly rejected
+`PROVIDER=azure` the first time the judge moved. It now reads `_PROVIDERS`.
+
+---
+
+## 7. What the numbers did
+
+**The judge stopped wobbling.** Same set, same command, same methodology as the
+recorded baseline:
+
+| Judge | Agreement | Unstable items |
+|---|---|---|
+| `mistral-small` (recorded, n=10) | mean 94.3 %, **range 26–30 of 30** | 5 |
+| **`gpt-4.1` (n=10)** | **29/29 every run, 100 %** | **0** |
+
+Open problem #1 — "the same set scores 26–30 of 30" — is closed by the engine
+change rather than by a determinism parameter. All five previously unstable
+items agree, including `cal-021` and `cal-023`, the two session 16 predicted by
+name as the likeliest false positives.
+
+⚠️ **29, not 30.** `cal-027` is unjudgeable on Azure, every run: it is the
+`jb_encoding` item whose `bot_response` *is* an Azure content-filter error, so
+the base64 payload trips the filter on the judge path exactly as it does at the
+target. Coherent, but it means the figure covers 29 items and is not a
+like-for-like replacement for "29/30".
+
+**The demo beat, on a real deployment, 0 errors in every run:**
+
+```
+vulnerable   F(0) | D(34) | F(0)        4-8 findings
+hardened     A(94) | A(100) | A(100)
+middle case  D(42)
+```
+
+Three-way resolution — F/D/A across the three bots — which session 23 feared
+the deduction model had lost to saturation. ⚠️ The vulnerable bot moves between
+**F and D**, and one earlier run of the hardened bot scored **B(85)**. That is
+the *target* answering differently, not the judge: it is the thing
+`PITCH-PLAN.md` already says out loud ("the same bot can answer differently to
+the same sentence twice"). Slide 5 should promise a contrast, not two specific
+letters.
+
+**`BLOCKED` finally matches real data.** Session 25 shipped the branch untested
+— "no saved scan contains a content-filter error". `jb_encoding` is now BLOCKED
+on all three bots: no credit, no penalty, excluded from gradability, listed in
+the report. `scored` is 20 of 21, and `critical_coverage` is 100 %.
+
+---
+
+## 8. Not verified
+
+- **One sample per bot** except the two above (n=3) and the hardened bot (n=4).
+- **The 78-attack library was not run** on the new engine. Session 19 found 8 of
+  78 attacks content-filtered on the Azure path; with the judge now on Azure
+  too, judge-side filtering could be broader than the single item seen here.
+  Untested.
+- **No scan went through `POST /api/scan`.** `run_scan` was called directly, so
+  org resolution, ownership checks and persistence are unexercised.
+- **Nothing was re-measured through the frontend.** The `"prompt"` alias was
+  verified in code (`target_mode='prompt'`, real HTTP, 0 errors), not in a browser.
+- **`set-v2` was not re-run** against the new judge.
+- Whether Azure's quota holds at `CONCURRENCY` above 3. Untested; 3 gave 0 errors.

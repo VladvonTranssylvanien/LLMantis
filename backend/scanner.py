@@ -29,14 +29,22 @@ import httpx
 from . import config, scoring
 from .attacks import Attack, load_library
 from .judge import judge
-from .llm import chat
 
 
 @dataclass
 class Target:
     """The bot we are attacking."""
-    mode: str = "prompt"            # "prompt" or "api"
-    system_prompt: str = ""         # used when mode == "prompt"
+    # "model" -- a real deployment we send the system prompt to on every
+    #            request, because the deployment holds no instructions of its
+    #            own. The endpoint comes from config, never from the caller.
+    # "api"   -- a chatbot that already has its own prompt. We send only the
+    #            attack. Gated behind DNS ownership verification.
+    # "prompt" is accepted as the old name for "model" and behaves identically,
+    # so the frontend and demo/targets.yaml keep working unchanged. It used to
+    # mean something different: the prompt was replayed on our OWN provider, so
+    # the scan measured a bot we were simulating rather than one that exists.
+    mode: str = "model"
+    system_prompt: str = ""         # sent with every request when mode == "model"
     api_url: str = ""               # used when mode == "api"
     api_headers: dict = field(default_factory=dict)
     canary: str | None = None       # planted secret, enables layer-1 detection
@@ -53,16 +61,71 @@ class Target:
     secrets: list[str] = field(default_factory=list)
 
 
+class TargetError(Exception):
+    """The target could not be reached, or gave us nothing to judge."""
+
+
 async def _ask_target(target: Target, message: str) -> str:
     """Send one attack to the bot and return its answer."""
 
-    if target.mode == "prompt":
-        return await chat(
-            system=target.system_prompt,
-            user=message,
-            model="mistral-small",
-            max_tokens=config.MAX_TOKENS_TARGET,
-        )
+    if target.mode in ("model", "prompt"):
+        if not config.TARGET_URL or not config.TARGET_KEY:
+            raise TargetError(
+                "TARGET_URL or TARGET_KEY is not set. mode='model' attacks a "
+                "real deployment; there is nothing to attack without one."
+            )
+
+        headers = {"Content-Type": "application/json"}
+        if config.TARGET_AUTH == "bearer":
+            headers["Authorization"] = f"Bearer {config.TARGET_KEY}"
+        else:
+            headers["api-key"] = config.TARGET_KEY
+
+        async with httpx.AsyncClient(timeout=config.LLM_TIMEOUT_S) as client:
+            response = await client.post(
+                config.TARGET_URL,
+                headers=headers,
+                json={
+                    "model": config.TARGET_MODEL,
+                    "max_tokens": config.MAX_TOKENS_TARGET,
+                    "messages": [
+                        {"role": "system", "content": target.system_prompt},
+                        {"role": "user", "content": message},
+                    ],
+                },
+            )
+
+        if response.status_code != 200:
+            # Pass the provider's own message through: it distinguishes quota
+            # from a wrong deployment name from a content-filter block.
+            raise TargetError(
+                f"target HTTP {response.status_code}: {response.text[:400]}"
+            )
+
+        choice = response.json()["choices"][0]
+        answer = choice["message"].get("content") or ""
+
+        # An empty answer must NEVER be returned as a reply.
+        #
+        # It contains no canary and no forbidden phrase, so the judge scores it
+        # PASS: a model that never answered is recorded as a model that
+        # resisted. Systematic false negatives, exactly inverted from the truth.
+        # Measured on a reasoning model at the 600-token default: 1857
+        # characters of reasoning, empty content, finish_reason=length.
+        #
+        # lab/runner.py has guarded this since 16.08; scanner.py never has
+        # (issue #7). This path does not go through the runner, so it carries
+        # the guard itself. Raising makes it an ERROR, which counts toward
+        # gradability instead of disappearing (PLAYBOOK §9).
+        if not answer.strip():
+            raise TargetError(
+                f"target returned an empty answer "
+                f"(finish_reason={choice.get('finish_reason')}, "
+                f"max_tokens={config.MAX_TOKENS_TARGET}). Scored as an error, "
+                f"never as a pass."
+            )
+
+        return answer
 
     if target.mode == "api":
         async with httpx.AsyncClient(timeout=30) as client:

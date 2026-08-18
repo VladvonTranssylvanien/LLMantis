@@ -20,25 +20,54 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 
-# --- Which LLM we talk to ------------------------------------------------
-# "mistral" is the only value llm.py currently registers. Needs MISTRAL_API_KEY.
-# That is what is wired up today, not a constraint: there is no vendor
-# restriction on this project any more (PLAYBOOK.md §1, withdrawn 18.08).
+# --- Which LLM the JUDGE talks to ----------------------------------------
+# This selects the provider for judge calls only. The target is no longer
+# reached through here at all -- see "The target deployment" below.
 #
 # "mock" was removed from _PROVIDERS during the Mistral migration but stayed
 # the default here, so a scan run by anyone following SETUP.md returned
 # 21 errors out of 21 and no grade - under HTTP 200, which is why neither a
 # status code nor a grep showed it.
-PROVIDER = os.getenv("PROVIDER", "mistral").lower()
+PROVIDER = os.getenv("PROVIDER", "azure").lower()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 
+# Azure AI Foundry / any OpenAI-compatible chat-completions endpoint.
+# AZURE_URL is the FULL url, taken verbatim from the deployment page, because
+# Azure OpenAI and Azure AI model inference use different paths and different
+# auth headers -- assembling it from resource + deployment + api-version means
+# guessing which one this resource speaks. Measured 16.08: this resource serves
+# both APIs and accepts both auth styles.
+AZURE_URL = os.getenv("AZURE_URL", "")
+AZURE_KEY = os.getenv("AZURE_KEY", "")
+AZURE_AUTH = os.getenv("AZURE_AUTH", "api-key").lower()   # "api-key" | "bearer"
 
 
 # The model that judges whether an answer was a security failure.
 # It processes customer system prompts, which are trade secrets -- that governs
 # retention and who may read them, and no longer restricts which vendor runs it.
-JUDGE_MODEL = os.getenv("JUDGE_MODEL", "mistral-small")
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4.1")
+
+
+# --- The target deployment (mode="model") --------------------------------
+# The bot under attack is a REAL deployment reached over HTTP, not a system
+# prompt replayed on our own provider. Azure AI Foundry holds no instructions
+# of its own, so the scan sends the system prompt with every request. That is
+# also how a great many real chatbots work: the application owns the prompt.
+#
+# The URL and key come from configuration and NEVER from a request body. A
+# caller-supplied target url is what mode="api" is for, and that path is gated
+# behind DNS ownership verification. Keeping this one config-only means the new
+# mode adds no SSRF surface (PLAYBOOK §5: never attack a url without proof).
+TARGET_URL = os.getenv("TARGET_URL", "")
+TARGET_KEY = os.getenv("TARGET_KEY", "")
+TARGET_MODEL = os.getenv("TARGET_MODEL", "gpt-4.1-mini")
+TARGET_AUTH = os.getenv("TARGET_AUTH", "api-key").lower()  # "api-key" | "bearer"
+
+# Was hardcoded to "mistral-small" at scanner.py:63 with no env var, unlike
+# JUDGE_MODEL -- so the demo could not test another model without editing
+# backend code, and the model-diversity table came from a path the demo never
+# used (GREGOR_WORKLOG.md, problem #5).
 
 
 # --- Scan behaviour ------------------------------------------------------
@@ -63,6 +92,12 @@ CONCURRENCY = int(os.getenv("CONCURRENCY", "3"))
 # Caps on response length, so one runaway answer cannot cost us 10 EUR.
 MAX_TOKENS_TARGET = 600
 MAX_TOKENS_JUDGE = 400
+
+# How long one model call may take. Measured: gpt-4.1 and gpt-4.1-mini answer a
+# short prompt in ~0.9 s, but Kimi-K2.5 took 31.8 s on a reasoning-heavy one,
+# which is over the 30 s that mode="api" allows. Configurable so a slow model
+# does not silently become an ERROR and drag the error rate up.
+LLM_TIMEOUT_S = int(os.getenv("LLM_TIMEOUT_S", "60"))
 
 
 # --- Where things live ---------------------------------------------------
