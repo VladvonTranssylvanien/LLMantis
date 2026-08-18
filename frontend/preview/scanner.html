@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About the LLMantis checker — LLMantis</title>
+<link rel="icon" href="../assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="../assets/brand/favicon-32.png" sizes="32x32">
+<style>
+/* ---- primitives lifted from assets/base.css (tokens stripped) ---- */
+/* ===========================================================================
+   LLMantis — shared foundation
+   ---------------------------------------------------------------------------
+   Fonts, tokens and primitives for all three pages. Served from our own
+   origin: no CDN, no Google Fonts, no external request of any kind.
+   PLAYBOOK.md §3 is the source of truth for every value here.
+   =========================================================================== */
+
+/* --------------------------------------------------------------- typefaces */
+/* Self-hosted. `font-display: swap` so text paints immediately in the
+   fallback and reflows once the file lands, rather than blocking on it. */
+@font-face {
+  font-family: 'Inter';
+  src: url('../assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;          /* one variable file covers the whole ramp */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------- dark tokens */
+
+
+/* ------------------------------------------------- light tokens: the paper */
+/* The Prüfbericht is the one printed surface. Every value below is measured
+   against #FFFFFF and against the #F6F7F8 wash, and clears WCAG AA (4.5:1)
+   for small text — the report is read, not glanced at. */
+
+
+/* ------------------------------------------------------------- primitives */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
+.mono { font-family: var(--mono); }
+
+/* One visible focus style everywhere. Never remove it without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+[data-surface='paper'] :focus-visible { outline-color: var(--accent-on-light); }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine), var(--glass-lift);
+}
+/* Without this a browser with no backdrop-filter paints a see-through panel
+   and the text behind shows through the text on top. Opaque is safe failure. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--glass-fallback); }
+}
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-decoration: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 18px;
+  display: inline-block;
+  transition: filter .2s var(--ease), transform .2s var(--ease);
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+
+/* Screen-reader-only, for labels that must exist but not be seen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* PLAYBOOK §3 makes this mandatory on every page. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root{
+  --bg:#F7F8F5;            /* warm off-white                                   */
+  --bg-2:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#EEF6E9;
+  --border:#E3E6DF;
+  --text:#111827;          /* 16.6:1                                           */
+  --muted:#5A6660;         /*  5.6:1  AA                                       */
+
+  /* One value has to serve two roles: green text on the page, and a button
+     fill carrying a white label. #256B10 is 6.18:1 as text on --bg and 6.6:1
+     the other way round, so both clear AA and there is no second green. */
+  --accent:#256B10;
+  --on-accent:#FFFFFF;
+  --accent-on-light:#1F5C0E;   /* 7.6:1 — headings, the grade A/B colour       */
+
+  --critical:#A3200F;      /*  7.1:1 */
+  --high:#B45309;          /*  4.7:1 */
+  --medium:#7A5200;        /*  6.5:1 */
+  --low:#27548F;
+  --info:#5A6660;
+
+  /* #7BE33F is 1.5:1 on white. It survives only as a large decorative shape,
+     never as text, an icon, or a border on its own. */
+  --brand-lite:#7BE33F;
+
+  --grid-line:rgba(17,24,39,.045);
+  --bloom-warm:rgba(123,227,63,.16);
+  --bloom-cool:rgba(31,92,14,.05);
+
+  /* Chrome that overlays scrolling content keeps the material; on a light
+     ground the inset shine reads as a smudge, so it is dropped. */
+  --glass-bg:rgba(247,248,245,.86);
+  --glass-border:#E3E6DF;
+  --glass-shine:none;
+  --glass-lift:0 8px 24px -14px rgba(17,24,39,.18);
+  --glass-fallback:#FFFFFF;
+
+  --ring:rgba(37,107,16,.30);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --r:12px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:var(--sans)}
+
+/* The printed sheet is its own surface. base.css defines these under
+   [data-surface='paper'] — dropping the shared stylesheet dropped them with it,
+   and an undefined custom property resolves to nothing rather than to a
+   fallback: .printbar lost its background and kept its white text. */
+[data-surface='paper']{
+  --paper:#FFFFFF;
+  --wash:#F6F7F8;
+  --ink:#111827;          /* 16.6:1 on --bg, 17.7:1 on white */
+  --ink-soft:#5A6660;     /*  5.6:1 */
+  --rule:#E3E6DF;
+  --accent-on-light:#1F5C0E;  /* 8.09:1 on white — base.css had #357C11 at 5.19 */
+  --critical:#A3200F;
+  --high:#B45309;
+  --medium:#7A5200;
+  --low:#27548F;
+  --on-accent:#FFFFFF;
+  --ring:rgba(31,92,14,.30);
+}
+
+/* STEP 9 — neither page carried this. The prompt named only report.html;
+   index.html was missing it too. */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+
+<style>
+/* ===========================================================================
+   LLMantis — the page our User-Agent points to, light preview. Nothing is
+   scanned here: this is what a site owner reads after seeing us in a log.
+   Foundation lifted verbatim from preview/index.html.
+   =========================================================================== */
+/* ===========================================================================
+   LLMantis — scan app. Tokens and typefaces live in assets/base.css.
+   No colour literal here; everything resolves to a token.
+   =========================================================================== */
+
+body {
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(1000px 700px at 8% -10%, var(--bloom-warm), transparent 62%),
+    radial-gradient(900px 800px at 100% 4%, var(--bloom-cool), transparent 62%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+  background-attachment: fixed;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ header */
+.topbar {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  border-width: 0 0 1px 0;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand img { width: 26px; height: 26px; display: block; }
+.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+.brand .name .ll { color: var(--accent); }
+
+.nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.nav a.link {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 7px 11px; border-radius: 7px;
+  transition: color .2s var(--ease), background .2s var(--ease);
+}
+.nav a.link:hover { color: var(--text); background: var(--surface-2); }
+.nav a.link[aria-current="page"] { color: var(--accent); background: var(--surface-2); }
+.nav .btn { margin-left: 8px; }
+
+.menu-btn {
+  display: none; margin-left: auto; background: transparent; border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 8px 11px; cursor: pointer; font: inherit;
+}
+@media (max-width: 760px) {
+  .menu-btn { display: block; }
+  .nav {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    padding: 10px clamp(16px, 4vw, 40px) 16px;
+    background: var(--glass-fallback); border-bottom: 1px solid var(--border);
+  }
+  .nav.open { display: flex; }
+  .nav .btn { margin: 8px 0 0; text-align: center; }
+}
+
+
+/* ------------------------------------------------------------------ layout */
+.wrap { max-width: 700px; margin: 0 auto;
+  padding: clamp(26px, 5vw, 48px) clamp(16px, 4vw, 40px) 110px; }
+h1 { font-size: clamp(22px, 4vw, 30px); letter-spacing: -.02em; margin: 0 0 6px; }
+.lede { color: var(--muted); margin: 0 0 32px; }
+h2 { font-size: 16px; margin: 30px 0 10px; }
+p { margin: 0 0 14px; }
+code { font-family: var(--mono); font-size: 13px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; }
+.panel { background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: clamp(16px, 3vw, 22px); margin: 20px 0; }
+.panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); margin: 0 0 10px; }
+ul { margin: 0 0 14px; padding-left: 20px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+footer.site { border-top: 1px solid var(--border); padding: 20px clamp(16px, 4vw, 40px); }
+footer.site .in { max-width: 940px; margin: 0 auto; display: flex; gap: 18px;
+  flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 12.5px; }
+footer.site a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="topbar glass">
+  <a class="brand" href="landing.html">
+    <img src="../assets/brand/mark-ink.svg" alt="" width="26" height="26">
+    <span class="name"><span class="ll">LL</span>Mantis</span>
+  </a>
+</header>
+<div class="wrap">
+  <h1>You've been visited by the LLMantis checker</h1>
+  <p class="lede">
+    This page is what our User-Agent string points to. If a request from
+    <code>LLMantis-Checker/1.0</code> showed up in your server logs, here's
+    exactly what happened and why.
+  </p>
+
+  <h2>What we did</h2>
+  <p>
+    We sent a single HTTP GET request to a public page on your site — the
+    same request an ordinary visitor's browser makes when they open the
+    page. We looked at the HTML for two things:
+  </p>
+  <ul>
+    <li>Is there a chat widget (a known vendor script — Intercom, Tidio,
+      Crisp, and similar)?</li>
+    <li>If so, does the page text disclose that it's an AI, as required by
+      <a href="https://artificialintelligenceact.eu/article/50/" rel="noopener">
+      Art. 50(1) of the EU AI Act</a> (in force since 2 August 2026)?</li>
+  </ul>
+
+  <div class="panel">
+    <h3>What we did not do</h3>
+    <ul>
+      <li>We never opened your chat widget or sent it a message.</li>
+      <li>We never attempted to log in, bypass authentication, or access
+        anything not already public.</li>
+      <li>We didn't store your page content — only whether a widget exists
+        and whether it discloses being AI.</li>
+    </ul>
+  </div>
+
+  <h2>Who we are</h2>
+  <p>
+    LLMantis tests whether AI chatbots disclose that they're AI and, for
+    consenting customers, runs documented security attacks against them.
+    This particular check — the free layer — is passive by design: no
+    permission is required because it's equivalent to a normal page visit.
+  </p>
+
+  <h2>How to opt out</h2>
+  <p>
+    We honour <code>robots.txt</code>. If you'd rather we didn't visit,
+    add a rule disallowing <code>LLMantis-Checker</code> and we won't
+    fetch your pages again. If you have any other concern, write to us —
+    a human reads every message:
+    <a href="mailto:kontakt@llmantis.de">kontakt@llmantis.de</a>.
+  </p>
+</div>
+<footer class="site">
+  <div class="in">
+    <span>© 2026 LLMantis</span>
+    <a href="../impressum.html" lang="de">Impressum</a>
+    <a href="../datenschutz.html" lang="de">Datenschutzerklärung</a>
+  </div>
+</footer>
+
+</body>
+</html>
