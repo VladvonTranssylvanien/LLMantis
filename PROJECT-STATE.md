@@ -156,39 +156,52 @@ that next) and the 21→75 attack library.
 | Sites checked for the hypothesis | 0 of 24 | 🔴 blocks the pitch |
 | Attacks in the library | 78 (`attacks.yaml`) · 21 (`attacks_short.yaml`, the demo default) | ✅ |
 | Test bots | 3 of 3 | ✅ `demo/targets.yaml` — TeleShop unprotected, TeleShop hardened, Praxis Dr. Weber. Mirrors `lab/bots/` byte for byte |
-| Calibration set | 30 of 30, all hand-labelled | ✅ `calibration/set-v1.yaml` |
-| Judge agreement with human labels | **26/30 to 30/30 over 10 runs** (mean 94.3 %, median 29) | ✅ measured 17.08 — see the caveat below |
-| — of which the deterministic layer | **9/9 in all 5 runs, 0 disagreements** | ✅ the number that carries the grade |
+| Calibration set | 30 of 30, all hand-labelled (v1) · 43 of 43 (v2) | ✅ `calibration/set-v1.yaml`, `set-v2.yaml` |
+| Judge agreement with human labels | **29/29, identical in all 10 runs** | ✅ measured 18.08 on the current engine |
+| — of which the deterministic layer | **11/11, 0 disagreements, every run** | ✅ the number that carries the grade |
 | Paid reports per month (**north star**) | 0 | — |
 
-⚠️ **The agreement number is a range, not a reading.** Ten runs of the same
-30-item set against the same judge gave 29, 30, 26, 29, 29, 29, 28, 29, 27, 27.
-Quoting "97 %" from a single run would be quoting one sample of a distribution.
-Reproduce with `python calibration/calibrate.py --runs 10 --show-disagreements`.
+### ⚠️ The engine changed on 18.08 — read this before quoting any number
 
-🔴 **STALE as of `cae96e9` (18.08, "finetuned judging").** These numbers were
-measured against the judge as it was BEFORE that commit. It changed the FAIL
-criteria in two ways that both bear directly on the disagreements — it added
-the six new criteria, and it told the judge that stating its own persona is
-not a disclosure, which is the exact principle `cal-021` and `cal-026` kept
-tripping on.
+**Mistral is out.** The judge now runs on **gpt-4.1** and the target on
+**gpt-4.1-mini**, both on Azure, and a scan attacks a **real deployment over
+HTTP** instead of replaying a system prompt on our own provider. See
+`docs/ENGINE-REWORK.md` and `GREGOR_WORKLOG.md` sessions 30–32.
 
-**Re-run before quoting anything here:** `python calibration/calibrate.py --runs 10`.
-For reference, an intermediate version of that judge measured 90.7 % (median
-27) against v1 — but that version is not what shipped. See `GREGOR_WORKLOG.md`
-sessions 27 and 29.
+Every figure in this section is measured on that engine. Reproduce with:
 
-Two things are stable across all five runs and are what should be said out
-loud:
+```bash
+python calibration/calibrate.py --runs 10
+```
+
+**The judge stopped wobbling, and that is the headline change:**
+
+| Judge | Agreement | Unstable items |
+|---|---|---|
+| `mistral-small` (superseded, n=10) | mean 94.3 %, range **26–30 of 30** | 5 |
+| **`gpt-4.1` (current, n=10)** | **29/29 every run** | **0** |
+
+All five items that used to disagree now agree, including `cal-021` and
+`cal-023`, which session 16 predicted by name as the likeliest false positives.
+
+⚠️ **29, not 30, and it is not a like-for-like replacement for "29/30".**
+`cal-027` is unjudgeable on Azure every run: it is the `jb_encoding` item whose
+`bot_response` *is* an Azure content-filter error, so the base64 payload trips
+the filter on the judge path exactly as it does at the target. The figure covers
+29 items; say so if asked.
+
+Two things to say out loud, both stronger than a percentage:
 
 * **The deterministic layer agreed with a human on every item it can see, in
-  every run — 9/9, zero disagreements.** Only a `confirmed` finding may drive
-  a grade to F (`PLAYBOOK.md:466`), so the worst grade we issue is the part
-  that does not wobble.
-* **Every disagreement is on a borderline item, and almost all are false
-  positives** (0–3 per run; one run had a single false negative). Five items
-  disagreed at least once — `cal-021`, `cal-023`, `cal-024`, `cal-026`,
-  `cal-028` — and none disagreed in every run.
+  every run — 11/11 on v1, 13/13 on v2, zero disagreements.** Only a `confirmed`
+  finding may drive a grade to F (`PLAYBOOK.md:466`), so the worst grade we issue
+  is the part that does not wobble, on either engine.
+* **The remaining variance is the bot, not the judge.** The vulnerable bot moves
+  **F↔D** between runs and the hardened control has been seen once at B(85) in
+  four runs, with zero errors throughout. That is the same target answering
+  differently to the same sentence — which is the product's own argument, and it
+  is already in the Q&A. **Slide 5 should promise a contrast, not two specific
+  letters.**
 
 ---
 
