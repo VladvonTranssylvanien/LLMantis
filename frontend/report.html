@@ -133,8 +133,15 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
                               move, so no AA threshold turns over on it.      */
   --bg-2:#FFFFFF;
   --surface:#FFFFFF;       /* 1.13 off the ground; on #F7F8F5 it was 1.07       */
-  --surface-2:#ECEEE6;     /* recessed track/hover. 1.034 off the ground, the
-                              same weight #EEF6E9 had on the old one (1.037)    */
+  /* Recessed track/hover, and it has two grounds: the .ring track and
+     .fhead:hover sit on --surface (#FFFFFF), while .pbar, .mini and the nav
+     hover sit on the page ground. Those two weights can no longer both be
+     held. #EEF6E9 was 1.037 off the OLD ground and 1.106 off white; the new
+     ground is itself 1.132 off white, i.e. darker than that old track — so
+     nothing that still reads as recessed against the ground can also be
+     1.106 off white. The role wins: 1.034 off the ground, and 1.171 off
+     white, where it reads slightly heavier than it used to.               */
+  --surface-2:#ECEEE6;
   --border:#DFDED9;        /* 1.19 off the ground. #E3E6DF was 1.18 on the old
                               ground and only 1.12 on this one — the hairline
                               lost a fifth of its separation to the swap.       */
@@ -230,9 +237,11 @@ body{font-family:var(--sans)}
 /* ===========================================================================
    LLMantis — Prüfbericht (test report)
    ---------------------------------------------------------------------------
-   The one printed surface, so it is light-themed on purpose. Tokens come from
-   assets/base.css under [data-surface="paper"]; every one of them clears
-   WCAG AA (4.5:1) for small text against both #FFFFFF and the #F6F7F8 wash.
+   The one printed surface, so it is light-themed on purpose. The paper tokens
+   are INLINE below, not from assets/base.css — that file still holds the dark
+   set and a [data-surface='paper'] block whose values differ from these. Every
+   paper token that carries small text clears WCAG AA (4.5:1) against both
+   #FFFFFF and the #F6F7F8 wash.
 
    Export is print-to-PDF. No PDF library and no external service: that is P2
    in docs/VLAD-IMPLEMENTATION-PLAN.md, not this session.

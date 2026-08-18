@@ -126,26 +126,47 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 > much as a compliance manager, the Prüfbericht was always a light document, and
 > one theme across landing + app + report is less to carry.
 >
-> **State right now:** built and awaiting team review in `frontend/preview/` on
-> branch `design/light-preview` (see `frontend/preview/REVIEW.md`). The live pages
-> and `assets/base.css` are still dark until the swap commit. The dark tokens
-> below are therefore still *accurate* — they are not still *intended*.
+> **State right now:** shipped. `frontend/preview/` and its `REVIEW.md` are gone —
+> the preview pages were swapped into the live ones, so there is nothing left to
+> review separately. `assets/base.css` is still dark, and is now loaded by exactly
+> one page, `art50check.html`, which belongs to Vlad. That is the one dark seam
+> left in the product.
 >
-> **Light tokens — every ratio computed, not estimated.** Against `--bg #F7F8F5`:
+> The app first shipped light on its own palette (`#F7F8F5 / #111827 / #256B10`)
+> while the landing shipped on another. Both differences turned out to be hue and
+> not weight — the two greens measure 1.007:1 apart and the two grounds 1.062:1 —
+> so the landing's won, and the app followed it.
+>
+> **Light tokens — every ratio computed, not estimated.** Against `--bg #F2F1EB`:
 >
 > ```css
-> --bg:#F7F8F5;        --surface:#FFFFFF;     --line:#E3E6DF;
-> --ink:#111827;       /* 16.64:1 */          --ink-muted:#5A6660;  /* 5.62:1 */
-> --brand:#1F5C0E;     /*  7.59:1 — green text and icons                        */
-> --accent:#256B10;    /*  6.18:1 as text, 6.58:1 under a white label — one
->                          value serves both roles, so there is no second green */
-> --brand-lite:#7BE33F;/*  1.53:1 — LARGE DECORATIVE SHAPES ONLY. Never text,
->                          never an icon, never a border on its own.            */
-> --critical:#A3200F;  /* 7.11 */  --high:#B45309; /* 4.71 */  --medium:#7A5200; /* 6.49 */
+> --bg:#F2F1EB;        --surface:#FFFFFF;     --line:#DFDED9;
+> --ink:#121210;       /* 16.57:1 */          --ink-muted:#5A6660;  /* 5.30:1 */
+> --accent:#116B2E;    /*  5.86:1 as text, 6.63:1 under a white label — one
+>                          value serves both roles, so there is no second green.
+>                          It is also the green on the printed sheet, and the
+>                          literal inside seal.svg and mark-ink.svg, which an
+>                          <img>-loaded SVG cannot read from a token.          */
+> --brand-lite:#7BE33F;/*  1.44:1 here, 1.63:1 on white — LARGE DECORATIVE
+>                          SHAPES ONLY. Never text, never an icon, never a
+>                          border on its own. Nothing references it today.    */
+> --critical:#A3200F;  /* 6.70 */  --high:#B45309; /* 4.44 */  --medium:#7A5200; /* 6.12 */
 > ```
 >
-> `#3E8F14` is **removed** — 3.83:1 on `--bg`, 4.08:1 on white, fails AA. It is a
-> live defect in `report.html` today, not a style preference.
+> `--high` at 4.44 is below AA on this ground and is deliberately kept: it is
+> never small text there. As a grade it is 34px, as a severity label it sits on
+> `--surface` at 5.02:1, and its one use on the ground is a 1px border, where the
+> threshold is 3:1.
+>
+> **Two grounds, not one.** `--surface` is `#FFFFFF` and did not move in the swap.
+> Before deciding a colour lost contrast, read the ancestor chain: `.capped`,
+> the `.ring` track and `.fhead:hover` all sit on white, not on `--bg`.
+>
+> `#3E8F14` is **removed** — 3.61:1 on `--bg`, 4.08:1 on white, fails AA both ways.
+> It survives only in `lockup-light.svg`, which no page references.
+>
+> `#1F5C0E` is **retired** — it was the second, darker green on the printed sheet.
+> It survives only in `lockup.svg`, likewise unreferenced.
 >
 > Accent budget is unchanged: the green is roughly **5 % of the pixels**. A light
 > page flooded with green looks like an eco brand, not a security tool.

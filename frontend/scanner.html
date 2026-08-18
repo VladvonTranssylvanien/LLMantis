@@ -134,8 +134,15 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
                               move, so no AA threshold turns over on it.      */
   --bg-2:#FFFFFF;
   --surface:#FFFFFF;       /* 1.13 off the ground; on #F7F8F5 it was 1.07       */
-  --surface-2:#ECEEE6;     /* recessed track/hover. 1.034 off the ground, the
-                              same weight #EEF6E9 had on the old one (1.037)    */
+  /* Recessed track/hover, and it has two grounds: the .ring track and
+     .fhead:hover sit on --surface (#FFFFFF), while .pbar, .mini and the nav
+     hover sit on the page ground. Those two weights can no longer both be
+     held. #EEF6E9 was 1.037 off the OLD ground and 1.106 off white; the new
+     ground is itself 1.132 off white, i.e. darker than that old track — so
+     nothing that still reads as recessed against the ground can also be
+     1.106 off white. The role wins: 1.034 off the ground, and 1.171 off
+     white, where it reads slightly heavier than it used to.               */
+  --surface-2:#ECEEE6;
   --border:#DFDED9;        /* 1.19 off the ground. #E3E6DF was 1.18 on the old
                               ground and only 1.12 on this one — the hairline
                               lost a fifth of its separation to the swap.       */
@@ -224,8 +231,12 @@ body{font-family:var(--sans)}
    Foundation lifted verbatim from preview/index.html.
    =========================================================================== */
 /* ===========================================================================
-   LLMantis — scan app. Tokens and typefaces live in assets/base.css.
-   No colour literal here; everything resolves to a token.
+   LLMantis — scan app. Both sentences that used to be here were wrong, so
+   they say the true thing now: the tokens and @font-face rules are INLINE in
+   this file (assets/base.css is the dark stylesheet, and only art50check.html
+   still loads it), and there ARE colour literals below — the status washes,
+   which are severity tints rather than palette values. Everything else
+   resolves to a token.
    =========================================================================== */
 
 body {
