@@ -93,8 +93,57 @@ input:focus-visible {
 .err { color: var(--critical); font-size: 13px; }
 
 /* ------------------------------------------------------------------ result */
-#result { display: none; }
-#result.on { display: block; }
+#result, #progress { display: none; }
+#result.on, #progress.on { display: block; }
+
+/* ------------------------------------------------------------- live progress */
+/* The twelve methods are shown as they run, not summarised afterwards. Watching
+   the list fill in is what a 90-second wait needs to not feel broken — and it is
+   also the evidence: the caller sees every method being tried. */
+.p-line { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.p-line b { color: var(--text); font-weight: 500; }
+.p-grid { display: grid; gap: 6px; }
+.p-probe {
+  display: grid; grid-template-columns: 18px 1fr auto; gap: 10px;
+  align-items: baseline; font-size: 13px; padding: 5px 0;
+  border-top: 1px solid var(--border);
+}
+.p-probe .mark { font-family: var(--mono); }
+.p-probe.hit .mark { color: var(--accent); }
+.p-probe.miss { color: var(--muted); }
+.p-probe.ctx .mark { color: var(--medium); font-style: italic; }
+.p-probe .detail {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.p-probe .conf { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* --------------------------------------------------------------- the verdict */
+.v-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 4px 11px; border-radius: 999px;
+  margin-bottom: 14px;
+}
+.v-badge.ok   { color: var(--accent);   background: rgba(123, 227, 63, .1); }
+.v-badge.bad  { color: var(--critical); background: rgba(255, 107, 107, .1); }
+.v-badge.warn { color: var(--medium);   background: rgba(255, 193, 7, .1); }
+.v-badge.none { color: var(--muted);    background: var(--surface-2); }
+.v-reason { font-size: 14.5px; margin: 0 0 16px; }
+.q-label { display: block; color: var(--muted); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.v-quote {
+  font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap;
+  background: var(--bg); border-left: 3px solid var(--border);
+  border-radius: 0 6px 6px 0; padding: 10px 14px; margin: 0 0 16px;
+}
+.v-meta { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px;
+  font-size: 13px; margin-bottom: 8px; }
+.v-meta dt { color: var(--muted); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .04em; }
+.v-meta dd { margin: 0; overflow-wrap: anywhere; }
+#rShot, .w-shot { display: block; width: 100%; border: 1px solid var(--border);
+  border-radius: 8px; margin: 8px 0 18px; }
+.w-shot { border-color: var(--accent); }
 .r-url {
   font-family: var(--mono); font-size: 12.5px; color: var(--muted);
   word-break: break-all; margin-bottom: 16px;
@@ -154,9 +203,18 @@ footer.site .sp { margin-left: auto; }
   <div>
     <h1>Art. 50 disclosure check</h1>
     <p class="lede">
-      One request to your public page. Does a chat widget exist, and does it
-      say it is AI? <b>We never send your bot a message</b> — this only reads
-      the page, the same way an ordinary visitor's browser would.
+      We open your site in a real browser and run <b>twelve detection methods</b>
+      on every page we visit — your entry page, your own
+      <span lang="de">Hilfe</span> and Kontakt pages, on desktop and on mobile.
+      Nothing is skipped once something is found, because a result that says
+      <i>no widget</i> is only worth the list of things that were tried.
+    </p>
+    <p class="lede">
+      When we find your chat button we <b>open it once and read what your
+      assistant says first</b> — that greeting is exactly what Art. 50(1) is
+      about, and it is not on the button. One click, the same as any visitor.
+      <b>We never type anything and never send your bot a message.</b>
+      Takes 30–150 seconds; you can watch each method run.
     </p>
   </div>
 
@@ -171,14 +229,22 @@ footer.site .sp { margin-left: auto; }
     </form>
   </div>
 
+  <div class="panel" id="progress" role="status" aria-live="polite">
+    <div class="r-url" id="pUrl"></div>
+    <div class="p-line" id="pPage">Starting…</div>
+    <div id="pProbes" class="p-grid"></div>
+  </div>
+
   <div class="panel" id="result" role="status" aria-live="polite">
     <div class="r-url" id="rUrl"></div>
     <div id="rBody"></div>
+    <img id="rShot" alt="" hidden>
     <div class="cta-row">
       <a class="btn" href="/">Run the full test on your own prompt</a>
       <span style="color:var(--muted);font-size:13px">
-        This check is passive. The full 21-attack scan requires
-        <span lang="de">Eigentumsnachweis</span> before it touches a live bot.
+        This check opens your chat once and reads it. Driving 21 documented
+        attacks at your assistant is a different thing and requires
+        <span lang="de">Eigentumsnachweis</span>.
       </span>
     </div>
   </div>
@@ -197,10 +263,11 @@ footer.site .sp { margin-left: auto; }
 <script>
 'use strict';
 
-const CHECK_LABELS = {
-  ai_disclosure: 'Discloses it is AI (Art. 50 Abs. 1)',
-  privacy_link:  'Privacy policy link',
-  impressum:     'Impressum (§ 5 DDG)',
+const VERDICT = {
+  disclosed:        ['ok',   'Discloses AI'],
+  not_disclosed:    ['bad',  'No disclosure'],
+  not_determinable: ['warn', 'Not determinable'],
+  no_widget_found:  ['none', 'No widget found'],
 };
 
 function escHtml(s) {
@@ -208,24 +275,125 @@ function escHtml(s) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
+const $ = id => document.getElementById(id);
 
-const menuBtn = document.getElementById('menuBtn');
-const nav = document.getElementById('nav');
+const menuBtn = $('menuBtn'), nav = $('nav');
 menuBtn.addEventListener('click', () => {
-  const open = nav.classList.toggle('open');
-  menuBtn.setAttribute('aria-expanded', String(open));
+  menuBtn.setAttribute('aria-expanded', String(nav.classList.toggle('open')));
 });
 
-const form = document.getElementById('checkForm');
-const runBtn = document.getElementById('run');
-const errEl = document.getElementById('error');
-const result = document.getElementById('result');
-const rUrl = document.getElementById('rUrl');
-const rBody = document.getElementById('rBody');
+const form = $('checkForm'), runBtn = $('run'), errEl = $('error');
+const progress = $('progress'), result = $('result');
+
+/* One row per probe, keyed by name so a probe that fires on page 7 updates the
+   row it already has instead of appending a duplicate. Twelve rows, always. */
+const rows = new Map();
+
+/* Per-probe state, because the sweep visits up to 18 pages and each probe
+   reports on every one of them.
+
+   Two rules, and the second was a bug worth remembering. A probe that fired
+   anywhere stays fired — a later page finding nothing does not undo an earlier
+   hit. But the DETAIL has to stay pinned to the event that justified the tick:
+   rendering the latest event's text produced rows reading "✓ fixed_launcher —
+   no pinned elements found at all", a tick contradicted by its own evidence, in
+   the one product whose entire pitch is honest measurement. */
+function probeRow(ev) {
+  let st = rows.get(ev.name);
+  if (!st) {
+    const row = document.createElement('div');
+    $('pProbes').appendChild(row);
+    st = { row, hit: false, detail: '' };
+    rows.set(ev.name, st);
+  }
+  if (ev.fired) {
+    st.hit = true;
+    if (ev.detail) st.detail = ev.detail;        // keep the finding, not the miss
+  } else if (!st.hit) {
+    st.detail = ev.detail || '';                 // a miss may explain why
+  }
+  /* consent_gate is context, never a finding. A cookie banner is not good news
+     and a green tick beside it reads as one — it is the reason a widget may not
+     have loaded at all, which belongs in the report as a caveat. */
+  const isContext = ev.name === 'consent_gate';
+  st.row.className = 'p-probe ' + (isContext ? 'ctx' : (st.hit ? 'hit' : 'miss'));
+  st.row.innerHTML =
+    '<span class="mark">' + (isContext ? (st.hit ? 'i' : '·') : (st.hit ? '✓' : '·')) + '</span>' +
+    '<span><b>' + escHtml(ev.name) + '</b> — ' + escHtml(ev.description || '') + '</span>' +
+    '<span class="detail" title="' + escHtml(st.detail) + '">' +
+    escHtml(st.detail) + '</span>';
+}
+
+function renderResult(rep) {
+  const [cls, label] = VERDICT[rep.verdict] || ['none', rep.verdict];
+  const fired = (rep.probes_fired || []).filter(n => n !== 'consent_gate');
+  let h = '<span class="v-badge ' + cls + '">' + escHtml(label) + '</span>';
+  h += '<p class="v-reason">' + escHtml(rep.reason) + '</p>';
+
+  if (rep.evidence) {
+    h += '<dt class="q-label">The words we judged on</dt>' +
+         '<div class="v-quote">' + escHtml(rep.evidence) + '</div>';
+  } else if (rep.launcher_label) {
+    h += '<dt class="q-label">What your chat button says</dt>' +
+         '<div class="v-quote">' + escHtml(rep.launcher_label) + '</div>';
+  } else if (rep.launcher_technical) {
+    h += '<dt class="q-label">Your chat button</dt>' +
+         '<p class="r-empty">carries no text a person can read — we found it by ' +
+         'its markup (<code>' + escHtml(rep.launcher_technical) + '</code>), which ' +
+         'is enough to locate it and not enough to judge it.</p>';
+  }
+
+  h += '<dl class="v-meta">' +
+    '<dt>Methods run</dt><dd>' + (rep.probes_attempted ?? 0) +
+      ' — ' + fired.length + ' found something' +
+      (fired.length ? ': <code>' + fired.map(escHtml).join('</code>, <code>') + '</code>' : '') +
+    '</dd>' +
+    '<dt>Pages checked</dt><dd>' + (rep.pages_tried || []).length +
+      ' (' + [...new Set((rep.pages_tried || []).map(p => p.viewport))].join(', ') + ')</dd>' +
+    '<dt>robots.txt</dt><dd>' + escHtml(rep.robots) +
+      ' — recorded, not enforced</dd>' +
+    '<dt>Your chat</dt><dd>' + (rep.opened_widget
+      ? 'opened once and read — we typed nothing'
+      : 'not opened') + '</dd>' +
+    '<dt>Took</dt><dd>' + escHtml(rep.duration_s) + ' s</dd>' +
+    '</dl>';
+
+  if (rep.first_message) {
+    h += '<dt class="q-label">What your assistant said first' +
+         (rep.greeting_source ? ' — read from the ' + escHtml(rep.greeting_source) +
+          ' the click opened' : '') + '</dt>' +
+         '<div class="v-quote">' + escHtml(rep.first_message.slice(0, 900)) + '</div>';
+    if (rep.widget_shot_b64) {
+      h += '<dt class="q-label">Your chat, open, at the moment we read it</dt>' +
+           '<img class="w-shot" alt="Your chat widget open on ' + escHtml(rep.url) +
+           '" src="data:image/png;base64,' + rep.widget_shot_b64 + '">';
+    }
+  }
+  if (rep.impersonation) {
+    h += '<p class="r-empty"><b>It introduces itself as a person</b> — ' +
+         escHtml(rep.impersonation) + '. That is the opposite of disclosure, and ' +
+         'harder to defend than saying nothing at all.</p>';
+  }
+  if (rep.verdict === 'not_determinable' && fired.length && !rep.opened_widget) {
+    h += '<p class="r-empty">We found your assistant but could not open it, so ' +
+         'nothing is claimed about what it says. A widget behind a cookie wall or ' +
+         'a login will do this.</p>';
+  }
+  $('rBody').innerHTML = h;
+
+  const shot = $('rShot');
+  if (rep.screenshot_b64) {
+    shot.src = 'data:image/png;base64,' + rep.screenshot_b64;
+    shot.alt = 'Screenshot of ' + rep.url;
+    shot.hidden = false;
+  } else { shot.hidden = true; }
+
+  result.classList.add('on');
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const url = document.getElementById('url').value.trim();
+  const url = $('url').value.trim();
   if (!url) return;
 
   errEl.textContent = '';
@@ -233,6 +401,11 @@ form.addEventListener('submit', async (e) => {
   const label = runBtn.textContent;
   runBtn.textContent = 'Checking…';
   result.classList.remove('on');
+  rows.clear();
+  $('pProbes').innerHTML = '';
+  $('pUrl').textContent = url;
+  $('pPage').textContent = 'Starting…';
+  progress.classList.add('on');
 
   try {
     const res = await fetch('/api/art50check', {
@@ -240,38 +413,51 @@ form.addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_url: url }),
     });
-    const data = await res.json();
 
     if (!res.ok) {
-      errEl.textContent = data.detail || 'Check failed.';
+      let detail = 'Check failed.';
+      try { detail = (await res.json()).detail || detail; } catch (_) {}
+      errEl.textContent = detail;
+      progress.classList.remove('on');
       return;
     }
-    if (data.status === 'error') {
-      errEl.textContent = 'Could not reach the page: ' + data.error;
-      return;
+
+    /* NDJSON: one JSON object per line, so the page moves while the browser
+       works. A 90-second blocking request reads as a broken page. */
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', pages = 0, done = false;
+
+    while (!done) {
+      const { value, done: finished } = await reader.read();
+      if (finished) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
+
+        if (ev.type === 'start') {
+          $('pPage').innerHTML = '<b>' + ev.probes +
+            '</b> detection methods, every page, both form factors…';
+        } else if (ev.type === 'page') {
+          pages++;
+          $('pPage').innerHTML = 'Page <b>' + pages + '</b> [' +
+            escHtml(ev.viewport) + '] — ' + escHtml(ev.url);
+        } else if (ev.type === 'probe') {
+          probeRow(ev);
+        } else if (ev.type === 'error') {
+          errEl.textContent = ev.message;
+          done = true;
+        } else if (ev.type === 'done') {
+          renderResult(ev.report);
+          $('pPage').innerHTML = 'Finished — <b>' + pages +
+            '</b> page(s) checked with every method.';
+          done = true;
+        }
+      }
     }
-
-    rUrl.textContent = data.url;
-
-    if (!data.widgets_found) {
-      rBody.innerHTML = '<p class="r-empty">No chat widget found on this page. ' +
-        'Widgets loaded dynamically via JavaScript are not detected by this ' +
-        'simple check — no widget found is not proof none exists.</p>';
-    } else {
-      rBody.innerHTML = data.findings
-        .filter(f => f.check !== 'widget_found')
-        .map(f => {
-          const pass = f.status === 'pass';
-          return '<div class="r-check">' +
-            '<div><div class="label">' + escHtml(CHECK_LABELS[f.check] || f.check) + '</div>' +
-            '<div class="evidence">' + escHtml(f.evidence) + '</div></div>' +
-            '<div class="r-status ' + (pass ? 'pass' : 'fail') + '">' +
-            (pass ? 'OK' : 'Missing') + '</div>' +
-            '</div>';
-        }).join('');
-    }
-
-    result.classList.add('on');
   } catch (err) {
     errEl.textContent = 'Check failed: ' + String(err);
   } finally {
