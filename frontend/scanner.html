@@ -125,44 +125,61 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
 }
 
 :root{
-  --bg:#F7F8F5;            /* warm off-white                                   */
+  /* This block is copied verbatim into index/scanner/report/impressum/
+     datenschutz.html. That duplication is why the app and the landing drifted
+     into two palettes in the first place: a colour changed in one file only.
+     Change it in all five, and keep them byte-identical. */
+  --bg:#F2F1EB;            /* the landing's ground. The app's own was #F7F8F5,
+                              1.06 away — the swap is a hue move, not a weight
+                              move, so no AA threshold turns over on it.      */
   --bg-2:#FFFFFF;
-  --surface:#FFFFFF;
-  --surface-2:#EEF6E9;
-  --border:#E3E6DF;
-  --text:#111827;          /* 16.6:1                                           */
-  --muted:#5A6660;         /*  5.6:1  AA                                       */
+  --surface:#FFFFFF;       /* 1.13 off the ground; on #F7F8F5 it was 1.07       */
+  --surface-2:#ECEEE6;     /* recessed track/hover. 1.034 off the ground, the
+                              same weight #EEF6E9 had on the old one (1.037)    */
+  --border:#DFDED9;        /* 1.19 off the ground. #E3E6DF was 1.18 on the old
+                              ground and only 1.12 on this one — the hairline
+                              lost a fifth of its separation to the swap.       */
+  --text:#121210;          /* 16.57:1                                          */
+  --muted:#5A6660;         /*  5.30:1  AA. The landing's #706E63 measures 4.53
+                              here — 0.03 above the threshold, for no gain.    */
 
   /* One value has to serve two roles: green text on the page, and a button
-     fill carrying a white label. #256B10 is 6.18:1 as text on --bg and 6.6:1
+     fill carrying a white label. #116B2E is 5.86:1 as text on --bg and 6.63:1
      the other way round, so both clear AA and there is no second green. */
-  --accent:#256B10;
+  --accent:#116B2E;
   --on-accent:#FFFFFF;
-  --accent-on-light:#1F5C0E;   /* 7.6:1 — headings, the grade A/B colour       */
+  --accent-on-light:#116B2E;   /* the same green. See the paper block below.    */
 
-  --critical:#A3200F;      /*  7.1:1 */
-  --high:#B45309;          /*  4.7:1 */
-  --medium:#7A5200;        /*  6.5:1 */
-  --low:#27548F;
+  --critical:#A3200F;      /*  6.70:1 */
+  --high:#B45309;          /*  4.44:1 on the ground — but it is never small
+                              text there: as a grade it is 34px, as a severity
+                              it sits on --surface (5.02:1), and its one use on
+                              the ground is a 1px border, where 3:1 applies. */
+  --medium:#7A5200;        /*  6.12:1 */
+  --low:#27548F;           /*  6.75:1 */
   --info:#5A6660;
 
   /* #7BE33F is 1.5:1 on white. It survives only as a large decorative shape,
-     never as text, an icon, or a border on its own. */
+     never as text, an icon, or a border on its own — and since the warm bloom
+     went orange nothing references it. Kept as the dark theme's brand green. */
   --brand-lite:#7BE33F;
 
-  --grid-line:rgba(17,24,39,.045);
-  --bloom-warm:rgba(123,227,63,.16);
-  --bloom-cool:rgba(31,92,14,.05);
+  --grid-line:rgba(18,18,16,.045);
+  /* The warm bloom was #7BE33F at .16, which blends to #DFEFCF — a cold lime
+     patch on a warm ground. It is now the landing's one warm note, #FF720D,
+     at the alpha that reproduces the old bloom's weight (1.06 off the ground). */
+  --bloom-warm:rgba(255,114,13,.067);
+  --bloom-cool:rgba(17,107,46,.05);
 
   /* Chrome that overlays scrolling content keeps the material; on a light
      ground the inset shine reads as a smudge, so it is dropped. */
-  --glass-bg:rgba(247,248,245,.86);
-  --glass-border:#E3E6DF;
+  --glass-bg:rgba(242,241,235,.86);
+  --glass-border:#DFDED9;
   --glass-shine:none;
-  --glass-lift:0 8px 24px -14px rgba(17,24,39,.18);
+  --glass-lift:0 8px 24px -14px rgba(18,18,16,.18);
   --glass-fallback:#FFFFFF;
 
-  --ring:rgba(37,107,16,.30);
+  --ring:rgba(17,107,46,.30);
   --ease:cubic-bezier(0.16,1,0.3,1);
   --r:12px;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -178,16 +195,19 @@ body{font-family:var(--sans)}
 [data-surface='paper']{
   --paper:#FFFFFF;
   --wash:#F6F7F8;
-  --ink:#111827;          /* 16.6:1 on --bg, 17.7:1 on white */
-  --ink-soft:#5A6660;     /*  5.6:1 */
+  --ink:#121210;          /* 16.57:1 on --bg, 18.75:1 on white */
+  --ink-soft:#5A6660;     /*  5.99:1 on white */
   --rule:#E3E6DF;
-  --accent-on-light:#1F5C0E;  /* 8.09:1 on white — base.css had #357C11 at 5.19 */
+  --accent-on-light:#116B2E;  /* 6.63:1 on white, 6.18:1 on the wash. Was
+                                 #1F5C0E at 8.09 — a second green, one hue
+                                 step off the screen one and visible when the
+                                 report opens out of the app. */
   --critical:#A3200F;
   --high:#B45309;
   --medium:#7A5200;
   --low:#27548F;
   --on-accent:#FFFFFF;
-  --ring:rgba(31,92,14,.30);
+  --ring:rgba(17,107,46,.30);
 }
 
 /* STEP 9 — neither page carried this. The prompt named only report.html;

@@ -1,9 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="LLMantis mark">
   <title>LLMantis mark</title>
-  <!-- Same geometry as mark.svg. Only the DEFAULT ink differs: #1F5C0E is
-       8.09:1 on white, where mark.svg's #7BE33F is 1.63:1. An <img>-loaded SVG
-       cannot inherit colour from the page, so a light surface needs its own file. -->
-  <g fill="currentColor" color="#1F5C0E">
+  <!-- Same geometry as mark.svg. Only the DEFAULT ink differs: #116B2E is
+       6.63:1 on white and 5.86:1 on the #F2F1EB ground, where mark.svg's
+       #7BE33F is 1.63:1. An <img>-loaded SVG cannot inherit colour from the
+       page, so a light surface needs its own file. That also means the token
+       named "accent" does not reach this green: it is edited here, by hand.
+       (No double hyphen anywhere in this comment: XML forbids it, and one
+       here made the whole file unparseable, so every page showed a broken
+       image icon instead of the mark.) -->
+  <g fill="currentColor" color="#116B2E">
     <!-- head silhouette with knocked-out compound eyes -->
     <path fill-rule="evenodd" d="
       M 50 29
