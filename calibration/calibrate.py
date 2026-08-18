@@ -24,11 +24,11 @@ WHY THIS REPLAYS THE REAL JUDGE
     A calibration harness with its own copy of the logic would measure the
     copy, and would keep agreeing with itself after the product changed.
 
-THE JUDGE RUNS ON MISTRAL, NEVER ON AZURE
-    PLAYBOOK.md section 1 and GREGOR-TARGET-LAB.md:158: the judge sees customer
-    system prompts, which are trade secrets, so it must run on an EU provider.
-    The lab targets may live on Azure; the judge may not. This script does not
-    read any LAB_AZURE_* variable, by design.
+THE JUDGE IS WHATEVER PROVIDER NAMES; THE LAB TARGETS ARE SEPARATE
+    This script does not read any LAB_AZURE_* variable, by design. Not for
+    residency reasons -- that rule was withdrawn on 18.08 -- but because the
+    number is only reproducible if the judge under test is the one the product
+    ships, configured in one place.
 
 USAGE
     python calibration/calibrate.py calibration/set-v1.yaml
@@ -126,13 +126,22 @@ def load_set(path: Path) -> list[dict]:
         # turn into false negatives, dragging the headline number down for a
         # reason that has nothing to do with the judge. Fail loudly instead.
         if item.get("kind") == "clean_fail":
-            _, canary, _secrets = bot_context(item["bot_file"])
-            if canary.lower() not in str(item["bot_response"]).lower():
+            _, canary, secrets = bot_context(item["bot_file"])
+            answer = str(item["bot_response"]).lower()
+            # A clean_fail is one layer 1 can PROVE, and since 10f0521 that is
+            # not only the canary: a declared secret from the bot's own YAML is
+            # checked the same way. cal-043 is exactly that case - Bot C
+            # reproduced its whole rules block and disclosed "Elternzeit"
+            # without ever printing the billing code, so a canary-only guard
+            # rejected a genuinely deterministic failure.
+            proofs = [canary, *(secrets or [])]
+            if not any(p and p.lower() in answer for p in proofs):
                 sys.exit(
-                    f"{where}: kind is clean_fail but the answer does not "
-                    f"contain the current canary of {item['bot_file']}. The "
-                    f"canary was probably rotated after this set was cut - "
-                    f"re-harvest with lab/harness/harvest.py and cut a new set."
+                    f"{where}: kind is clean_fail but the answer contains "
+                    f"neither the current canary of {item['bot_file']} nor any "
+                    f"of its declared secrets. Either was rotated after this "
+                    f"set was cut - re-harvest with lab/harness/harvest.py and "
+                    f"cut a new set - or the item is not a clean_fail."
                 )
 
     return items
@@ -246,6 +255,51 @@ def report(results: list[dict], show_disagreements: bool) -> int:
     return 0
 
 
+def stability(runs: list[list[dict]]) -> None:
+    """Report the spread across repeated runs, and which items are unstable.
+
+    WHY THIS EXISTS
+        The judge is not deterministic. Two runs of this set minutes apart gave
+        29/30 and 28/30 - and not on the same items: the first disagreed on
+        cal-023 alone, the second on cal-021 and cal-028, with cal-023
+        agreeing. A single reading is one sample of a distribution, and
+        "our judge agrees 97 % of the time" is a claim about the distribution.
+
+        Same lesson the model matrix learned (lab/harness/matrix.py): a cell
+        from one run is a coin flip wearing a number. It costs 22 judge calls
+        to find out, and the alternative is finding out on stage.
+    """
+    scores = []
+    disagreed: dict[str, int] = {}
+    for results in runs:
+        scored = [r for r in results if r["judge"]["verdict"] in ("PASS", "FAIL")]
+        agree = [r for r in scored if r["judge"]["verdict"].lower() == r["human_label"]]
+        scores.append((len(agree), len(scored)))
+        for r in scored:
+            if r["judge"]["verdict"].lower() != r["human_label"]:
+                disagreed[r["id"]] = disagreed.get(r["id"], 0) + 1
+
+    n = len(runs)
+    best = max(s for s, _ in scores)
+    worst = min(s for s, _ in scores)
+    total = scores[0][1]
+    print("\n" + "=" * 72)
+    print(f"STABILITY over {n} runs")
+    print("=" * 72)
+    print("  per run:  " + "  ".join(f"{s}/{t}" for s, t in scores))
+    if best == worst:
+        print(f"  range:    {worst}/{total} every time - stable at this n")
+    else:
+        print(f"  range:    {worst}/{total} to {best}/{total}  "
+              f"<- report the range, not one reading")
+    print(f"\n  items that disagreed at least once ({len(disagreed)}):")
+    for item_id, count in sorted(disagreed.items(), key=lambda kv: (-kv[1], kv[0])):
+        kind = "every run" if count == n else f"{count} of {n} runs"
+        print(f"    {item_id}  {kind}")
+    if not disagreed:
+        print("    none")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("set_file", type=Path, nargs="?",
@@ -254,6 +308,10 @@ def main() -> None:
                     help="run the deterministic layer only; no provider needed")
     ap.add_argument("--show-disagreements", action="store_true",
                     help="print every item the judge and the human disagreed on")
+    ap.add_argument("--runs", type=int, default=1,
+                    help="repeat the whole set N times and report the spread. "
+                         "The judge is not deterministic; one reading is a "
+                         "sample, not the number.")
     args = ap.parse_args()
 
     if not args.set_file.is_file():
@@ -276,8 +334,30 @@ def main() -> None:
             sys.exit("PROVIDER=mistral but MISTRAL_API_KEY is empty.")
         print(f"Judge: {config.JUDGE_MODEL} via {config.PROVIDER} (EU).")
 
-    results = asyncio.run(run(items, args.layer1_only))
-    sys.exit(report(results, args.show_disagreements))
+    if args.runs < 1:
+        sys.exit("--runs must be at least 1")
+
+    # One asyncio.run for ALL runs, not one per run. The Mistral client keeps a
+    # connection pool bound to the loop that created it, so a second
+    # asyncio.run() dies with "RuntimeError: Event loop is closed" partway
+    # through the second pass. Found by running it.
+    async def run_all() -> list[list[dict]]:
+        return [await run(items, args.layer1_only) for _ in range(args.runs)]
+
+    all_runs = asyncio.run(run_all())
+
+    exit_code = 0
+    for i, results in enumerate(all_runs, start=1):
+        if args.runs > 1:
+            print(f"\n----- run {i} of {args.runs} " + "-" * 45)
+        # Report every run, not just the last: a reader who sees only a summary
+        # cannot tell a stable 28 from a 27/29 that averaged to 28.
+        exit_code |= report(results, args.show_disagreements)
+
+    if args.runs > 1:
+        stability(all_runs)
+
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

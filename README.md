@@ -51,14 +51,13 @@ Germany that is a § 5 UWG problem, not a wording preference. See `PLAYBOOK.md`.
 
 _Last verified against the running code: 16.08.2026._
 
-**Working today, verified against live bots and real Mistral scans:**
+**Working today, verified against live bots and real scans:**
 
 - Two attack corpora across the 5 OWASP LLM categories: `attacks_short.yaml`
   (21, v1.4) is what a scan runs by default, `attacks.yaml` (78, v2.0) is
   available per request. They are not interchangeable — see
   `ATTACK_LIBRARY` in `.env.example` for why
-- Two-layer judging (deterministic string match, then AI judge) — **judge runs
-  on Mistral (France), not a US provider.** See `PLAYBOOK.md` §1
+- Two-layer judging (deterministic string match, then AI judge)
 - Canary auto-detection - finds the bot's secret without being told
 - Severity-weighted scoring with a critical-failure grade cap
 - Web UI with live progress, grade, expandable findings and fixes, PDF export
@@ -79,8 +78,8 @@ _Last verified against the running code: 16.08.2026._
   org-scoped endpoint (organizations, API keys, branding, ownership,
   scan history) requires membership in that org. The free, no-signup scan
   path (`mode="prompt"`, no `org_id`) is untouched — see "Authentication" below
-- Mistral is the only provider. There is no mock or offline mode: a
-  MISTRAL_API_KEY is required before any scan produces a grade
+- Mistral is the only provider registered today. There is no mock or offline
+  mode: a MISTRAL_API_KEY is required before any scan produces a grade
 
 **Not built yet:**
 

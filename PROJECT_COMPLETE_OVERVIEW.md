@@ -70,7 +70,7 @@
 │                                                 │
 │  2. judge.py: Two-layer verdict                 │
 │     - Layer 1: Deterministic (canary leak)      │
-│     - Layer 2: AI judge (Claude/Mistral)        │
+│     - Layer 2: AI judge (whatever PROVIDER is)  │
 │     - Returns: verdict + confidence + evidence  │
 │                                                 │
 │  3. scoring.py: Risk calculation                │
@@ -83,7 +83,7 @@
 │     - Validates: IDs unique, categories valid   │
 │                                                 │
 │  5. llm.py: Provider abstraction                │
-│     - Mistral (France, EU) - the only one       │
+│     - Mistral - the only one registered today   │
 │     - No mock mode: it was removed with the     │
 │       Anthropic code during the migration       │
 └─────────────────────────────────────────────────┘
@@ -210,7 +210,7 @@ sets means renaming them, see the Mistral quota note in PROJECT-STATE.md #12
 | **Migrations** | Alembic 1.13.1 | ✅ |
 | **DB Driver** | psycopg 3.3.4 | ✅ |
 | **Config** | python-dotenv 1.2.2 | ✅ |
-| **LLM Provider** | mistralai 2.9.3 | ✅ EU-only, no US vendor in the stack |
+| **LLM Provider** | mistralai 2.9.3 | ✅ the only provider registered today |
 | **HTTP Client** | httpx 0.28.1 | ✅ |
 | **Data Format** | YAML 6.0.2 | ✅ |
 | **HTML Parsing** | BeautifulSoup4 4.15.0 | ✅ (for art50check) |
@@ -224,12 +224,12 @@ sets means renaming them, see the Mistral quota note in PROJECT-STATE.md #12
 
 ### 🔴 CRITICAL (Before First Customer)
 
-1. ✅ **DONE 16.08 — the judge runs on Mistral.**
+1. ✅ **DONE 16.08 — the judge runs on Mistral.** ⚠️ **Rationale withdrawn 18.08.**
    - `anthropic` is gone from `requirements.txt` and `_PROVIDERS` holds only
-     `mistral`. No US vendor is in the stack.
-   - Kept here because this section is what a reader checks first, and an
-     open "we use a US provider" item in a public repository says the
-     opposite of what the product is sold on.
+     `mistral`. That is still an accurate description of the code.
+   - What changed is why: this was tech debt #1 because a US vendor was
+     forbidden. That rule is gone (`PLAYBOOK.md` §1), so this is no longer a
+     compliance item — it is just a note about which provider is wired up.
 
 2. **Database not integrated into endpoints**
    - Problem: Models exist, tables created, but `/api/scan` doesn't save results
@@ -445,9 +445,11 @@ comes back ERROR under an HTTP 200.
 
 ## KEY PRINCIPLES (From PLAYBOOK)
 
-1. **EU-Only Stack** (INVARIANT)
-   - All tools must be EU-based or self-hosted
-   - No US cloud (CLOUD Act risk for trade secrets)
+1. ~~**EU-Only Stack**~~ — **withdrawn 18.08** (`PLAYBOOK.md` §1)
+   - No vendor prohibition applies to this project any more, and data
+     residency is not a selling point
+   - Customer system prompts are still trade secrets: that governs retention,
+     logging and access, not which vendor processes them
 
 2. **Black-Box Only**
    - Never read source code

@@ -122,7 +122,7 @@ and slide 6 fills it exactly.
 
 ### 6. Why the verdict is defensible (2:00)
 
-This is the slide the jury is actually grading. Four mechanisms, each stated as
+This is the slide the jury is actually grading. Three mechanisms, each stated as
 a rule we can be held to:
 
 1. **A canary makes the worst finding deterministic.** We plant a unique string
@@ -134,9 +134,6 @@ a rule we can be held to:
    report — an unproven claim in a paid report is § 5 UWG again.
 3. **Three confidence levels**, and the judge may never award itself
    `confirmed`. It was caught doing exactly that during integration and capped.
-4. **The judge runs on Mistral, in France.** It reads customer system prompts,
-   which are trade secrets. A US provider under the CLOUD Act would contradict
-   the thing we are selling.
 
 Then the number that closes the Q&A before it opens: **judge agreement with
 human labels on the 30-item calibration set** — see Part 2, item T0-2. Say the
@@ -185,7 +182,7 @@ an omission.
 
 | # | Task | Why it breaks the pitch | Owner | Est. |
 |---|---|---|---|---|
-| **T0-1** | **Run `calibration/calibrate.py` and record the number.** The set is ready: 30 items, **all 30 human-labelled** (18 pass / 12 fail). `PROJECT-STATE.md` still says "0 of 30 🔴" — the document is behind the repo | Slide 6 ends on this number, and *"what if the judge is wrong?"* is the sharpest question in Q&A. One command turns a reassurance into a measurement. **Highest value per minute in this whole plan.** If `confirmed` disagreements are not zero, we have a real defect and four days to find out | Gregor / Vlad | 30 min |
+✅| **T0-1** | **Run `calibration/calibrate.py` and record the number.** The set is ready: 30 items, **all 30 human-labelled** (18 pass / 12 fail). `PROJECT-STATE.md` still says "0 of 30 🔴" — the document is behind the repo | Slide 6 ends on this number, and *"what if the judge is wrong?"* is the sharpest question in Q&A. One command turns a reassurance into a measurement. **Highest value per minute in this whole plan.** If `confirmed` disagreements are not zero, we have a real defect and four days to find out | Gregor / Vlad | 30 min |
 | **T0-2** | **Art.-50-Check against the 24 German sites.** Currently **0 of 24** | Slide 7's strongest sentence does not exist. And 0 of 24 is not a market finding — it is far more likely a broken checker, exactly as it turned out to be in CodeArgus. Either outcome must be known before the stage, not discovered on it | Bogdan | 2–3 h |
 ✅| **T0-3** | **Decide the scoring dilution (tech debt #15).** A bot with three confirmed critical leaks scores 80 | A juror asks *"what does 80 mean?"* and we have no answer. Minimum viable resolution: demo on the 21-attack set (contrast 48 points) **and** a prepared sentence about what we measured. Changing the formula four days out is the riskier option — decide, do not drift | Team, Bogdan has the numbers | 1 h decision |
 | **T0-4** | **Full demo rehearsal, end to end, on the presentation machine.** Both bots, both scans, the report page, with a stopwatch | Every failure this project has had came from testing pieces and not the assembly — the image was fine, Caddy was fine, and the first full stack start still failed on `container_name`. A demo is an assembly | Bogdan | 1 h |
@@ -231,7 +228,7 @@ has a measurement or a mechanism behind it.
 | *"What if the judge is wrong?"* | We measured it: N of 30 agreement on a human-labelled set, with false positives counted separately because inventing a vulnerability is worse than missing one. And the worst grade we issue can only come from a deterministic string match, never from the model's opinion |
 | *"Is this a certificate?"* | No, and it legally cannot be — certificates come from notified bodies, high-risk only. We issue a Prüfbericht: evidence of diligence. Anyone selling you an "AI Act certificate" for a chatbot is selling you a § 5 UWG problem |
 | *"Can an AI judge another AI?"* | For the finding that matters most, no AI is involved: a planted canary string either appears in the answer or it does not. The model only handles the softer categories, capped at `likely`, and never without a quote |
-| *"Where does our data go?"* | Mistral, France. The judge reads system prompts, which are trade secrets — a US provider under the CLOUD Act would contradict what we sell |
+| *"Where does our data go?"* | The judge reads system prompts, which are trade secrets, so what we can be held to is how they are handled: retention, who may read them, and the "delete after scan" option. We make no claim about which country the model runs in — the EU-only stack was dropped on 18.08 |
 | *"How is this different from a normal pentest?"* | A normal pentest attacks code. The attack surface here is language: the exploit is a sentence, and the same bot can answer differently to the same sentence twice. That is why it needs a library and a judge, not a scanner |
 | *"What if my bot passes everything?"* | Then you have exactly what you are buying — a dated, reproducible Prüfbericht saying so, with the library version stamped on it. That is the deliverable, not the vulnerability |
 | *"Why pay if the check is free?"* | The free check reads your page and asks whether you disclosed the bot. The paid one asks what the bot does when someone actually tries |

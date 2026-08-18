@@ -647,6 +647,8 @@ footer a:hover{color:var(--accent)}
   <section id="team">
     <p class="label rv"><b>06</b> <i>/</i> Team</p>
     <h2 class="rv">Vier Leute, klare Zuständigkeiten.</h2>
+    <p class="sub rv">Wir prüfen zuerst unseren eigenen Bot und veröffentlichen,
+      was dabei herauskommt — auch dann, wenn das Ergebnis unbequem ist.</p>
     <div class="team">
       <div class="who rv"><b>Bogdan</b><span>Projektstruktur, Planung, Engine, Gestaltung</span></div>
       <div class="who rv"><b>Vlad</b><span>Engine, API, Datenhaltung</span></div>
@@ -1140,6 +1142,21 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
   const at = q => track.getBoundingClientRect().top + scrollY
                 + q * (track.offsetHeight - innerHeight);
   const PANE_AT = { verfahren: 0, problem: W_END };
+  /* A hash can arrive three ways and the overlay is only one of them: another
+     page links here with #problem, and a bookmark opens with it already in the
+     URL. Binding the menu alone left both of those landing on Verfahren - a
+     guard on one path is not a guard. */
+  const goPane = key => {
+    if (!(key in PANE_AT)) return false;
+    scrollTo({ top: at(PANE_AT[key]), behavior: 'smooth' });
+    return true;
+  };
+  addEventListener('hashchange', () => goPane(location.hash.slice(1)));
+  if (location.hash) {
+    /* after layout, or the track has no height to measure yet */
+    addEventListener('load', () => setTimeout(() => goPane(location.hash.slice(1)), 60),
+                     { once: true });
+  }
   document.querySelectorAll('.overlay a[href^="#"]').forEach(link => {
     const key = link.getAttribute('href').slice(1);
     if (!(key in PANE_AT)) return;

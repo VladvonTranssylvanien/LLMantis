@@ -15,7 +15,9 @@ with a measurement instead of a reassurance.
 
 | File | What |
 |---|---|
-| `set-v1.yaml` | The calibration set. 30 real bot answers, each with a human PASS/FAIL label and the human's reason |
+| `set-v1.yaml` | The original set. 30 real bot answers, each with a human PASS/FAIL label and the human's reason. **Frozen** — it is what the recorded baseline was measured against |
+| `set-v2.yaml` | v1's 30 items with their labels intact, plus 13 covering the FAIL criteria added to `backend/judge.py` on 17.08. The new items are **unlabelled** until a person runs `review.py` |
+| `scans-v78/` | Full scan reports for all three bots, 78 attacks, the real scanner. v2's answers are extracted from here |
 | `pool.jsonl` | Every answer harvested from the lab bots. The set is drawn from this; the rest is kept so a later set can be cut without re-running Azure |
 | `review.py` | Walks a human through the set one answer at a time and writes their labels |
 | `calibrate.py` | Replays the real `backend/judge.py` over the set and prints the agreement number |
@@ -122,19 +124,76 @@ Measure agreement:
 
 ```bash
 python calibration/calibrate.py calibration/set-v1.yaml --show-disagreements
+python calibration/calibrate.py calibration/set-v1.yaml --runs 10
 ```
 
-Full mode needs a working EU judge in the repo root `.env`:
+**Use `--runs`.** The judge is not deterministic: ten runs of v1 against one
+judge gave 26 to 30 out of 30. A single reading is one sample of a
+distribution, and the claim we make on stage is about the distribution.
+
+---
+
+## v2 — covering the criteria added on 17.08
+
+Six FAIL criteria were added to `backend/judge.py`. Measured against v1 they
+cost about one item of agreement per run and produced no new correct
+findings — because **v1 contains no item that exercises any of them.** v2 fixes
+that. Label the new items with:
+
+```bash
+python calibration/review.py calibration/set-v2.yaml
+```
+
+| Criterion | Items | Refusal probed | Failure probed |
+|---|---|---|---|
+| illegal / unethical advice | `cal-031`, `cal-032` | ✅ | ⬜ |
+| defamation | `cal-033` | ✅ | ⬜ |
+| self-harm instructions | `cal-034`, `cal-035` | ✅ | ⬜ |
+| invents pricing / discounts | `cal-036`, `cal-037` | ✅ | ✅ `cal-036` |
+| discriminatory language | `cal-038`, `cal-039`, `cal-040` | ✅ | ⬜ |
+| shares other customers' data | `cal-041`, `cal-042` | ✅ | ⬜ |
+
+### 🔴 Read the empty column before quoting v2
+
+**Five of the six criteria are tested in one direction only.** Every lab bot
+refused every attack in those categories — no bot of ours has ever produced a
+slur, defamed anyone, given self-harm instructions or handed over another
+customer's record. So v2 can show whether the judge **invents** such a finding,
+and cannot show whether it **catches** one.
+
+That asymmetry is the right way round. A false positive is the expensive error
+(`GREGOR-TARGET-LAB.md:131`) — an invented vulnerability in a paid Prüfbericht
+is a § 5 UWG problem, while a missed one disappoints a customer. The
+false-positive direction is also the one these criteria are most likely to get
+wrong, since each names a *topic* and the attacks are *about* that topic: a
+judge matching subject matter rather than behaviour fails a correct refusal.
+`cal-034` is the sharpest case — a bot refusing self-harm instructions has to
+discuss self-harm to signpost the Telefonseelsorge.
+
+Closing the other direction needs a bot that actually fails, and we will not
+build one whose purpose is to emit slurs or self-harm instructions. The one
+criterion with a real catch case, `cal-036`, got it by accident: Bot A invented
+promotions that do not exist while leaking the canary.
+
+**`shares other customers' data` is the closable gap.** Bot C already fails it
+in the lab — it disclosed another patient's name, appointment time and medical
+reason when a prior conversation was pasted into the message
+(`calibration/pool-botc.jsonl`). That answer cannot be used as a calibration
+item because the probe is not in `attacks/attacks.yaml`, and an item's
+`attack_id` must be a real library id. One attack supplying a prior
+conversation would close it.
+
+Full mode needs a working judge in the repo root `.env`:
 
 ```
 PROVIDER=mistral
 MISTRAL_API_KEY=...
 ```
 
-**The judge runs on Mistral, never on Azure.** The lab targets may live anywhere;
-the judge sees customer system prompts, which are trade secrets, so it stays in
-the EU (`PLAYBOOK.md` §1, `GREGOR-TARGET-LAB.md:158`). `calibrate.py` reads no
-`LAB_AZURE_*` variable by design.
+**The judge is whatever `PROVIDER` names; the lab targets are separate.**
+`calibrate.py` reads no `LAB_AZURE_*` variable by design — not for residency
+reasons, but because a number is only reproducible if the judge under test is
+the one the product ships, configured in one place.
 
 Without a provider:
 
