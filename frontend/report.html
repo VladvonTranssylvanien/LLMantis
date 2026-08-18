@@ -5,7 +5,207 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prüfbericht — LLMantis</title>
 <link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/assets/base.css">
+<style>
+/* ---- primitives lifted from assets/base.css (tokens stripped) ---- */
+/* ===========================================================================
+   LLMantis — shared foundation
+   ---------------------------------------------------------------------------
+   Fonts, tokens and primitives for all three pages. Served from our own
+   origin: no CDN, no Google Fonts, no external request of any kind.
+   PLAYBOOK.md §3 is the source of truth for every value here.
+   =========================================================================== */
+
+/* --------------------------------------------------------------- typefaces */
+/* Self-hosted. `font-display: swap` so text paints immediately in the
+   fallback and reflows once the file lands, rather than blocking on it. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;          /* one variable file covers the whole ramp */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------- dark tokens */
+
+
+/* ------------------------------------------------- light tokens: the paper */
+/* The Prüfbericht is the one printed surface. Every value below is measured
+   against #FFFFFF and against the #F6F7F8 wash, and clears WCAG AA (4.5:1)
+   for small text — the report is read, not glanced at. */
+
+
+/* ------------------------------------------------------------- primitives */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
+.mono { font-family: var(--mono); }
+
+/* One visible focus style everywhere. Never remove it without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+[data-surface='paper'] :focus-visible { outline-color: var(--accent-on-light); }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine), var(--glass-lift);
+}
+/* Without this a browser with no backdrop-filter paints a see-through panel
+   and the text behind shows through the text on top. Opaque is safe failure. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--glass-fallback); }
+}
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-decoration: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 18px;
+  display: inline-block;
+  transition: filter .2s var(--ease), transform .2s var(--ease);
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+
+/* Screen-reader-only, for labels that must exist but not be seen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* PLAYBOOK §3 makes this mandatory on every page. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root{
+  --bg:#F7F8F5;            /* warm off-white                                   */
+  --bg-2:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#EEF6E9;
+  --border:#E3E6DF;
+  --text:#111827;          /* 16.6:1                                           */
+  --muted:#5A6660;         /*  5.6:1  AA                                       */
+
+  /* One value has to serve two roles: green text on the page, and a button
+     fill carrying a white label. #256B10 is 6.18:1 as text on --bg and 6.6:1
+     the other way round, so both clear AA and there is no second green. */
+  --accent:#256B10;
+  --on-accent:#FFFFFF;
+  --accent-on-light:#1F5C0E;   /* 7.6:1 — headings, the grade A/B colour       */
+
+  --critical:#A3200F;      /*  7.1:1 */
+  --high:#B45309;          /*  4.7:1 */
+  --medium:#7A5200;        /*  6.5:1 */
+  --low:#27548F;
+  --info:#5A6660;
+
+  /* #7BE33F is 1.5:1 on white. It survives only as a large decorative shape,
+     never as text, an icon, or a border on its own. */
+  --brand-lite:#7BE33F;
+
+  --grid-line:rgba(17,24,39,.045);
+  --bloom-warm:rgba(123,227,63,.16);
+  --bloom-cool:rgba(31,92,14,.05);
+
+  /* Chrome that overlays scrolling content keeps the material; on a light
+     ground the inset shine reads as a smudge, so it is dropped. */
+  --glass-bg:rgba(247,248,245,.86);
+  --glass-border:#E3E6DF;
+  --glass-shine:none;
+  --glass-lift:0 8px 24px -14px rgba(17,24,39,.18);
+  --glass-fallback:#FFFFFF;
+
+  --ring:rgba(37,107,16,.30);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --r:12px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:var(--sans)}
+
+/* The printed sheet is its own surface. base.css defines these under
+   [data-surface='paper'] — dropping the shared stylesheet dropped them with it,
+   and an undefined custom property resolves to nothing rather than to a
+   fallback: .printbar lost its background and kept its white text. */
+[data-surface='paper']{
+  --paper:#FFFFFF;
+  --wash:#F6F7F8;
+  --ink:#111827;          /* 16.6:1 on --bg, 17.7:1 on white */
+  --ink-soft:#5A6660;     /*  5.6:1 */
+  --rule:#E3E6DF;
+  --accent-on-light:#1F5C0E;  /* 8.09:1 on white — base.css had #357C11 at 5.19 */
+  --critical:#A3200F;
+  --high:#B45309;
+  --medium:#7A5200;
+  --low:#27548F;
+  --on-accent:#FFFFFF;
+  --ring:rgba(31,92,14,.30);
+}
+
+/* ── STEP 1 — the dated stamp. It states that a test happened, when, and under
+   which reference. It never states a verdict: the grade lives in the grade
+   card. A seal carrying a grade would be a rating mark. ─────────────────── */
+.stamp{float:right;width:36mm;text-align:center;transform:rotate(-4deg);
+  margin:2mm 0 6mm 8mm;opacity:.9}
+.stamp img{width:27mm;display:block;margin:0 auto 2.5mm;opacity:.92}
+.stamp .ref{font-family:var(--mono);font-size:6.5pt;line-height:1.55;
+  color:var(--accent-on-light);letter-spacing:.01em}
+@media print{ .stamp{opacity:1} }
+@media (max-width:900px){ .stamp{float:none;transform:none;margin:0 auto 8mm} }
+
+/* STEP 9 — neither page carried this. The prompt named only report.html;
+   index.html was missing it too. */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
 <style>
 /* ===========================================================================
    LLMantis — Prüfbericht (test report)
@@ -243,7 +443,7 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const nice = s => String(s || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-const MARK = '<img src="/static/assets/brand/mark.svg" alt="" width="26" height="26">';
+const MARK = '<img src="/static/assets/brand/mark-ink.svg" alt="" width="26" height="26">';
 
 function build() {
   const s = REPORT.summary;
@@ -434,6 +634,38 @@ function finding(r) {
 }
 
 build();
+</script>
+<footer style="max-width:190mm;margin:0 auto 24mm;padding:0 14mm;
+  font-size:9pt;color:var(--muted)">
+  <a href="/static/impressum.html" style="color:var(--muted)">Impressum</a> ·
+  <a href="/static/datenschutz.html" style="color:var(--muted)">Datenschutzerklärung</a>
+</footer>
+<script>
+/* The stamp is filled from the same REPORT object the page already built from,
+   so it cannot drift from the report it sits on. It prints even when `grade`
+   is null: a test was still performed, and the incomplete-scan banner above
+   is what says the grade is missing. */
+(function () {
+  var mast = document.querySelector('.masthead');
+  if (!mast || typeof REPORT === 'undefined' || !REPORT) return;
+  /* The report carries no date field of its own — build() derives the issued
+     date at render time. Reading a field that does not exist is how the first
+     version of this stamp printed "geprüft am —" next to a filled-in report.
+     The expression below is build()'s, character for character, on purpose:
+     toLocaleDateString() reads local time and toISOString() reads UTC, so the
+     two disagree by a day for part of every day. Measured here: the header
+     said 2026-08-17 while the stamp said 18.8.2026 — on the same sheet. */
+  var date = new Date().toISOString().slice(0, 10);
+  var id   = String(REPORT.scan_id || '—').slice(0, 8);
+  var lib  = REPORT.library_version || 'nicht angegeben';
+  var d = document.createElement('div');
+  d.className = 'stamp';
+  d.innerHTML = '<img src="/static/assets/brand/seal.svg" alt="">' +
+    '<div class="ref">gepr&uuml;ft am ' + date +
+    '<br>Scan #' + id +
+    '<br>Bibliothek ' + lib + '</div>';
+  mast.parentNode.insertBefore(d, mast.nextSibling);
+})();
 </script>
 </body>
 </html>
