@@ -292,17 +292,17 @@ footer a:hover{color:var(--accent)}
 .layer--reveal .pane--a .trail{background:#116B2E}
 .pane-in{width:100%;max-width:1180px;margin:0 auto;padding:0 var(--pad)}
 .pane-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px}
-.pane .label{margin-bottom:18px}
-.pane h2{font-size:clamp(24px,3.4vw,46px);max-width:none;margin-bottom:30px}
+.pane .label{margin-bottom:clamp(8px,1.6vh,18px)}
+.pane h2{font-size:clamp(22px,3vw,40px);max-width:none;margin-bottom:clamp(14px,2.2vh,26px)}
 .focus{font-size:12px;letter-spacing:.13em;color:var(--muted);margin:0}
 .focus b{color:var(--accent);font-weight:500}
 
 /* rows on the axis: name, numbered chip, description */
 .axis-rows{position:relative;border-top:1px solid var(--hairline)}
 .arow{display:grid;grid-template-columns:57% 46px 1fr;align-items:center;
-  gap:0 18px;padding:clamp(10px,1.7vh,20px) 0;border-bottom:1px solid var(--hairline);
+  gap:0 18px;padding:clamp(7px,1.25vh,16px) 0;border-bottom:1px solid var(--hairline);
   transition:color .22s var(--ease),opacity .22s var(--ease)}
-.an{text-align:right;font-size:clamp(19px,2.5vw,34px);font-weight:700;
+.an{text-align:right;font-size:clamp(18px,2.2vw,30px);font-weight:700;
   letter-spacing:-.032em;line-height:1.1;color:var(--muted);
   transition:color .22s var(--ease)}
 .chip{justify-self:center;border:1px solid var(--accent-line);color:var(--accent);
@@ -324,7 +324,7 @@ footer a:hover{color:var(--accent)}
   transition:top var(--focus-dur) var(--ease-expo),
              height var(--focus-dur) var(--ease-expo),
              opacity .22s linear}
-.pane .note{margin-top:20px}
+.pane .note{margin-top:clamp(10px,1.6vh,18px);font-size:11px;line-height:1.6}
 
 /* ── scroll reveal — IntersectionObserver, no library, no CDN ────────────── */
 .rv{opacity:0;transform:translateY(18px);
@@ -914,7 +914,9 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     delete shell.dataset.bandFrozen;
     shell.style.removeProperty('--axis-x');
     shell.style.removeProperty('--axis-h');
-    cur = tgt = START;
+    /* Keep the position. Resetting to START put the band back at 60% the
+       moment you returned to the top, so it sat in the wrong place until the
+       next scroll snapped it onto the chips again. */
     write();
     addEventListener('pointermove', onMove, { passive: true });
   };
