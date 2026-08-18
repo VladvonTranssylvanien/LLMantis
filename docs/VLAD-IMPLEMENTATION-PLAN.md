@@ -65,7 +65,7 @@ All attacks are publicly documented techniques from the OWASP Top 10 for LLM.
 
 | # | What | Why |
 |---|---|---|
-| 7 | **Migrate to Mistral** | 🔴 tech debt #1. A US vendor inside an EU-compliance product is a contradiction the customer will notice |
+| 7 | ~~**Migrate to Mistral**~~ | **Withdrawn 18.08.** It was done, and then the rule behind it was dropped: there is no vendor restriction any more (`PLAYBOOK.md` §1) |
 | 8 | **Persistent database** (Postgres) | State is in memory today; reports must live forever |
 | 9 | **Layer 1: Art.-50-Check** | Passive site check — the lead funnel. See §5 |
 | 10 | **Real ownership verification** | DNS TXT or a header |
@@ -310,4 +310,3 @@ QUESTIONS: …
 - **A canary in the system prompt turns a judge's opinion into a proven fact.**
 - **No quote, no finding.** This is both a technical and a legal rule.
 - An incomplete scan has **no grade at all**. Not "F", not "approximately".
-- Mistral instead of a US model — before the first paying customer, not later.

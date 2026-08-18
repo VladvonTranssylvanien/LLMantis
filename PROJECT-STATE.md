@@ -38,7 +38,8 @@ that next) and the 21→75 attack library.
 - ✅ Playbook, role briefs and brand merged into the engine repository
 - ✅ LICENSE added (AGPL-3.0)
 - ✅ Brand mark drawn (`Brand/`) — wordmark still needs outlining
-- ✅ **Judge migrated to Mistral** — no US provider anywhere in the stack (16.08)
+- ✅ **Judge runs on Mistral** — the only provider `llm.py` registers (16.08).
+  ⚠️ The EU-only reason for it was withdrawn on 18.08, see the changelog
 - ✅ **Postgres database** — organizations, targets, scans, results, ownership
   verifications, memberships, API keys, branding. Alembic migrations (16.08)
 - ✅ **Real DNS ownership verification**, gating active (`mode="api"`) scans (16.08)
@@ -71,7 +72,7 @@ that next) and the 21→75 attack library.
 | 4 | Market: Germany → EU | Lets us reuse the CodeArgus groundwork | 15.08 |
 | 5 | **Two product layers** | Passive Art.-50-Check without permission (funnel) + active red team with ownership verification (revenue). Solves the legal problem | 15.08 |
 | 6 | **Prüfbericht, not Zertifikat** | AI Act certificates come only from notified bodies, and only for high-risk. "Zertifiziert" = § 5 UWG | 15.08 |
-| 7 | **Judge on Mistral, not OpenAI/Anthropic** | The judge processes customer system prompts = trade secrets. US CLOUD Act contradicts what we sell | 15.08 |
+| 7 | ~~**Judge on Mistral, not OpenAI/Anthropic**~~ **REVERSED 18.08** | Was: US CLOUD Act contradicts what we sell. The EU-only stack is no longer true and no longer claimed; provider choice is an engineering decision. What survives is that system prompts are trade secrets — a retention and access rule, not a vendor rule | 15.08, reversed 18.08 |
 | 8 | Three `confidence` levels + mandatory `evidence` | A `possible` finding as fact in a paid report = § 5 UWG | 15.08 |
 | 9 | Canary strings in system prompts | Turns a judge's opinion into a deterministic fact. Only `confirmed` may produce an F | 15.08 |
 | 10 | **Working language: English** | Code, comments, commits, docs, UI — all English | 15.08 |
@@ -113,7 +114,7 @@ that next) and the 21→75 attack library.
 
 | # | What | Due | Who |
 |---|---|---|---|
-| 1 | ✅ **DONE 16.08** ~~Migrate the judge to Mistral~~ — `backend/llm.py` talks only to Mistral. No US provider anywhere; `anthropic` removed from `requirements.txt` too | ~~before the first paying customer~~ | Vlad |
+| 1 | ✅ **DONE 16.08, then MOOT 18.08** ~~Migrate the judge to Mistral~~ — `backend/llm.py` talks only to Mistral and `anthropic` is gone from `requirements.txt`, both still true. It stopped being technical debt because the rule requiring it was withdrawn, not because it was finished | ~~before the first paying customer~~ | Vlad |
 | 2 | ✅ **DONE 16.08** ~~Persistent database instead of in-memory state~~ — Postgres + Alembic, every scan/org/result survives a restart | ~~week 2~~ | Vlad |
 | 3 | ✅ **DONE 16.08** ~~Real ownership verification (DNS TXT)~~ — gates every `mode="api"` scan; 90-day re-verification | ~~week 4~~ | Vlad |
 | 4 | ✅ **DONE 16.08** ~~Organizations in the data model~~ — plus a `Membership` table (user_id, org_id, role), unused until auth exists | ~~week 3~~ | Vlad |
@@ -404,3 +405,24 @@ lands. Bot B's occasional failures are real, not false positives — it leaks
 the supplier name intermittently and drafts a legal demand letter despite
 its own rule 6. Both are Gregor's to fix; the control group is working
 exactly as it should by surfacing them.
+
+**18.08.2026 — the EU-only stack is withdrawn.** Gregor's decision. It was
+`PLAYBOOK.md` §1, an INVARIANT, and it required an EU-only vendor stack and an
+EU-only judge model (Mistral or Aleph Alpha, with Anthropic, OpenAI and Google
+forbidden). It is gone: **no vendor prohibition applies to this project any
+more, and data residency is no longer a selling point.** Decision #7 is marked
+reversed, technical debt #1 is moot rather than done, and the customer-facing
+claim is removed from `PITCH-PLAN.md` — slide 6 now rests on three mechanisms
+instead of four, and the Q&A answer to *"where does our data go?"* answers with
+how prompts are handled rather than with a country.
+
+What survives on its own merits: customer system prompts and transcripts are
+trade secrets and may contain personal data, which governs **retention, logging
+and access** — not which vendor processes them. The ban on "zertifiziert"
+(`PLAYBOOK.md` §5) was never a residency rule and is untouched.
+
+⚠️ Mistral is still the only provider `backend/llm.py` registers, so the
+descriptive statements about it remain accurate. The rate-limit and quota
+numbers throughout this document (technical debt #12, #16, the 50 req/min
+figures) are measurements of the Mistral free tier and will not survive a
+provider change.

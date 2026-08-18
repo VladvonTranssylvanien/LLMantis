@@ -149,15 +149,15 @@ This is what lets Vlad mark a finding `confirmed` rather than `likely` — and p
 
 ---
 
-## 5. Azure — yes, but with a hard boundary
+## 5. Azure — yes, and keep it on the target side
 
-You suggested using the school Azure account. Good idea, with one line drawn firmly:
+You suggested using the school Azure account. Good idea:
 
-✅ **Allowed:** running your test bots. They are ours, they contain no customer data, and Azure gives you several models cheaply for free — which is genuinely useful, because testing against only one model family teaches us nothing about generalisation.
+✅ **Targets.** They are ours, they contain no customer data, and Azure gives you several models cheaply for free — which is genuinely useful, because testing against only one model family teaches us nothing about generalisation.
 
-🔴 **Not allowed:** the **judge**. Per `PLAYBOOK.md` §1, the judge processes customer system prompts — trade secrets — and must run on an EU provider (Mistral). Azure is Microsoft, therefore US CLOUD Act, therefore a contradiction with the thing we sell.
+⚠️ **The judge is a different question, and the reason changed on 18.08.** It used to be a residency rule (`PLAYBOOK.md` §1, now withdrawn — there is no vendor prohibition any more). What remains is a measurement rule: the judge under test must be **the one the product ships**, configured in one place, or an agreement number measures a judge no customer will ever meet.
 
-Simple rule: **targets may live anywhere. The judge lives in the EU.**
+Simple rule: **targets may live anywhere. The judge is whatever `PROVIDER` names.**
 
 ### Model diversity — worth doing if you have time
 

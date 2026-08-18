@@ -24,11 +24,11 @@ WHY THIS REPLAYS THE REAL JUDGE
     A calibration harness with its own copy of the logic would measure the
     copy, and would keep agreeing with itself after the product changed.
 
-THE JUDGE RUNS ON MISTRAL, NEVER ON AZURE
-    PLAYBOOK.md section 1 and GREGOR-TARGET-LAB.md:158: the judge sees customer
-    system prompts, which are trade secrets, so it must run on an EU provider.
-    The lab targets may live on Azure; the judge may not. This script does not
-    read any LAB_AZURE_* variable, by design.
+THE JUDGE IS WHATEVER PROVIDER NAMES; THE LAB TARGETS ARE SEPARATE
+    This script does not read any LAB_AZURE_* variable, by design. Not for
+    residency reasons -- that rule was withdrawn on 18.08 -- but because the
+    number is only reproducible if the judge under test is the one the product
+    ships, configured in one place.
 
 USAGE
     python calibration/calibrate.py calibration/set-v1.yaml

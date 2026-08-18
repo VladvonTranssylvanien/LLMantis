@@ -69,43 +69,39 @@ The `LLM` prefix saves us — but only if we always write the name **as one word
 
 # PART II — INVARIANTS
 
-## 1. EU-only stack **INVARIANT**
+## 1. ~~EU-only stack~~ — **WITHDRAWN 18.08.2026**
 
-| Layer | Choice | ❌ Never |
-|---|---|---|
-| Hosting | **Hetzner** (Nuremberg / Falkenstein) 🇩🇪 | AWS, Azure, GCP |
-| Mail | **mailbox.org** 🇩🇪 | Google Workspace, M365 |
-| Email sending | **Brevo** 🇫🇷 | SendGrid, Postmark, Resend |
-| Payments | **Mollie** 🇳🇱 | Stripe, Paddle at launch |
-| Auth | **self-hosted** | Clerk, Auth0, Supabase Auth |
-| Analytics | **Plausible self-hosted** | Google Analytics |
-| Fonts | **self-hosted** | Google Fonts CDN |
-| Errors | **GlitchTip** | Sentry US |
-| **LLM judge** | **Mistral** 🇫🇷 or **Aleph Alpha** 🇩🇪 | 🔴 **Anthropic, OpenAI, Google** |
+This section required an EU-only vendor stack and, in its last row, an EU-only
+LLM for the judge — Mistral or Aleph Alpha, with Anthropic, OpenAI and Google
+forbidden. **It is no longer an invariant, and data residency is no longer a
+selling point.** Provider choice is now an engineering decision like any other.
 
-**One reason for all of it:** US companies fall under the **US CLOUD Act** —
-US authorities can demand data regardless of which data centre it sits in.
+The section number is kept so that references to `§1` elsewhere still resolve.
+Nothing replaces the prohibition: there is no forbidden vendor in this playbook
+any more, for any layer.
 
-### 🔴 The last row is the most important one in this table
+**What the project actually uses** — a record, not a rule. Other documents refer
+to "the stack decision" and mean this list. Any of it may change on ordinary
+engineering grounds:
 
-We have the sharpest possible version of this problem. Consider what we send
-to the judge model:
+| Layer | Currently |
+|---|---|
+| Hosting | Hetzner (Nuremberg / Falkenstein) |
+| Mail | mailbox.org |
+| Email sending | Brevo — not wired up yet |
+| Payments | Mollie — not wired up yet |
+| Auth | self-hosted (email/password + JWT) |
+| Analytics | Plausible, self-hosted |
+| Fonts | self-hosted |
+| Errors | GlitchTip |
+| LLM judge | Mistral — the only provider `backend/llm.py` registers |
 
-> the customer's system prompt — their trade secret — and full conversation
-> transcripts where the bot may have leaked personal data.
+What survives, on its own merits and not as a residency argument:
 
-If that goes to OpenAI or Anthropic, we:
-1. become an **Auftragsverarbeiter** with a US sub-processor — SCCs, TIA,
-   an entry in the Verzeichnis;
-2. **sell AI compliance while breaking AI compliance.** The first lawyer-customer
-   asks this in the first meeting;
-3. lose the only advantage we have over American competitors.
-
-**Decision:** judge and attacker run on **Mistral** (Paris, data in the EU).
-For the course demo anything goes — but this is recorded as **tech debt #1**
-and closed **before the first paying customer**, not later.
-
-> 💬 In a meeting: *"Wo liegen die Prompts meines Bots?" — "Frankreich. Mistral. Kein US-Anbieter im gesamten Stack."*
+- customer system prompts and transcripts are **trade secrets and may contain
+  personal data**. That governs retention, logging and who may read them
+  (§2, and the retention rule in PART VII) — it no longer dictates a vendor.
+- the word "zertifiziert" is still banned (§5). That was never a residency rule.
 
 ## 2. 🔒 The core product rule **INVARIANT**
 
@@ -566,7 +562,7 @@ different jobs, and confusing them is the fastest way to fail both.
 | **7** | pitch, 3 rehearsals | local fallback ready | — | legal Q&A answers |
 
 **Track A scope — what we do NOT do:** billing, business registration, Hetzner,
-Mistral migration, i18n, subscriptions, badge, PDF export (HTML is enough), real
+i18n, subscriptions, badge, PDF export (HTML is enough), real
 DNS ownership verification (a stub is enough).
 
 ## 13. TRACK B — startup (after submission)
@@ -575,7 +571,6 @@ DNS ownership verification (a stub is enough).
 |---|---|---|
 | **1** (course) | demo + **the 24-site number** + legal map | no number = building blind |
 | **2** | name cleared at DPMA/EUIPO, domains bought, Hetzner, mailbox.org | name not cleared = don't order a logo |
-| **3** | 🔴 **migration to Mistral** — tech debt #1 closed | US vendor in the stack = we sell what we violate |
 | **4** | real ownership verification, public free Art.-50-Check | active attacks without verification = a legal bomb |
 | **6** | ⚡ **first payment** | none = stop and figure out why, don't write more code |
 | **8** | 10 customers, first paper letters sent | |
@@ -613,7 +608,6 @@ not GitHub stars.
 |---|---|
 | The word "zertifiziert" slips into copy | Kwabena proofreads **every** text before publication |
 | Name taken by a live competitor | Google the name, not just registers and domains. `Mantis` is taken in security |
-| US LLM inside an EU-compliance product | Mistral before the first paying customer |
 | Attacking a bot without the owner's permission | Layer 1 passive, layer 2 verified only |
 | Judge produces false positives | Gregor's calibration set + three confidence levels |
 | Grade issued from an incomplete scan | >10% failed checks → no grade |
@@ -675,5 +669,6 @@ Date · Task · Branch · Author
 
 1. **Test the hypothesis in 20 minutes, not two months.** 150 lines and 24 real sites.
 2. **Proof of work is effect, not change.** And verify the tool before trusting its output.
-3. **Do not violate what you protect against.** For us that means two specific things:
-   **no US vendor in the stack** and **never the word "zertifiziert"**.
+3. **Do not violate what you protect against.** For us that means our own bot
+   passes our own test and discloses that it is an AI — and **never the word
+   "zertifiziert"**.

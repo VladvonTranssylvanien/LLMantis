@@ -3330,7 +3330,111 @@ disagreements.
 
 ---
 
+## 2026-08-18 — Session 30: the EU-only stack is withdrawn across the repository
+
+Gregor: the EU-only stack is no longer true, Mistral is out, and the engine
+changes next in this session. First job was to remove every statement that an
+EU provider — or Mistral specifically — is *required* for the judge or anything
+else. He had already cut the two relevant blocks from `CLAUDE-CODE-PROMPT.md`
+himself (`EU-ONLY STACK`, `THE JUDGE MODEL RUNS IN THE EU`).
+
+**Asked one question rather than guessing:** the EU story was also a
+customer-facing sales claim in four places, and I did not know what the new
+engine runs on, so any replacement claim would have been invented. Gregor's
+decision: **drop the data-residency argument entirely, no placeholder.**
+Slide 6 of the pitch now rests on three mechanisms instead of four.
+
+### The root, and why the section number survives
+
+`PLAYBOOK.md` §1 "EU-only stack **INVARIANT**" was the origin; five other files
+cited it by number (`README.md`, `SETUP.md`, `SECRETS.md`,
+`calibration/README.md`, `docs/GREGOR-TARGET-LAB.md`) and PLAYBOOK's own
+sections are numbered 1, 2, 5, 8, 11 with **`§5` and `§11` invariant 2 and 5
+referenced from `AGENTS.md`, this worklog and `lab/bots/praxis-weber.yaml`.**
+Deleting §1 would have renumbered live references, so it is **retired in place**:
+heading kept, prohibition gone.
+
+🔴 **A correction I made to my own edit.** The first version deleted §1's table
+outright — and with it the only record of which vendors the project actually
+uses. `PROJECT-STATE.md:340` and two other places say "per the stack decision"
+and mean that table. Restored as a plain "what the project actually uses" list
+with no ❌ column: the prohibition was withdrawn, the choices were not.
+
+### Three classes of statement, handled differently
+
+Grouping them was the whole job; a blind find-and-replace would have falsified
+either the code or the history.
+
+| Class | Treatment |
+|---|---|
+| **Prohibitions** — "must be EU", "no US vendor", "the only accepted value", "Not allowed: the judge" | Removed. This is what Gregor asked for |
+| **Customer-facing promises** — pitch slide 6, the Q&A row, PLAYBOOK's meeting line, Kwabena's subprocessor asset, the live landing page | Removed, no replacement claim invented |
+| **Descriptions that are still true** — `_PROVIDERS` holds one entry, a `MISTRAL_API_KEY` is required, the 50 req/min measurements | Left accurate, reworded so they describe the code rather than assert a rule |
+| **Dated history** — decision #7 (15.08), tech debt #1, the changelog entries | Preserved and marked reversed/moot. Rewriting a dated decision to match today's would destroy the record of what was decided when |
+
+### ⭐ The one that was actually live to customers
+
+`frontend/landing.html:444` — German, on `llmantis.de`, in the "Über uns" copy:
+
+> *"Der gesamte Stack liegt in der EU — auch das Modell, das die Antworten
+> bewertet, weil es Ihre Systemprompts liest."*
+
+That is a false statement to customers as of today, and it was the only
+occurrence outside documentation. The grep that found it looked for `hetzner|
+mollie|brevo|europ|frankreich` in `frontend/` specifically — the first sweep,
+scoped to `mistral|EU-only|CLOUD Act`, **missed it**, because the sentence names
+neither Mistral nor the EU-only rule. Replaced with the "we test our own bot
+first and publish the result" half, which is true and is `PLAYBOOK.md` §2.
+
+⚠️ German published copy. No `§`, `Art.`, `Gesetz` or `Pflicht` in the sentence,
+so `PLAYBOOK.md` §11 invariant 5 is not triggered — but it is customer-facing
+text and Kwabena proofreads those. Flagged, not routed.
+
+### What survives, and it is not nothing
+
+The trade-secret argument was doing two jobs and only one of them was residency.
+System prompts and transcripts are still trade secrets that may contain personal
+data — which governs **retention, logging and access**. Every place that reason
+appeared now says that instead of naming a country. The `zertifiziert` ban
+(`PLAYBOOK.md` §5) was never a residency rule and is untouched.
+
+### Verified, not assumed
+
+| Check | Result |
+|---|---|
+| `py_compile` on the three edited Python files | OK |
+| `node --check` on `landing.html`'s script block (a JS string concat was edited) | OK |
+| `check_demo_sync.py` | in sync, 3 bots, canaries distinct |
+| Re-grep for `EU-only\|CLOUD Act\|must be EU\|no US\|EU provider\|Aleph\|France` | every remaining hit is either a dated withdrawal note or a true description |
+| `main` fast-forwarded 8 commits before editing | Vlad's Art.-50 browser engine; touches none of these files |
+
+### What I did NOT verify
+
+- **No scan, no judge run, no calibration run.** Only comments, docstrings and
+  prose changed; `PROVIDER`, `JUDGE_MODEL` and every default are byte-identical
+  in behaviour. The numbers in this worklog are unaffected, and nothing here
+  re-measures them.
+- **The landing page was not opened in a browser.** The script block parses; the
+  rendered German paragraph has not been seen. `PITCH-PLAN.md` T0-5 is the same
+  gap and it is still open.
+- **Kwabena has not seen the landing-copy change** or the note in his GRC brief.
+- **Bogdan has not seen slide 6 losing a mechanism.** It is his file and his slide.
+- Rate-limit and quota numbers throughout the docs (technical debt #12, #16,
+  `PITCH-PLAN` lines 113/117) are Mistral free-tier **measurements**. They are
+  still accurate today and will all be wrong the moment the engine changes.
+  Flagged in `PROJECT-STATE.md`'s new changelog entry, not edited.
+- Whether any of this needed to reach the other contributors' own agent
+  instruction files. `AGENTS.md` and `CLAUDE-CODE-PROMPT.md` are gitignored, so
+  Gregor's copies are local only.
+
+---
+
 # Start here tomorrow
+
+⚠️ **Superseded in one respect by session 30:** the EU-only stack and the
+Mistral-only judge rule are withdrawn repository-wide, and the engine change
+follows. Every Mistral rate-limit number below is still a real measurement of
+the current provider and will not survive that change.
 
 ## Where things stand — 18.08, four days to the pitch
 

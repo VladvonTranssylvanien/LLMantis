@@ -143,7 +143,7 @@ A list every team member checks their text against before publishing. Start: *ze
 - **AVV (Auftragsverarbeitungsvertrag)** template, downloadable with one click. ⭐ Agencies always ask for this, and it's usually a week of email back-and-forth. One week of your work removes an objection competitors spend days on.
 - **TOMs** per Art. 32 GDPR, as PDF
 - **Verzeichnis von Verarbeitungstätigkeiten** (Art. 30)
-- **Subprocessor list with countries** — this is where the Mistral-instead-of-OpenAI decision becomes a sales asset: every entry says EU
+- **Subprocessor list with countries** — required regardless of where the subprocessors sit. Note it is no longer a residency selling point: the EU-only stack was withdrawn on 18.08 (`PLAYBOOK.md` §1), so the list is an obligation to satisfy, not an advantage to advertise
 - Retention policy for client system prompts (they are trade secrets)
 - AGB + Widerrufsbelehrung + `Zahlungspflichtig bestellen` button wording (§ 312j BGB)
 

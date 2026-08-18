@@ -4,9 +4,10 @@ The only place in the project that talks to an AI model.
 Everything else calls chat() and gets text back. It does not know or care
 which provider is behind it. Swap providers here, nowhere else.
 
-There is no mock provider. It was removed with the Anthropic code during the
-Mistral migration; _PROVIDERS below is the whole list. A MISTRAL_API_KEY is
-required for any scan to produce a grade.
+There is no mock provider; _PROVIDERS below is the whole list. Today that list
+holds one entry, so a MISTRAL_API_KEY is required for any scan to produce a
+grade. Adding an entry is not restricted by anything: the EU-only vendor rule
+was withdrawn on 18.08 (PLAYBOOK.md §1).
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ class LLMError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# MISTRAL PROVIDER (EU-COMPLIANT, ONLY PROVIDER)
+# MISTRAL PROVIDER (the only one registered today)
 # ---------------------------------------------------------------------------
 
 _mistral_client = None
@@ -72,12 +73,12 @@ def _retry_delay(attempt: int, headers=None) -> float:
 
 async def _mistral_chat(system: str, user: str, model: str, max_tokens: int) -> str:
     """
-    Mistral AI provider (France-based, EU-compliant).
+    Mistral AI provider.
 
-    WHY MISTRAL?
-        The judge processes customer system prompts (trade secrets).
-        CLOUD Act (US) contradicts EU data protection. We use Mistral (France)
-        to guarantee that customer data stays in the EU.
+    Registered because it is what the project was built against, not because a
+    rule requires it -- the EU-only provider constraint was withdrawn on 18.08
+    (PLAYBOOK.md §1). Adding a second provider means adding an entry to
+    _PROVIDERS below; nothing else in the codebase needs to know.
     """
     global _mistral_client
 
