@@ -35,6 +35,11 @@
   --band:#116B2E;         /* the band fill. Never re-pointed inside the band. */
   --accent-line:rgba(17,107,46,.42);
   --accent-soft:rgba(17,107,46,.09);
+  /* The one warm note in the palette, and the only colour that has to hold on
+     the paper AND on the accent at once. 2.42:1 on both — which is the ceiling,
+     not a compromise: the two grounds are 5.86:1 apart, so no single colour can
+     beat sqrt(5.86) against both. Decorative only; the word carries the meaning. */
+  --accent-warm:#FF720D;
   --axis:60%;
   --dur:.35s;                       /* --transition-duration */
   --ease:cubic-bezier(.2,.7,.2,1);  /* --ease-out */
@@ -124,11 +129,19 @@ header{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--ground)}
   padding:13px var(--pad) 12px;border-bottom:1px solid var(--hairline)}
 /* The mark is the brand, so it is set at a size where its ring text can
    actually be read — 64px, not the 34px badge it was before. */
-.logo{display:flex;align-items:center;gap:16px;text-decoration:none;color:var(--ink)}
+.logo{display:flex;align-items:center;text-decoration:none;color:var(--ink)}
 .logo img{width:84px;height:84px;display:block}
-.logo .wm{font-size:33px;font-weight:700;letter-spacing:-.035em;line-height:1}
+/* The wordmark lies ON the seal, not beside it: it comes later in the DOM so it
+   paints over the ring, and the negative margin pulls it back across the seal's
+   right edge — which is why there is no gap on .logo any more. */
+.logo .wm{position:relative;margin-left:-12px;
+  font-size:33px;font-weight:700;letter-spacing:-.035em;line-height:1}
 .logo .wm em{font-style:normal;color:var(--accent)}
-.logo .sub{display:block;font-family:var(--mono);font-size:10px;font-weight:400;
+/* Out of flow, so the flex centres the seal against the WORDMARK alone. Left in
+   flow it centred the wordmark-plus-label block, which sat the word ~8px above
+   the seal's centre line; the label is meant to hang below that line. */
+.logo .sub{position:absolute;top:100%;left:0;
+  display:block;font-family:var(--mono);font-size:10px;font-weight:400;
   letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
 .menu{display:flex;align-items:center;gap:11px;background:none;border:0;padding:8px 0;
   font:inherit;font-size:15px;color:var(--ink);cursor:pointer}
@@ -136,22 +149,41 @@ header{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--ground)}
 .dots i{width:5px;height:5px;background:var(--accent);display:block}
 
 /* ── overlay navigation ──────────────────────────────────────────────────── */
-.overlay{position:fixed;inset:0;z-index:50;background:var(--ground);
+/* A green strip that slides out of the right edge, only as wide as its own
+   labels need — hence width:max-content, with a cap so a long word cannot push
+   it across the page. It slides rather than fades, so the panel reads as an
+   object arriving from off-screen. */
+.overlay{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:50;background:var(--accent);
+  width:max-content;max-width:min(90vw,460px);
   display:flex;flex-direction:column;padding:var(--pad);
-  opacity:0;visibility:hidden;transition:opacity var(--dur) var(--ease),visibility var(--dur)}
-.overlay[data-open="true"]{opacity:1;visibility:visible}
+  transform:translateX(100%);visibility:hidden;
+  transition:transform var(--dur) var(--ease-expo),visibility var(--dur)}
+.overlay[data-open="true"]{transform:none;visibility:visible}
 .overlay .close{align-self:flex-end;background:none;border:0;font:inherit;font-size:15px;
-  color:var(--ink);cursor:pointer;padding:8px 0}
+  color:var(--ground);cursor:pointer;padding:8px 0}
 .overlay nav{margin:auto 0;display:grid;gap:6px}
+/* On the green the type carries the page instead of the ground, so the sizes
+   drop to what a strip can hold: 86px was a full-screen figure. */
 .overlay a{display:flex;align-items:baseline;gap:22px;text-decoration:none;
-  font-size:clamp(34px,7vw,86px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
+  color:rgba(242,241,235,.82);                       /* 4.51:1 on the accent */
+  font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
   padding:6px 0;transition:color var(--dur) var(--ease)}
-.overlay a:hover{color:var(--accent)}
+.overlay a:hover{color:var(--ground)}                /* 5.86:1 */
 .overlay a span{font-family:var(--mono);font-size:13px;font-weight:400;
-  letter-spacing:.1em;color:var(--muted)}
+  letter-spacing:.1em;color:rgba(242,241,235,.82)}
 
 /* ── section scaffold ────────────────────────────────────────────────────── */
 main{position:relative;z-index:2;padding-top:110px}
+/* The header is fixed, so a bare anchor lands underneath it. 110px is the
+   header's own height — the same figure main's padding and .hero's min-height
+   already carry — which also puts #signal, the first section, back at zero. */
+#signal{scroll-margin-top:110px}
+/* Every other section already opens with a top padding of its own, so landing
+   its EDGE under the header left the heading 117px further down — an empty
+   screen. Subtracting that padding lands the heading 40px under the header
+   instead. The result goes negative on a tall viewport, which is correct: the
+   padding is simply scrolled past. */
+#grenzen,#preise,#team{scroll-margin-top:calc(150px - clamp(90px,13vh,170px))}
 section{padding:clamp(90px,13vh,170px) var(--pad);border-bottom:1px solid var(--hairline)}
 .label{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;
   letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:38px}
@@ -247,9 +279,13 @@ h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
   letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
   background:var(--ground);padding:6px 10px 6px 0}
 .rail .status i{width:7px;height:7px;background:var(--accent);display:block;flex:0 0 auto}
+/* No backplate: over the paper ground it was invisible anyway, and over the
+   accent pane it read as a white box sitting on the colour. The type stays ink
+   on both grounds by Orel's call — 16.6:1 on the paper, 2.83:1 on the accent,
+   and the brackets, being accent themselves, vanish on the accent entirely. */
 .rail .talk{pointer-events:auto;text-decoration:none;font-weight:700;font-size:clamp(19px,2vw,27px);
-  letter-spacing:-.035em;line-height:1.05;text-align:right;background:var(--ground);padding:6px 0 6px 10px}
-.rail .talk s{text-decoration:none;color:var(--accent)}
+  letter-spacing:-.035em;line-height:1.05;text-align:right;background:none;padding:6px 0 6px 10px}
+.rail .talk s{text-decoration:none;color:var(--accent-warm)}
 
 footer{padding:44px var(--pad) 96px;display:flex;gap:26px;flex-wrap:wrap;align-items:center;
   font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--muted)}
@@ -271,6 +307,16 @@ footer a:hover{color:var(--accent)}
   width:var(--reveal-w);z-index:-1;visibility:hidden;pointer-events:none}
 .pane{position:absolute;inset:0;display:flex;align-items:center;
   padding:0;border:0;background:var(--ground)}
+/* The axis has to carry on across the pinned pane, and the base layer's line
+   cannot do it: that one sits at z-index 3 inside .layer--base while the pane
+   sits inside main at z-index 2, so it always paints ON TOP of the pane, in
+   the pane's own colour — green on green. Each pane draws its own instead, in
+   whichever palette it is wearing, and the base line now stops where the
+   runway starts. z-index:-1 puts it above the pane's fill but below every
+   row, so a chip covers the line instead of being crossed by it. */
+.pane::after{content:'';position:absolute;top:0;height:var(--axis-end,100%);
+  left:var(--axis-x,60%);
+  width:1px;background:var(--accent-line);pointer-events:none;z-index:-1}
 .pane--b{z-index:1}
 /* Pane A is solid accent, the way their "Selected work" section is solid blue.
    Without the colour change the wipe has no visible edge: both panes are the
@@ -280,14 +326,16 @@ footer a:hover{color:var(--accent)}
   --ink:#F6F6F4;--body:rgba(246,246,244,.9);--muted:rgba(246,246,244,.72);
   --faint:rgba(246,246,244,.55);--hairline:rgba(246,246,244,.26);
   --accent:#F6F6F4;--accent-line:rgba(246,246,244,.5)}
-.pane--a .chip{border-color:rgba(246,246,244,.5);color:rgba(246,246,244,.8)}
+.pane--a .chip{background:var(--band);border-color:rgba(246,246,244,.5);
+  color:rgba(246,246,244,.8)}
 .pane--a .arow.act .chip{background:#F6F6F4;color:var(--band);border-color:#F6F6F4}
 .pane--a .trail{background:#F6F6F4}
 /* inside the reveal band the accent pane inverts the other way, back to paper */
 .layer--reveal .pane--a{background:var(--ground);color:var(--ink-solid);
   --ink:#121210;--body:#3A3A36;--muted:#706E63;--faint:#B6B5AB;
   --hairline:rgba(18,18,16,.14);--accent:#116B2E;--accent-line:rgba(17,107,46,.42)}
-.layer--reveal .pane--a .chip{border-color:rgba(17,107,46,.42);color:#116B2E}
+.layer--reveal .pane--a .chip{background:var(--ground);
+  border-color:rgba(17,107,46,.42);color:#116B2E}
 .layer--reveal .pane--a .arow.act .chip{background:#116B2E;color:#F6F6F4}
 .layer--reveal .pane--a .trail{background:#116B2E}
 .pane-in{width:100%;max-width:1180px;margin:0 auto;padding:0 var(--pad)}
@@ -305,8 +353,11 @@ footer a:hover{color:var(--accent)}
 .an{text-align:right;font-size:clamp(18px,2.2vw,30px);font-weight:700;
   letter-spacing:-.032em;line-height:1.1;color:var(--muted);
   transition:color .22s var(--ease)}
-.chip{justify-self:center;border:1px solid var(--accent-line);color:var(--accent);
-  background:transparent;padding:3px 7px;font-size:11.5px;letter-spacing:.06em;
+/* Opaque and above .trail (z-index 1): the axis and its lit segment pass
+   BEHIND the square rather than being drawn across it. */
+.chip{justify-self:center;position:relative;z-index:2;
+  border:1px solid var(--accent-line);color:var(--accent);
+  background:var(--ground);padding:3px 7px;font-size:11.5px;letter-spacing:.06em;
   transition:background .26s var(--ease),color .22s var(--ease),border-color .22s var(--ease)}
 .ad{color:var(--muted)}
 .ad p{margin:0;font-size:14.5px;line-height:1.45}
@@ -333,7 +384,7 @@ footer a:hover{color:var(--accent)}
 
 @media (max-width:900px){
   :root{--axis:100%}
-  .layer--base::before,.trail{display:none}
+  .layer--base::before,.trail,.pane::after{display:none}
   .runway{min-height:auto}
   .pin{position:static;height:auto;overflow:visible}
   .pane{position:static;display:block;padding:64px 0;clip-path:none!important}
@@ -345,9 +396,11 @@ footer a:hover{color:var(--accent)}
   .row{grid-template-columns:1fr;gap:12px}
   .split,.plans,.team{grid-template-columns:1fr}
   .logo img{width:60px;height:60px}
-  .logo .wm{font-size:25px}
+  .logo .wm{margin-left:-9px;font-size:25px}
   .rail .status{display:none}
   main{padding-top:90px}
+  #signal{scroll-margin-top:90px}
+  #grenzen,#preise,#team{scroll-margin-top:calc(126px - clamp(90px,13vh,170px))}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -774,7 +827,15 @@ const ov = $('#ov'), mb = $('#menuBtn');
 const setOv = open => {
   ov.dataset.open = String(open);
   mb.setAttribute('aria-expanded', String(open));
+  /* Locking the body removes the scrollbar, and where scrollbars take real
+     width that widens the content box: every centred column shifts, while
+     --axis-x is a pixel measured before the shift, so the line walks off the
+     chips. Handing back exactly the scrollbar's width keeps the layout the
+     same size. Where scrollbars overlay the content the gap is 0 and this
+     line does nothing. Measured before the lock, or it is already gone. */
+  const gutter = innerWidth - document.documentElement.clientWidth;
   document.body.style.overflow = open ? 'hidden' : '';
+  document.body.style.paddingRight = open ? gutter + 'px' : '';
   if (open) ov.querySelector('a').focus(); else mb.focus();
 };
 mb.addEventListener('click', () => setOv(ov.dataset.open !== 'true'));
@@ -835,7 +896,10 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
   const safe = x => {
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const half = (BAND_REM * rem) / 2, w = innerWidth;
+    /* --reveal-pos is a percentage of .shell, which is clientWidth wide.
+       Dividing by innerWidth instead put the band 8.7px left of the axis on a
+       1400/1385 viewport — two parallel hairlines where there is one line. */
+    const half = (BAND_REM * rem) / 2, w = document.documentElement.clientWidth;
     return clamp(x / w, half / w, 1 - half / w);
   };
   const write = () => shell.style.setProperty('--reveal-pos', (cur * 100) + '%');
@@ -888,7 +952,10 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     const run = document.getElementById('runway');
     if (x == null || !run) return;
     shell.style.setProperty('--axis-x', x + 'px');
-    shell.style.setProperty('--axis-h', (run.offsetTop + run.offsetHeight) + 'px');
+    /* Stops where the runway begins: from there the panes draw the line
+       themselves, each in its own palette. Running it to the runway's end
+       meant a green hairline printed over the green pane. */
+    shell.style.setProperty('--axis-h', run.offsetTop + 'px');
   };
   addEventListener('resize', () => {
     if (shell.dataset.bandFrozen === 'true') placeAxis();
@@ -900,7 +967,7 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     clearTimeout(idleTimer);
     cancelAnimationFrame(raf); raf = 0;
     const x = chipCentre();
-    if (x != null) cur = tgt = x / innerWidth;   /* land on the chips, then hold */
+    if (x != null) cur = tgt = x / document.documentElement.clientWidth;
     write();
     placeAxis();
     collapse();                     /* back to the 1px hairline */
@@ -977,12 +1044,15 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
 
   const paint = () => {
     const r = track.getBoundingClientRect();
+    /* The clip insets land on .pin, the band on .shell: both are clientWidth
+       wide. innerWidth includes the scrollbar and is a different space. */
+    const W = document.documentElement.clientWidth;
     /* progress from "track top touches the bottom of the screen" to
        "track top reaches the top of the screen" */
-    /* The first stretch of the scroll is the hairline holding still; growth
-       only starts once the section is properly on its way in. Without this
-       the line never exists as a line - it is already a block. */
-    const HOLD = .45;
+    /* Orel's call: the band starts widening on the FIRST scroll, not after a
+       beat of the hairline holding still. .45 of a 900px viewport was 405px —
+       three or four wheel clicks before anything moved. */
+    const HOLD = 0;
     const raw = (innerHeight - r.top) / innerHeight;
     const p = clamp01((raw - HOLD) / (1 - HOLD));
 
@@ -993,7 +1063,7 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
       const ax = parseFloat(getComputedStyle(shell).getPropertyValue('--axis-x'));
       if (!Number.isNaN(ax)) {
         pin.style.setProperty('--hw-left', (ax - 0.5) + 'px');
-        pin.style.setProperty('--hw-right', (innerWidth - ax - 0.5) + 'px');
+        pin.style.setProperty('--hw-right', (W - ax - 0.5) + 'px');
       }
     }
     if (p <= 0 || p >= 1) {
@@ -1024,13 +1094,13 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
     }
 
     const left  = lerp(from.left, 0, p);
-    const width = lerp(from.width, innerWidth, p);
+    const width = lerp(from.width, W, p);
     /* the band itself widens with the same numbers */
-    shell.style.setProperty('--reveal-pos', (((left + width / 2) / innerWidth) * 100) + '%');
+    shell.style.setProperty('--reveal-pos', (((left + width / 2) / W) * 100) + '%');
     shell.style.setProperty('--reveal-w', width + 'px');
     /* and the pinned section is cut to that rectangle */
     pin.style.setProperty('--hw-left',  Math.max(0, left) + 'px');
-    pin.style.setProperty('--hw-right', Math.max(0, innerWidth - (left + width)) + 'px');
+    pin.style.setProperty('--hw-right', Math.max(0, W - (left + width)) + 'px');
     pin.style.setProperty('--hw-top', '0px');
     pin.style.setProperty('--hw-bottom', '0px');
   };
@@ -1062,6 +1132,22 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
 
   /* the wipe occupies the middle of the track; the rest is row time */
   const A_END = .42, W_END = .58;
+
+  /* Both panes are absolutely positioned inside the sticky pin, so they share
+     one document position and a plain #problem link lands on Verfahren. Their
+     real addresses are points along this track: pane A owns the start, pane B
+     owns everything after the wipe has finished. */
+  const at = q => track.getBoundingClientRect().top + scrollY
+                + q * (track.offsetHeight - innerHeight);
+  const PANE_AT = { verfahren: 0, problem: W_END };
+  document.querySelectorAll('.overlay a[href^="#"]').forEach(link => {
+    const key = link.getAttribute('href').slice(1);
+    if (!(key in PANE_AT)) return;
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      scrollTo({ top: at(PANE_AT[key]), behavior: 'smooth' });
+    });
+  });
 
   const paint = () => {
     const rect = track.getBoundingClientRect();
@@ -1101,6 +1187,14 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
               (cb.left + cb.width / 2 - rb.left - 1) + 'px');
           }
           trail.style.setProperty('--trail-o', '1');
+        }
+        /* The axis stops on the last row's rule. Measured off the same rects,
+           because the distance from the pane's top edge down to the bottom of
+           the rows depends on the heading, which reflows with the width. */
+        if (rows_box) {
+          pane.style.setProperty('--axis-end',
+            (rows_box.getBoundingClientRect().bottom
+             - pane.getBoundingClientRect().top) + 'px');
         }
       };
       focus(a, 0, A_END);
