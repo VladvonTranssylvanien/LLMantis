@@ -195,6 +195,22 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 # development, never on a shared or public host.
 ALLOW_PRIVATE_SCAN_TARGETS = os.getenv("ALLOW_PRIVATE_SCAN_TARGETS", "").lower() in ("1", "true", "yes")
 
+# --- Public targets we own, exempt from DNS verification ----------------------
+# Same waiver as above, for a PUBLIC domain: our own test bots, named one at a
+# time, comma separated. A test bot on a real domain can publish the TXT record
+# — the reason to skip it is that during development the target moves and the
+# record does not follow, not that verification is impossible.
+#
+# This is a list rather than a boolean on purpose. Ownership verification is
+# what stops this deployment being aimed at a stranger's bot (PLAYBOOK §5), and
+# waiving it for a domain we control is a different act from waiving it for
+# everyone. Empty by default: a domain gets in only by being typed here.
+SCAN_UNVERIFIED_DOMAINS = {
+    d.strip().lower()
+    for d in os.getenv("SCAN_UNVERIFIED_DOMAINS", "").split(",")
+    if d.strip()
+}
+
 
 def summary() -> str:
     """Human-readable config dump, used by selfcheck and on server startup."""

@@ -73,6 +73,12 @@ services:
       # logged-in caller point a scan at 127.0.0.1 or the private network -
       # our own database included. It exists for lab/runner.py on a laptop.
       ALLOW_PRIVATE_SCAN_TARGETS: "false"
+      # Public domains allowed to be scanned without DNS ownership proof, comma
+      # separated. Our own test bots only. Empty here means the deployed default
+      # is "nobody" - a domain gets in by being named in deploy/.env, and comes
+      # back out by being removed from it. Listed in this block because
+      # `--env-file` alone would never reach the container (see PROVIDER above).
+      SCAN_UNVERIFIED_DOMAINS: ${SCAN_UNVERIFIED_DOMAINS:-}
 
   caddy:
     image: caddy:2.10-alpine

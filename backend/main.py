@@ -1071,7 +1071,8 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
                     f"network. If this is a local lab target (see lab/runner.py), "
                     f"set ALLOW_PRIVATE_SCAN_TARGETS=true in .env and restart."
                 )
-        elif not is_domain_verified(db, effective_org_id, domain):
+        elif (domain.lower() not in config.SCAN_UNVERIFIED_DOMAINS
+                and not is_domain_verified(db, effective_org_id, domain)):
             raise HTTPException(
                 403,
                 f"Ownership of '{domain}' is not verified for this organization. "

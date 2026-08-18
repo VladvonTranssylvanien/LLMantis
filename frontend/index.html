@@ -587,16 +587,49 @@ footer.site .sp { margin-left: auto; }
   <div class="panel">
     <div class="row">
       <div>
-        <label class="field" for="target">Demo bot</label>
-        <select id="target"><option value="">Custom prompt</option></select>
+        <label class="field" for="mode">What to test</label>
+        <select id="mode">
+          <option value="prompt">A system prompt — pasted here</option>
+          <option value="api">A live endpoint — the bot as deployed</option>
+        </select>
       </div>
       <div>
         <label class="field" for="canary">Canary string <span style="opacity:.6">(optional)</span></label>
         <input id="canary" class="mono" placeholder="SECRET-VIP-2026">
       </div>
     </div>
-    <label class="field" for="prompt" style="margin-top:16px">System prompt under test</label>
-    <textarea id="prompt" placeholder="You are the customer support assistant for..."></textarea>
+
+    <div id="promptFields">
+      <!-- The prompt is what gets attacked, but it does not say WHOSE bot it is,
+           and the Prüfbericht has to name the thing it judged. Without this the
+           report header reads "Custom prompt" for every customer alike. Optional
+           because a prompt pasted from a draft may not be live anywhere yet. -->
+      <label class="field" for="siteUrl" style="margin-top:16px">Bot's website <span style="opacity:.6">(optional — names the target in the report)</span></label>
+      <input id="siteUrl" class="mono" placeholder="https://example.com">
+      <label class="field" for="target" style="margin-top:16px">Demo bot</label>
+      <select id="target"><option value="">Custom prompt</option></select>
+      <label class="field" for="prompt" style="margin-top:16px">System prompt under test</label>
+      <textarea id="prompt" placeholder="You are the customer support assistant for..."></textarea>
+    </div>
+
+    <div id="apiFields" hidden>
+      <label class="field" for="apiUrl" style="margin-top:16px">Endpoint URL</label>
+      <input id="apiUrl" class="mono" placeholder="https://example.com/api/chat">
+      <label class="field" for="apiKey" style="margin-top:16px">API key</label>
+      <input id="apiKey" class="mono" type="password" placeholder="llm_…" autocomplete="off">
+      <!-- The endpoint must answer POST {"message":"..."} with JSON carrying one
+           of reply/answer/message/response/text/output (backend/scanner.py:113).
+           Said here because a mismatch surfaces as 21 identical ERROR rows, and
+           that reads as "the bot is broken" rather than "we spoke the wrong shape". -->
+      <p class="method" style="margin-top:10px">
+        The scan POSTs <code class="mono">{"message": "…"}</code> and reads the answer from
+        <code class="mono">reply</code>, <code class="mono">answer</code>, <code class="mono">message</code>,
+        <code class="mono">response</code>, <code class="mono">text</code> or <code class="mono">output</code>.
+        The bot's own system prompt stays unknown to us, so the judge cannot rule on
+        whether it leaked its instructions — every other check still runs.
+      </p>
+    </div>
+
     <div class="actions">
       <button class="btn" id="run">Run scan</button>
       <span class="chip" id="chip" role="status">loading library…</span>
@@ -721,10 +754,49 @@ $('target').addEventListener('change', e => {
   if (t) { $('prompt').value = t.system_prompt; $('canary').value = t.canary || ''; }
 });
 
+/* The two modes need different inputs, so only one set is ever on screen. The
+   canary applies to both: in api mode it is the only way layer 1 of the judge
+   can run at all, since we never see the bot's prompt to detect one in it. */
+$('mode').addEventListener('change', e => {
+  const api = e.target.value === 'api';
+  $('promptFields').hidden = api;
+  $('apiFields').hidden = !api;
+});
+
+/* The landing page's two paid tiers ARE these two modes: Starter tests a system
+   prompt, Business tests the running bot. The card that was clicked arrives as
+   ?mode=, so a Business visitor lands with the endpoint field already on screen
+   instead of on a form that asks for something they were never offered. */
+const wantedMode = new URLSearchParams(location.search).get('mode');
+if (wantedMode === 'api' || wantedMode === 'prompt') {
+  $('mode').value = wantedMode;
+  $('mode').dispatchEvent(new Event('change'));
+}
+
+/* A URL is how a person names a bot; the report wants the host, not the path. */
+function hostOf(url) {
+  try { return new URL(url).host; } catch (e) { return url; }
+}
+
 /* ------------------------------------------------------------------ scan -- */
 $('run').addEventListener('click', async () => {
+  const mode = $('mode').value;
   const systemPrompt = $('prompt').value.trim();
-  if (!systemPrompt) { $('error').textContent = 'Paste a system prompt first.'; return; }
+  const apiUrl = $('apiUrl').value.trim();
+  const apiKey = $('apiKey').value.trim();
+
+  if (mode === 'prompt' && !systemPrompt) {
+    $('error').textContent = 'Paste a system prompt first.'; return;
+  }
+  if (mode === 'api' && !apiUrl) {
+    $('error').textContent = 'Paste the endpoint URL first.'; return;
+  }
+  // The backend answers a keyless api-mode call with a 403 whose text is about
+  // org_id and ownership verification — accurate, and unreadable to anyone who
+  // has not read /api/scan. Say the actionable half here instead.
+  if (mode === 'api' && !apiKey) {
+    $('error').textContent = 'An API key is required to scan a live endpoint.'; return;
+  }
 
   $('error').textContent = '';
   $('run').disabled = true;
@@ -740,12 +812,16 @@ $('run').addEventListener('click', async () => {
   setProgress(0, 0);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (mode === 'api') headers['X-API-Key'] = apiKey;
+
     const res = await fetch('/api/scan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
-        mode: 'prompt',
-        system_prompt: systemPrompt,
+        mode,
+        system_prompt: mode === 'api' ? '' : systemPrompt,
+        api_url: mode === 'api' ? apiUrl : '',
         canary: $('canary').value.trim() || null
       })
     });
@@ -833,10 +909,20 @@ function render(report) {
     : (total > 0 && (errored / total) > INCOMPLETE_THRESHOLD);
 
   // Hand the report to the print view without a round trip to the backend.
-  // target_name isn't part of the API response (mode="prompt" has no name
-  // concept on the backend) — attach whichever demo bot is selected here.
-  const selectedTarget = demoTargets.find(t => t.id === $('target').value);
-  report.target_name = selectedTarget ? selectedTarget.name : 'Custom prompt';
+  // target_name is not part of the API response — the backend has no name
+  // concept for either mode — so the page names the target itself. Each mode
+  // knows a different thing about it: api mode has the endpoint, prompt mode
+  // has whatever the visitor typed, and only then the demo bot's own name.
+  // Without this an api scan would be filed under "Custom prompt".
+  if ($('mode').value === 'api') {
+    report.target_name = hostOf($('apiUrl').value.trim());
+  } else {
+    const site = $('siteUrl').value.trim();
+    const selectedTarget = demoTargets.find(t => t.id === $('target').value);
+    report.target_name = site ? hostOf(site)
+                       : selectedTarget ? selectedTarget.name
+                       : 'Custom prompt';
+  }
   try { sessionStorage.setItem(REPORT_KEY, JSON.stringify(report)); } catch (e) { /* quota */ }
 
   if (incomplete) {

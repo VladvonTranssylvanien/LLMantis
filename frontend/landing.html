@@ -628,7 +628,7 @@ footer a:hover{color:var(--accent)}
           <li>Prüfbericht als PDF: Note, Befunde, Behebung</li>
           <li>Jeder Befund mit dem Zitat, das ihn belegt</li>
         </ul>
-        <a class="cta" href="/static/index.html">Prüfung starten →</a>
+        <a class="cta" href="/static/index.html?mode=prompt">Prüfung starten →</a>
       </div>
       <div class="plan rv">
         <span class="n">Business</span>
@@ -641,7 +641,10 @@ footer a:hover{color:var(--accent)}
           <li>Nachprüfung nach der Behebung</li>
           <li>Verlauf und mehrere Bots</li>
         </ul>
-        <a class="cta" href="/static/index.html">Anfragen →</a>
+        <!-- Business is the live-bot test, so the page must open on the mode that
+             asks for the endpoint. Without ?mode=api it opens on the Starter form
+             and the endpoint field is not even on screen. -->
+        <a class="cta" href="/static/index.html?mode=api">Anfragen →</a>
       </div>
     </div>
     <p class="vat">Alle Preise zzgl. USt. · Individuelle Prüfung und Behebung auf Anfrage.</p>
