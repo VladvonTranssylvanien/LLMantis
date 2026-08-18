@@ -6,7 +6,7 @@ uvicorn[standard]==0.34.0
 pyyaml==6.0.2
 python-dotenv==1.2.2
 httpx==0.28.1
-mistralai==2.9.3          # EU provider for judge (France-based, CLOUD Act compliance)
+mistralai==2.9.3          # the judge/target provider registered in llm.py today
 beautifulsoup4==4.15.0    # tools/art50check.py and backend/art50check.py parse HTML for chat widgets
 dnspython==2.8.0          # backend/ownership.py - DNS TXT record verification
 sqlalchemy==2.0.52        # backend/models.py, backend/database.py

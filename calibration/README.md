@@ -183,17 +183,17 @@ item because the probe is not in `attacks/attacks.yaml`, and an item's
 `attack_id` must be a real library id. One attack supplying a prior
 conversation would close it.
 
-Full mode needs a working EU judge in the repo root `.env`:
+Full mode needs a working judge in the repo root `.env`:
 
 ```
 PROVIDER=mistral
 MISTRAL_API_KEY=...
 ```
 
-**The judge runs on Mistral, never on Azure.** The lab targets may live anywhere;
-the judge sees customer system prompts, which are trade secrets, so it stays in
-the EU (`PLAYBOOK.md` §1, `GREGOR-TARGET-LAB.md:158`). `calibrate.py` reads no
-`LAB_AZURE_*` variable by design.
+**The judge is whatever `PROVIDER` names; the lab targets are separate.**
+`calibrate.py` reads no `LAB_AZURE_*` variable by design — not for residency
+reasons, but because a number is only reproducible if the judge under test is
+the one the product ships, configured in one place.
 
 Without a provider:
 

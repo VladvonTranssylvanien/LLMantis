@@ -38,8 +38,8 @@ cp .env.example .env
 
 Keep `PROVIDER=mistral` and put a real `MISTRAL_API_KEY` next to it. Get one
 from https://console.mistral.ai — the free tier is enough for the current
-21-attack library. **Mistral is the only provider** — see `PLAYBOOK.md` §1
-for why (no US vendor in the stack).
+21-attack library. Mistral is the only provider `backend/llm.py` registers at
+the moment; that is what is wired up, not a rule.
 
 There is no mock or offline mode. Without a key every attack comes back as
 an error and the scan is issued no grade, under an HTTP 200.

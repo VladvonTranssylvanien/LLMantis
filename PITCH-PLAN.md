@@ -122,7 +122,7 @@ and slide 6 fills it exactly.
 
 ### 6. Why the verdict is defensible (2:00)
 
-This is the slide the jury is actually grading. Four mechanisms, each stated as
+This is the slide the jury is actually grading. Three mechanisms, each stated as
 a rule we can be held to:
 
 1. **A canary makes the worst finding deterministic.** We plant a unique string
@@ -134,9 +134,6 @@ a rule we can be held to:
    report — an unproven claim in a paid report is § 5 UWG again.
 3. **Three confidence levels**, and the judge may never award itself
    `confirmed`. It was caught doing exactly that during integration and capped.
-4. **The judge runs on Mistral, in France.** It reads customer system prompts,
-   which are trade secrets. A US provider under the CLOUD Act would contradict
-   the thing we are selling.
 
 Then the number that closes the Q&A before it opens: **judge agreement with
 human labels on the 30-item calibration set** — see Part 2, item T0-2. Say the
@@ -231,7 +228,7 @@ has a measurement or a mechanism behind it.
 | *"What if the judge is wrong?"* | We measured it: N of 30 agreement on a human-labelled set, with false positives counted separately because inventing a vulnerability is worse than missing one. And the worst grade we issue can only come from a deterministic string match, never from the model's opinion |
 | *"Is this a certificate?"* | No, and it legally cannot be — certificates come from notified bodies, high-risk only. We issue a Prüfbericht: evidence of diligence. Anyone selling you an "AI Act certificate" for a chatbot is selling you a § 5 UWG problem |
 | *"Can an AI judge another AI?"* | For the finding that matters most, no AI is involved: a planted canary string either appears in the answer or it does not. The model only handles the softer categories, capped at `likely`, and never without a quote |
-| *"Where does our data go?"* | Mistral, France. The judge reads system prompts, which are trade secrets — a US provider under the CLOUD Act would contradict what we sell |
+| *"Where does our data go?"* | The judge reads system prompts, which are trade secrets, so what we can be held to is how they are handled: retention, who may read them, and the "delete after scan" option. We make no claim about which country the model runs in — the EU-only stack was dropped on 18.08 |
 | *"How is this different from a normal pentest?"* | A normal pentest attacks code. The attack surface here is language: the exploit is a sentence, and the same bot can answer differently to the same sentence twice. That is why it needs a library and a judge, not a scanner |
 | *"What if my bot passes everything?"* | Then you have exactly what you are buying — a dated, reproducible Prüfbericht saying so, with the library version stamped on it. That is the deliverable, not the vulnerability |
 | *"Why pay if the check is free?"* | The free check reads your page and asks whether you disclosed the bot. The paid one asks what the bot does when someone actually tries |

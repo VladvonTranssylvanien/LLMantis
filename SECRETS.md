@@ -17,9 +17,9 @@ This document explains how LLMantis handles secrets securely.
 | User passwords | `users.password_hash` in Postgres | ✅ bcrypt, plaintext never stored | Each user |
 | LLMantis API keys (`llm_live_...`) | Issued via `POST /api/keys`, hash stored in Postgres | ✅ shown to the caller once, never recoverable | Whoever calls the endpoint, if a member of the org |
 
-⚠️ No US provider is used anywhere — `ANTHROPIC_API_KEY` was removed along
-with all Anthropic code during the Mistral migration. Do not reintroduce it;
-see `PLAYBOOK.md` §1 for why (CLOUD Act vs. the customer data we process).
+⚠️ `MISTRAL_API_KEY` is the only model credential the code reads today. Whatever
+provider replaces or joins it, the rule that matters is the one in this file:
+the key lives in `.env`, never in the repository, and never in a chat message.
 
 ### `JWT_SECRET` — signs every login token
 
@@ -36,7 +36,7 @@ everyone out immediately (same idea as revoking an API key).
 
 ### 1. Get Your API Keys
 
-**Mistral (the only LLM provider — France, EU-compliant):**
+**Mistral (the LLM provider the code reads today):**
 ```
 1. Go to https://console.mistral.ai
 2. Login

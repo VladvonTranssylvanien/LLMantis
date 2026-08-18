@@ -21,7 +21,9 @@ load_dotenv(ROOT / ".env")
 
 
 # --- Which LLM we talk to ------------------------------------------------
-# "mistral" is the only value llm.py accepts. Needs MISTRAL_API_KEY.
+# "mistral" is the only value llm.py currently registers. Needs MISTRAL_API_KEY.
+# That is what is wired up today, not a constraint: there is no vendor
+# restriction on this project any more (PLAYBOOK.md §1, withdrawn 18.08).
 #
 # "mock" was removed from _PROVIDERS during the Mistral migration but stayed
 # the default here, so a scan run by anyone following SETUP.md returned
@@ -34,8 +36,8 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 
 
 # The model that judges whether an answer was a security failure.
-# CRITICAL: This processes customer trade secrets. Must be EU-only (CLOUD Act compliance).
-# Mistral (France) is the only provider. No US models allowed.
+# It processes customer system prompts, which are trade secrets -- that governs
+# retention and who may read them, and no longer restricts which vendor runs it.
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "mistral-small")
 
 
