@@ -79,7 +79,16 @@ CHATTY_TEXT = re.compile(
     r"\bchat|chatbot|\bbot\b|messenger|\bnachricht|"
     r"\bassistent\b|\bassistant\b|\bberater\b|"
     r"\bhilfe-?chat\b|\bfrage stellen\b|\bfragen\?|"
-    r"schreiben sie uns|write to us|\bkonversation\b", re.I)
+    r"schreiben sie uns|write to us|\bkonversation\b|"
+    # An element pinned to a corner that says "AI" or "KI" is announcing an AI.
+    # That is the cleanest signal there is, and tightening this pattern to kill
+    # tchibo.de's "Anfrage" false positive removed it: westwing.de's launcher
+    # reads "Westwing AI (BETA) — Suchst du etwas Bestimmtes…" and came back
+    # chatty=false, so a site whose bot announces itself in the button was
+    # reported as "widget present, launcher says nothing".
+    r"\bKI\b|\bAI\b|künstliche intelligenz|"
+    # Vendors name their own mount points. vfrc = Voiceflow React Chat.
+    r"launcher|vfrc|voiceflow|webchat|web-chat", re.I)
 
 # Things that live in a fixed corner, look chat-shaped, and are not chats. These
 # are the systematic false positives — found by reading the probe log, not by
@@ -127,7 +136,7 @@ WALK_FIXED = r"""
   // and an accessibility overlay both sit fixed in a corner and both matched the
   // loose version of this, which is how tchibo.de's consent notice was reported
   // as a chat launcher.
-  const CHATTY = /\bchat|chatbot|\bbot\b|messenger|\bnachricht|\bassistent\b|\bassistant\b|\bberater\b|\bhilfe-?chat\b|\bfrage stellen\b|schreiben sie uns|write to us/i;
+  const CHATTY = /\bchat|chatbot|\bbot\b|messenger|\bnachricht|\bassistent\b|\bassistant\b|\bberater\b|\bhilfe-?chat\b|\bfrage stellen\b|schreiben sie uns|write to us|\bKI\b|\bAI\b|künstliche intelligenz|launcher|vfrc|voiceflow|webchat|web-chat/i;
   const NOT_CHAT = /eye-?able|accessibility|barrierefrei|assistenztechnik|usercentrics|cookiebot|onetrust|sourcepoint|borlabs|klaro|consent|cookie|datenschutz|privatsph|einwillig|newsletter|rabatt|gutschein|trustbadge|trustedshops|back-?to-?top|scroll-?to-?top/i;
   // Shadow roots are walked because innerText and querySelectorAll both stop at
   // the boundary, and westwing.de keeps its launcher text inside one.
@@ -149,7 +158,24 @@ WALK_FIXED = r"""
     const cs = getComputedStyle(host);
     if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) continue;
     const r = host.getBoundingClientRect();
-    if (r.width < 24 || r.height < 24 || r.width > 560 || r.height > 760) continue;
+    if (r.width < 24 || r.height < 24) continue;
+    // Size is a WEAK guess and must not overrule a label that names the thing.
+    //
+    // westwing.de's Voiceflow container is 960x810 and its label reads
+    // "Shopping Assistant (BETA)" — we threw it away for being wider than 560,
+    // which is how a site whose bot announces itself in plain German came back
+    // as "widget present, launcher says nothing". The cap exists to reject
+    // page-sized overlays, so keep it tight when we are guessing from shape
+    // alone, and relax it when the element tells us what it is. Anything
+    // covering essentially the whole viewport is still out: that is a modal,
+    // not a launcher.
+    const lbl = [host.getAttribute('aria-label'), host.getAttribute('title'),
+                 host.id, ((host.className || '') + ''),
+                 (host.innerText || '').slice(0, 200)].filter(Boolean).join(' ');
+    const named = CHATTY.test(lbl) && !NOT_CHAT.test(lbl);
+    const nearlyFullscreen = r.width > innerWidth * 0.96 && r.height > innerHeight * 0.9;
+    if (nearlyFullscreen) continue;
+    if (!named && (r.width > 560 || r.height > 760)) continue;
     if (r.bottom < innerHeight * 0.45) continue;
     const visible = [host.getAttribute('aria-label'), host.getAttribute('title'),
                      (host.innerText || '').slice(0, 200)]
