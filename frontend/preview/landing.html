@@ -97,9 +97,14 @@ a{color:inherit}
 /* No axis is drawn up front. The hairline that runs down the page IS the band,
    frozen where it stopped on the first scroll — so there is never a moment
    with two vertical lines on screen. */
-.shell[data-band-frozen="true"] .layer--base::after{content:'';position:absolute;
-  top:0;bottom:0;left:var(--reveal-pos);width:1px;background:var(--accent-line);
-  pointer-events:none;z-index:0}
+/* Drawn on the runway, not on the whole layer: the line ends where the pinned
+   sections end instead of running on through the footer. */
+.shell[data-band-frozen="true"] .runway::after{content:'';position:absolute;
+  top:0;bottom:0;left:var(--axis-x,60%);width:1px;background:var(--accent-line);
+  pointer-events:none;z-index:3}
+/* --axis-x, not --reveal-pos: the growing rectangle's centre necessarily
+   drifts toward the middle of the screen as it widens, and the axis must not
+   drift with it. Measured 55.71% against chips at 57.45% before this split. */
 /* The head no longer needs to sit above the band: the reveal layer is given a
    second canvas of its own and the same geometry is painted into it with an
    inverted palette, so the head shows through the band like everything else. */
@@ -857,18 +862,42 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   /* The first scroll ends the pointer phase permanently: the band stops where
      it is and becomes the page's vertical axis. Their band keeps following
      forever; this is Bogdan's call and it is deliberate. */
+  /* The line has to run THROUGH the numbered chips, so the freeze target is
+     the chip column measured from a real chip - not wherever the pointer
+     happened to be. Guessing the column from the grid percentages would drift
+     the moment the layout changes. */
+  const chipCentre = () => {
+    const chip = document.querySelector('.pane--a .chip');
+    if (!chip) return cur;
+    const r = chip.getBoundingClientRect();
+    return (r.left + r.width / 2) / innerWidth;
+  };
+
   const freeze = () => {
     if (shell.dataset.bandFrozen === 'true') return;
     shell.dataset.bandFrozen = 'true';
     clearTimeout(idleTimer);
     cancelAnimationFrame(raf); raf = 0;
-    cur = tgt;                      /* stop mid-flight, do not spring */
+    cur = tgt = chipCentre();       /* land on the chips, then hold */
     write();
+    shell.style.setProperty('--axis-x', (cur * 100) + '%');
     collapse();                     /* back to the 1px hairline */
     removeEventListener('pointermove', onMove);
   };
-  addEventListener('scroll', () => { if (scrollY > 0) freeze(); },
-                   { passive: true, once: false });
+
+  /* Back at the top, the first screen behaves as it did on arrival. Without
+     this the band stayed dead for the rest of the visit. */
+  const thaw = () => {
+    if (shell.dataset.bandFrozen !== 'true') return;
+    delete shell.dataset.bandFrozen;
+    shell.style.removeProperty('--axis-x');
+    cur = tgt = START;
+    write();
+    addEventListener('pointermove', onMove, { passive: true });
+  };
+
+  addEventListener('scroll', () => { scrollY > 0 ? freeze() : thaw(); },
+                   { passive: true });
 
   const enable = () => {
     if (on) return;
