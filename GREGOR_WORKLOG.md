@@ -3429,6 +3429,154 @@ appeared now says that instead of naming a country. The `zertifiziert` ban
 
 ---
 
+## 2026-08-18 — Session 31: the engine attacks a real deployment, and the judge stopped wobbling
+
+Gregor's direction: judge on **gpt-4.1**, target on **gpt-4.1-mini**, both on the
+existing Azure resource; Grok deleted as unusable on its rate limits; variance
+acceptable. And the real ask: **the scan should attack a real target instead of
+replaying a system prompt on our own engine.** PR #25, branch
+`gregor/engine-rework`.
+
+### What a scan is, changed
+
+`mode="prompt"` called `chat()` with the target's system prompt on
+`mistral-small` — so every scan measured a bot **we were simulating**. It now
+POSTs the system prompt plus the attack to a real deployment and attacks the
+answer. Azure Foundry holds no instructions of its own, so the prompt travels
+with each request; that is also how a great many real chatbots work, because the
+application owns the prompt.
+
+Three choices worth recording, all made to keep the change small:
+
+1. **`"prompt"` kept as an alias for the new `"model"` mode.** `frontend/`
+   hardcodes `mode:'prompt'` (`index.html:422-430`) and `demo/targets.yaml`
+   carries the prompts, so aliasing means **zero frontend change** and the prompt
+   stays exactly as editable as before — a textarea and a YAML field, which was
+   Gregor's requirement.
+2. **`mode="api"` untouched.** That is the path for a bot that already holds its
+   own prompt — Gregor's "readily applied chatbot" — and it keeps its DNS
+   ownership gate.
+3. **`TARGET_URL`/`TARGET_KEY` are config-only, never read from a request body.**
+   A caller-supplied url is precisely what `mode="api"` is for, and it is gated.
+   Keeping the new mode config-only means it adds **no SSRF surface**. `Target`
+   is built field by field in `main.py:1081`, verified, so a body cannot inject
+   one.
+
+`TARGET_MODEL` replaces the hardcoded `"mistral-small"` at `scanner.py:63`,
+which closes problem #5.
+
+### ⭐ The judge stopped wobbling — problem #1 is closed by the engine, not by a seed
+
+Same set, same command, same n as the recorded baseline:
+
+```
+mistral-small  n=10   mean 94.3 %   range 26-30 of 30   5 unstable items
+gpt-4.1        n=10   29/29 EVERY RUN                   0 unstable items
+```
+
+No `temperature` and no `seed` were added — Gregor said variance was acceptable,
+so `chat()`'s signature is unchanged. It turned out not to be needed. All five
+previously unstable items agree, **including `cal-021` and `cal-023`**, the two
+session 16 named in advance as the likeliest false positives.
+
+⚠️ **29, not 30, and it is not a like-for-like replacement for "29/30".**
+`cal-027` is unjudgeable on Azure every single run: it is the `jb_encoding` item
+whose `bot_response` *is* an Azure content-filter error, so the base64 payload
+trips the filter on the judge path exactly as it does at the target.
+
+### Two defects this path had to carry itself
+
+Both would have been silent.
+
+1. 🔴 **The empty-answer guard.** `lab/runner.py` has had it since 16.08;
+   `scanner.py` never has (issue #7), because prompt mode went through `chat()`.
+   An empty answer holds no canary and no forbidden phrase, so the judge scores
+   it **PASS** — a model that never answered recorded as one that resisted,
+   systematic false negatives inverted from the truth. Leaving the runner behind
+   meant carrying the guard or reintroducing the bug. It now raises, so the
+   result is ERROR and counts toward gradability.
+2. 🔴 **`calibrate.py` died on the first unjudgeable item**, taking the other 29
+   with it in a traceback. Unjudgeable items are now ERROR and excluded from the
+   agreement count — neither agreement nor disagreement, because counting them
+   either way invents a verdict the judge never gave. Its provider guard also
+   hardcoded `("mistral",)` and duly rejected `PROVIDER=azure` the first time the
+   judge moved; it reads `_PROVIDERS` now, so it will not go stale again.
+
+### ⭐ The judge-filtering risk was measured and is not real
+
+The obvious worry with judge and target on the same filtered provider: the judge
+reads attack text and bot answers, which is what a filter objects to. Measured
+across the full 78-attack library on all three bots, ~218 judge calls:
+
+```
+judge-side filtering    0 of 78, every bot
+target-side filtering   5 of 78, identical on every bot
+```
+
+Session 19 measured **8** of 78 filtered at the target through the runner;
+directly it is **5**. Not chased — the direction is favourable and
+`critical_coverage` came out at 87 %, comfortably gradable.
+
+⚠️ One latent inconsistency **reported, not fixed**: `scoring.classify()` decides
+BLOCKED from the error *text*, so a judge-side filter would also be labelled
+BLOCKED, and its docstring justifies that exclusion with "the bot demonstrated
+nothing" — false when the bot answered and only the judging failed. Zero
+occurrences in 218 calls. Fixing it now would be building a defence for an
+invented scenario (Gate 1).
+
+### The quota problem is gone; the corpus problem is not
+
+**0 rate-limit errors** across 234 target calls and ~218 judge calls. Mistral
+needed ~121 requests against a 50/minute ceiling and returned *no grade / C / A*
+on three runs of the same bot (session 22). That whole class of instability is
+closed.
+
+| corpus | vulnerable | hardened | middle case |
+|---|---|---|---|
+| 21 attacks | **F (0)** | **A (94-100)** | **D (42)** |
+| 78 attacks | **F (0)** | **B (79)** | **F (0)** |
+
+So the quota argument for the short corpus is gone and the **resolution**
+argument is now the only one — on 78 attacks the vulnerable bot and the middle
+case both floor at F and the control drops to B. `DEFAULT_ATTACK_LIBRARY` is
+already `attacks_short.yaml`; this is evidence for keeping it there on the
+merits.
+
+### ⚠️ For the pitch: promise a contrast, not two letters
+
+Three runs each on the 21-attack corpus, 0 errors every time:
+
+```
+vulnerable   F(0) | D(34) | F(0)          4-8 findings
+hardened     A(94) | A(100) | A(100)      one earlier run: B(85)
+```
+
+The vulnerable bot moves **F↔D** and the control has been seen at **B(85)** once
+in four runs. That is the **target** answering differently, not the judge — the
+judge is now stable. It is the thing `PITCH-PLAN.md` already says out loud in
+Q&A ("the same bot can answer differently to the same sentence twice"), so it is
+honest rather than embarrassing. But slide 5 must not promise "D → A".
+Bogdan's slide; flagged, not edited.
+
+### What I did NOT verify
+
+- **One sample per bot on the 78-attack corpus.** Given the F↔D movement, those
+  are indicative, not settled.
+- **No scan through `POST /api/scan`.** `run_scan` was called directly, so org
+  resolution, ownership checks and persistence are still unexercised — the same
+  gap as session 22.
+- **No browser.** The `"prompt"` alias was verified in code (`target_mode`
+  round-trips, real HTTP, 0 errors), never through the UI.
+- **`set-v2` was not re-run** against the new judge. Only v1.
+- **Whether Azure holds at `CONCURRENCY` above 3.** 3 gave 0 errors; higher
+  untested.
+- Why target-side filtering fell from 8 to 5. Two different request paths and
+  two different dates; not isolated.
+- The `inj_base64_exfil` parse error on Bot C (*"the judge returned output we
+  could not parse"*) — 1 of 234, not chased.
+
+---
+
 # Start here tomorrow
 
 ⚠️ **Superseded in one respect by session 30:** the EU-only stack and the

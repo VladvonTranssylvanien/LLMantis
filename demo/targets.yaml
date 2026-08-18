@@ -16,8 +16,10 @@
 #
 # They are the same three bots, reached two different ways:
 #
-#   - this file  -> the frontend dropdown -> scanner mode="prompt", which runs
-#     the prompt on mistral-small (backend/scanner.py:52)
+#   - this file  -> the frontend dropdown -> scanner mode="model" (the frontend
+#     still says "prompt", which is an accepted alias). Since 18.08 that sends
+#     this system_prompt to the real TARGET_MODEL deployment over HTTP; it used
+#     to replay the prompt on mistral-small inside our own process
 #   - lab/bots/  -> lab/runner.py -> Azure, scanner mode="api", which is where
 #     the model-diversity numbers in GREGOR_WORKLOG.md come from
 #

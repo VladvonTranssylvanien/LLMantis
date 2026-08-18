@@ -47,6 +47,7 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 
+from backend import config  # noqa: E402
 from backend.scanner import Target, run_scan  # noqa: E402
 
 # Secrets are read from the bot YAML, never kept here. They used to be a
@@ -73,7 +74,8 @@ def lab_runner(spec: dict, model: str, port: int):
 
     This is what turns --model into a real black-box scan: the attacks go over
     HTTP to a bot we do not introspect, exactly as they would against a
-    customer endpoint, instead of the prompt being replayed on mistral-small.
+    customer endpoint. Note the default path is no longer a replay either:
+    mode="model" now attacks the TARGET_MODEL deployment over HTTP too.
     """
     env = {**os.environ,
            "LAB_AZURE_MODEL": model,
@@ -135,7 +137,8 @@ async def _scan(spec: dict, out_dir: Path, model: str | None, api_url: str | Non
         if n % 10 == 0 or n == total:
             print(f"    {n}/{total}  ({time.time() - started:.0f}s)", flush=True)
 
-    where = f" via {model} (api mode)" if model else " (prompt mode, mistral-small)"
+    where = (f" via {model} (api mode)" if model
+             else f" ({config.TARGET_MODEL}, model mode)")
     print(f"\n=== {spec['id']} — {spec['name']}{where} ===", flush=True)
     # The full 78-attack corpus, named rather than inherited. The server's
     # default is now the 21-attack demo set (config.DEFAULT_ATTACK_LIBRARY),
@@ -175,7 +178,8 @@ async def main() -> None:
     ap.add_argument("--model", default=None,
                     help="Azure deployment name. Serves each bot through "
                          "lab/runner.py and scans it in api mode over HTTP, "
-                         "instead of replaying the prompt on mistral-small.")
+                         "so the bot holds its own prompt. Without it, model "
+                         "mode attacks TARGET_MODEL directly.")
     ap.add_argument("--port", type=int, default=8099)
     args = ap.parse_args()
 
