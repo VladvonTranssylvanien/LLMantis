@@ -126,11 +126,14 @@ Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 > much as a compliance manager, the Prüfbericht was always a light document, and
 > one theme across landing + app + report is less to carry.
 >
-> **State right now:** shipped. `frontend/preview/` and its `REVIEW.md` are gone —
-> the preview pages were swapped into the live ones, so there is nothing left to
-> review separately. `assets/base.css` is still dark, and is now loaded by exactly
-> one page, `art50check.html`, which belongs to Vlad. That is the one dark seam
-> left in the product.
+> **State right now:** shipped, and there is no dark page left. `frontend/preview/`
+> and its `REVIEW.md` are gone — the preview pages were swapped into the live
+> ones, so there is nothing left to review separately. `assets/base.css` still
+> holds the dark set but **no page links it any more**: `art50check.html` was the
+> last one, and it joined the light system by inlining the same foundation the
+> other five carry. It held no colour literal of its own, so nothing in its own
+> rules had to be rewritten. base.css is now dead weight and can be deleted the
+> day somebody wants to.
 >
 > The app first shipped light on its own palette (`#F7F8F5 / #111827 / #256B10`)
 > while the landing shipped on another. Both differences turned out to be hue and

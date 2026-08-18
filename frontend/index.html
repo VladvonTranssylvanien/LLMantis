@@ -125,10 +125,14 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
 }
 
 :root{
-  /* This block is copied verbatim into index/scanner/report/impressum/
-     datenschutz.html. That duplication is why the app and the landing drifted
-     into two palettes in the first place: a colour changed in one file only.
-     Change it in all five, and keep them byte-identical. */
+  /* This block is copied verbatim into all SIX pages: index, scanner, report,
+     impressum, datenschutz, art50check. That duplication is why the app and
+     the landing drifted into two palettes in the first place: a colour changed
+     in one file only. Change it in all six, and keep them byte-identical:
+       for f in index scanner report impressum datenschutz art50check; do
+         awk '/^:root\{/,/^\}/' frontend/$f.html | md5; done   # one hash
+     art50check.html was the last page to join, and it joined by dropping its
+     <link> to assets/base.css — which nothing loads any more. */
   --bg:#F2F1EB;            /* the landing's ground. The app's own was #F7F8F5,
                               1.06 away — the swap is a hue move, not a weight
                               move, so no AA threshold turns over on it.      */
@@ -227,8 +231,9 @@ body{font-family:var(--sans)}
 /* ===========================================================================
    LLMantis — scan app. Both sentences that used to be here were wrong, so
    they say the true thing now: the tokens and @font-face rules are INLINE in
-   this file (assets/base.css is the dark stylesheet, and only art50check.html
-   still loads it), and there ARE colour literals below — the status washes,
+   this file (assets/base.css is the dark stylesheet, and NOTHING loads it any
+   more — art50check.html was the last page and it stopped), and there ARE
+   colour literals below — the status washes,
    which are severity tints rather than palette values. Everything else
    resolves to a token.
    =========================================================================== */
