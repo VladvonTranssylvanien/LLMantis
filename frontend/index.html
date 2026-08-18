@@ -648,12 +648,6 @@ const truncate = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(
 
 let demoTargets = [];
 
-/* ---------------------------------------------------------- mobile menu -- */
-$('menuBtn').addEventListener('click', () => {
-  const open = $('nav').classList.toggle('open');
-  $('menuBtn').setAttribute('aria-expanded', String(open));
-});
-
 /* ------------------------------------------------------------- bootstrap -- */
 (async function init() {
   try {

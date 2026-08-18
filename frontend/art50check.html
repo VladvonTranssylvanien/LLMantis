@@ -571,11 +571,6 @@ function escHtml(s) {
 }
 const $ = id => document.getElementById(id);
 
-const menuBtn = $('menuBtn'), nav = $('nav');
-menuBtn.addEventListener('click', () => {
-  menuBtn.setAttribute('aria-expanded', String(nav.classList.toggle('open')));
-});
-
 const form = $('checkForm'), runBtn = $('run'), errEl = $('error');
 const progress = $('progress'), result = $('result');
 
