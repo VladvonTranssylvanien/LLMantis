@@ -80,14 +80,19 @@ footer.site a { color: var(--muted); }
 
   <h2>What we did</h2>
   <p>
-    We sent a single HTTP GET request to a public page on your site — the
-    same request an ordinary visitor's browser makes when they open the
-    page. We looked at the HTML for two things:
+    We opened a public page on your site in an ordinary browser — the same
+    Chromium an ordinary visitor uses, running your JavaScript and scrolling
+    the page as a visitor would. If the entry page carried no chat widget, we
+    may have followed your own <span lang="de">Hilfe</span>, Kontakt or
+    Service link and looked there too. We were checking two things:
   </p>
   <ul>
-    <li>Is there a chat widget (a known vendor script — Intercom, Tidio,
-      Crisp, and similar)?</li>
-    <li>If so, does the page text disclose that it's an AI, as required by
+    <li>Is a chat widget present? We look at the requests the page makes, the
+      objects its scripts install, and the elements it renders — not just at
+      the raw HTML, because most widgets today are bundled into a site's own
+      build and never show a vendor's domain at all.</li>
+    <li>If one is present: does its visible label, or the first thing the
+      assistant says when the chat opens, disclose that it's an AI — as required by
       <a href="https://artificialintelligenceact.eu/article/50/" rel="noopener">
       Art. 50(1) of the EU AI Act</a> (in force since 2 August 2026)?</li>
   </ul>
@@ -95,29 +100,61 @@ footer.site a { color: var(--muted); }
   <div class="panel">
     <h3>What we did not do</h3>
     <ul>
-      <li>We never opened your chat widget or sent it a message.</li>
+      <li><b>We did not send your bot a message and did not type anything.</b>
+        We clicked your chat button once — what any visitor does — and read the
+        greeting your assistant produced on its own, because that greeting is what
+        Art. 50(1) actually governs. Nothing was submitted, and no code path in
+        the checker can enter text into a chat.</li>
+      <li>We did not run any attack against your assistant. That is a separate,
+        paid test and it requires you to prove you own the domain first.</li>
       <li>We never attempted to log in, bypass authentication, or access
-        anything not already public.</li>
-      <li>We didn't store your page content — only whether a widget exists
-        and whether it discloses being AI.</li>
+        anything not already public. We did not accept a cookie banner on your
+        behalf, and we do not disguise ourselves as something we're not.</li>
+      <li>We didn't store your page content. We keep whether a widget exists,
+        the widget's visible label, and one screenshot.</li>
     </ul>
+  </div>
+
+  <div class="panel">
+    <h3>What we will not claim</h3>
+    <p style="margin:0">
+      If we could not open your widget — a cookie wall, a login, a button that
+      would not respond — our result says <i>not determinable</i> and nothing more.
+      We do not infer non-compliance from a button we never opened, and we do not
+      infer it from page copy either. A missing disclosure is only reported when we
+      actually read what your assistant said and it did not say it was one.
+    </p>
   </div>
 
   <h2>Who we are</h2>
   <p>
     LLMantis tests whether AI chatbots disclose that they're AI and, for
     consenting customers, runs documented security attacks against them.
-    This particular check — the free layer — is passive by design: no
-    permission is required because it's equivalent to a normal page visit.
+    This particular check — the free layer — asks no permission because it does
+    nothing a visitor could not do: it loads public pages and clicks one public
+    button. The line we hold is between <b>reading</b> what your assistant says
+    and <b>writing</b> to it. We read. Attacking it is the paid test, and it
+    requires you to prove the domain is yours.
+  </p>
+
+  <h2>About <code>robots.txt</code></h2>
+  <p>
+    We read your <code>robots.txt</code> and record what it says on every
+    check, and the result names it. We do not treat it as a bar to opening one
+    public page: it is a voluntary convention
+    (<a href="https://datatracker.ietf.org/doc/html/rfc9309" rel="noopener">RFC
+    9309</a>) addressed to crawlers that collect content, and this is a
+    single compliance read of a page any visitor can open. We are not copying
+    your content, indexing it, or using it to train anything.
   </p>
 
   <h2>How to opt out</h2>
   <p>
-    We honour <code>robots.txt</code>. If you'd rather we didn't visit,
-    add a rule disallowing <code>LLMantis-Checker</code> and we won't
-    fetch your pages again. If you have any other concern, write to us —
-    a human reads every message:
-    <a href="mailto:kontakt@llmantis.de">kontakt@llmantis.de</a>.
+    Write to us and we will stop, permanently, and tell you what we already
+    hold about your site. A human reads every message:
+    <a href="mailto:kontakt@llmantis.de">kontakt@llmantis.de</a>. Blocking the
+    <code>X-LLMantis-Checker</code> header or our address at your edge also
+    works, and we won't route around it.
   </p>
 </div>
 
