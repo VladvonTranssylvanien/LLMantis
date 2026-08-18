@@ -19,6 +19,14 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Chromium for backend/art50engine.py, plus the system libraries it needs. This is
+# the single largest thing in the image (~400 MB with the browser) and it is here
+# rather than in a separate service because the Art.-50 check is an endpoint of
+# this app, not a pipeline stage. --with-deps installs the apt packages Chromium
+# links against; without them the browser is present and every launch fails.
+RUN python -m playwright install --with-deps chromium && \
+    rm -rf /root/.cache/pip
+
 COPY backend/  ./backend/
 COPY attacks/  ./attacks/
 COPY demo/     ./demo/

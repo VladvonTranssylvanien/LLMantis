@@ -54,8 +54,11 @@ from .models import (
     Organization, Target as DBTarget, Scan as DBScan, Result as DBResult,
     Branding, User, Membership,
 )
-from .art50check import check_art50
-from .netguard import is_private_url
+# The browser-driven checker replaced the passive one on 18.08 — art50check.py
+# found 0 widgets on 24 real German sites. Kept importable for now so nothing
+# else breaks, but no endpoint calls it.
+from .art50engine import check as art50_check_site
+from .netguard import is_private_url, assert_public_host, UnsafeUrlError
 from .ownership import create_challenge, verify_ownership, is_domain_verified
 from .apikeys import (
     create_api_key, list_api_keys, revoke_api_key, resolve_org_from_api_key,
@@ -406,26 +409,108 @@ async def list_targets():
     return {"targets": _load_demo_targets()}
 
 
+# One browser is ~300 MB of RAM and a check runs 30-150 s, so this is a real
+# resource, not a request handler. Two at a time; the rest wait rather than
+# taking the box down. The rate limit below is the first line, this is the second.
+_ART50_SLOTS = asyncio.Semaphore(2)
+
+
 @app.post("/api/art50check")
-@limiter.limit("20/minute")
+@limiter.limit("4/minute")
 async def art50_check(request: Request, body: ScanRequest):
     """
-    Passive Art. 50 AI Act compliance check.
+    Art. 50 AI Act disclosure check. Streams NDJSON.
 
-    Checks if a website's chatbot discloses that it is AI (Art. 50(1) AI Act).
-    No active attacks — just visits the page and looks at the widget.
+    ALL TWELVE DETECTION METHODS RUN, ON EVERY PAGE, ON THE FREE CHECK.
+        Team decision 18.08. The previous version was one passive GET that grepped
+        the whole page; measured on 24 real German sites it found 0 widgets, because
+        6 sites never served it a usable page and the rest bundle their widget into
+        their own build where no vendor domain appears. See backend/art50engine.py
+        for the numbers.
 
-    Returns findings about:
-        - Widget detection
-        - AI disclosure
-        - Privacy link
-        - Impressum (§ 5 DDG)
+        The sweep is exhaustive: every candidate page, both form factors, nothing
+        stopped early. That costs 30-150 s, which is why this streams — the caller
+        watches twelve methods run on up to nine pages, and the watching is the
+        evidence of diligence the report is actually selling.
+
+    Event types:
+        {"type": "start",  "url": ..., "probes": 12, "robots": "allows"}
+        {"type": "page",   "url": ..., "viewport": "desktop"}
+        {"type": "probe",  "name": "websocket", "fired": false, "detail": "..."}
+        {"type": "done",   "report": {...}}
+        {"type": "error",  "message": "..."}
+
+    IT OPENS THE CHAT AND NEVER TYPES INTO IT
+        Art. 50(1) is about what a person is told when the conversation starts, so
+        the check clicks the chat button and reads what the assistant says on its
+        own. One mouse click, which is what any visitor does; nothing is submitted
+        and no conversation is authored by us. art50engine._read_greeting is the
+        only place a click happens and it contains no code path that can enter
+        text, so the promise on /static/scanner.html is enforced by the
+        implementation rather than by a paragraph.
+
+        This is what makes `not_disclosed` reachable from the free check. Team
+        decision 18.08: of three widgets found across 24 sites, exactly one
+        disclosed on the button itself, so a check that never opens anything is a
+        check that cannot answer the question it is named after.
+
+        Driving ATTACKS at the bot is a different thing and still requires DNS TXT
+        ownership (PLAYBOOK §5).
+
+    RATE LIMIT
+        4/minute per IP, plus two concurrent browsers process-wide. Anonymous and
+        unauthenticated on purpose: this reads a public page, which is what makes
+        it free.
     """
     if not body.api_url.strip():
         raise HTTPException(400, "api_url (the website URL) is required")
 
-    result = await check_art50(body.api_url)
-    return result.dict()
+    target = body.api_url.strip()
+    if not target.startswith(("http://", "https://")):
+        target = f"https://{target}"
+
+    # Refuse before a browser is launched. netguard resolves the host and rejects
+    # anything private; art50engine additionally re-checks every request the page
+    # makes, because the browser resolves the name a second time and a
+    # rebinding record could differ (technical debt #14).
+    try:
+        assert_public_host(target)
+    except UnsafeUrlError as e:
+        raise HTTPException(400, str(e))
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def on_progress(event: dict):
+        await queue.put(event)
+
+    async def worker():
+        try:
+            async with _ART50_SLOTS:
+                report = await art50_check_site(target, authorized=False,
+                                                exhaustive=True,
+                                                on_progress=on_progress)
+            await queue.put({"type": "done", "report": report.as_dict()})
+        except UnsafeUrlError as e:
+            await queue.put({"type": "error", "message": str(e)})
+        except Exception as e:
+            await queue.put({"type": "error",
+                             "message": f"{type(e).__name__}: {e}"})
+        finally:
+            await queue.put(None)
+
+    async def stream():
+        task = asyncio.create_task(worker())
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield json.dumps(event) + "\n"
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
 
 
 class OwnershipChallengeRequest(BaseModel):

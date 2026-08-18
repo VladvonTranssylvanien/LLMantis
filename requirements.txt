@@ -15,3 +15,8 @@ psycopg[binary]==3.3.4    # PostgreSQL driver for SQLAlchemy
 slowapi==0.1.10           # per-IP rate limiting on backend/main.py endpoints
 bcrypt==5.0.0             # backend/auth.py - password hashing
 PyJWT==2.13.0             # backend/auth.py - login token signing/verification
+playwright==1.62.0        # backend/art50engine.py drives a real Chromium. The passive
+                          # GET it replaced found 0 chat widgets on 24 German sites:
+                          # 6 never served it a usable page, and the rest bundle the
+                          # widget into their own build where no vendor domain shows.
+                          # The browser binary is NOT pip-installed - see Dockerfile.
