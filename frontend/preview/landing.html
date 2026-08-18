@@ -36,8 +36,12 @@
   --accent-line:rgba(17,107,46,.42);
   --accent-soft:rgba(17,107,46,.09);
   --axis:60%;
-  --dur:.35s;
-  --ease:cubic-bezier(.2,.7,.2,1);
+  --dur:.35s;                       /* --transition-duration */
+  --ease:cubic-bezier(.2,.7,.2,1);  /* --ease-out */
+  --ease-expo:cubic-bezier(.16,1,.3,1);  /* the site's signature ease */
+  --focus-dur:.36s;                 /* the lava-lamp indicator */
+  --link-dur:.26s;
+  --btn-x:2px; --btn-y:1px;
   --pad:clamp(20px,4.4vw,64px);
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -70,6 +74,12 @@ a{color:inherit}
   transition:clip-path var(--dur) var(--ease)}
 .shell[data-reveal-on="true"] .layer--reveal{display:block}
 .shell[data-reveal-instant="true"] .layer--reveal{transition:none}
+/* During Hero->Work the band is redundant and actively harmful: it is wide
+   open, and the copy inside it inverts the accent pane back to paper, so the
+   growing section is overprinted with a paper-coloured duplicate of itself.
+   Their band can stay because both layers show the same page; ours cannot.
+   The pinned clip alone carries the transition. */
+.shell[data-hero-work="active"] .layer--reveal{display:none}
 /* the band opens from the hairline to 7rem while the pointer is moving */
 .shell{--reveal-pos:60%;--reveal-w:1px}
 .shell[data-reveal-active="true"]{--reveal-w:7rem}
@@ -200,7 +210,10 @@ h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
 .cta{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;text-decoration:none;
   font-weight:600;font-size:15.5px;color:var(--ink);border-bottom:1px solid var(--accent);
   padding-bottom:3px;transition:color var(--dur) var(--ease)}
-.cta:hover{color:var(--accent)}
+.cta{transition:color var(--dur) var(--ease),transform .18s var(--ease)}
+.cta:hover{color:var(--accent);transform:translate(var(--btn-x),var(--btn-y))}
+.rail .talk{transition:transform .18s var(--ease)}
+.rail .talk:hover{transform:translate(calc(var(--btn-x) * -1),var(--btn-y))}
 .vat{margin-top:26px;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--muted)}
 
 /* ── team ────────────────────────────────────────────────────────────────── */
@@ -230,7 +243,15 @@ footer a:hover{color:var(--accent)}
    A tall scroll track holds a sticky viewport; two full-screen panes stack
    inside it; the top one is wiped away from the top with clip-path. */
 .runway{position:relative;min-height:360vh}
-.pin{position:sticky;top:0;height:100vh;overflow:clip}
+/* The pinned viewport is clipped by the SAME rectangle the band grows into,
+   so the section appears through the widening band rather than after it. */
+.pin{position:sticky;top:0;height:100vh;overflow:clip;
+  clip-path:inset(var(--hw-top,0px) var(--hw-right,0px)
+                  var(--hw-bottom,0px) var(--hw-left,0px))}
+/* an invisible probe: the band's real geometry is read from here, never guessed */
+.band-probe{position:absolute;inset-block:0;
+  left:calc(var(--reveal-pos) - var(--reveal-w) / 2);
+  width:var(--reveal-w);z-index:-1;visibility:hidden;pointer-events:none}
 .pane{position:absolute;inset:0;display:flex;align-items:center;
   padding:0;border:0;background:var(--ground)}
 .pane--b{z-index:1}
@@ -283,8 +304,9 @@ footer a:hover{color:var(--accent)}
 .trail{position:absolute;left:calc(57% + 9px);width:2px;
   top:var(--trail-top,0px);height:var(--trail-h,0px);opacity:var(--trail-o,0);
   background:var(--accent);pointer-events:none;z-index:1;
-  transition:top .26s cubic-bezier(.2,.75,.2,1),height .26s cubic-bezier(.2,.75,.2,1),
-             opacity .2s ease-out}
+  transition:top var(--focus-dur) var(--ease-expo),
+             height var(--focus-dur) var(--ease-expo),
+             opacity .22s linear}
 .pane .note{margin-top:20px}
 
 /* ── scroll reveal — IntersectionObserver, no library, no CDN ────────────── */
@@ -351,6 +373,7 @@ footer a:hover{color:var(--accent)}
 </div>
 
 <div class="shell" id="shell">
+<div class="band-probe" id="probe" aria-hidden="true"></div>
 <div class="layer layer--base">
 <main id="top">
 
@@ -812,6 +835,7 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   };
 
   const onMove = e => {
+    if (bandLocked()) return;          /* a scroll animation owns the band */
     const a = e.target instanceof Element
       ? e.target.closest('a, button, .plan, .step, .row') : null;
     if (a) {
@@ -846,6 +870,86 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   const sync = () => (canReveal.matches && !REDUCED) ? enable() : disable();
   canReveal.addEventListener('change', sync);
   sync();
+})();
+
+/* ══ Locks ════════════════════════════════════════════════════════════════
+   Their reveal.js keeps a Set of lock owners so a scroll animation can freeze
+   the pointer band without the two fighting over --reveal-pos. Same idea. */
+const bandLocks = new Set();
+const bandLocked = () => bandLocks.size > 0;
+addEventListener('band:pause',  e => bandLocks.add(e.detail.owner));
+addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
+
+/* ══ Hero → Work ══════════════════════════════════════════════════════════
+   The band's rectangle is interpolated into the full viewport, and the same
+   rectangle is written as an inset() clip on the pinned section, so the
+   section appears THROUGH the widening band. Rect interpolation, no tween -
+   which is what keeps two independent elements exactly in step.
+
+   Their version is a ScrollTrigger with start 'top bottom' / end 'top top'
+   and a manual onUpdate. This reads the same two points off the element. */
+(function heroWork() {
+  const track = document.getElementById('runway');
+  const pin   = track && track.querySelector('.pin');
+  const probe = document.getElementById('probe');
+  if (!track || !pin || REDUCED) return;
+  const clamp01 = v => Math.min(Math.max(v, 0), 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  let active = false;
+  /* The probe's width comes FROM --reveal-w, which this function writes. Reading
+     it every frame makes the band inflate itself: measured 995px at p=0.25 where
+     444px was due. The start rectangle is therefore captured once, on entry. */
+  let from = null;
+
+  const paint = () => {
+    const r = track.getBoundingClientRect();
+    /* progress from "track top touches the bottom of the screen" to
+       "track top reaches the top of the screen" */
+    const p = clamp01((innerHeight - r.top) / innerHeight);
+
+    if (p <= 0 || p >= 1) {
+      if (active) {
+        active = false;
+        pin.style.setProperty('--hw-top', '0px');
+        pin.style.setProperty('--hw-right', '0px');
+        pin.style.setProperty('--hw-bottom', '0px');
+        pin.style.setProperty('--hw-left', '0px');
+        shell.style.removeProperty('--reveal-w');
+        from = null;
+        delete shell.dataset.heroWork;
+        dispatchEvent(new CustomEvent('band:resume', { detail: { owner: 'hero-work' } }));
+      }
+      return;
+    }
+    if (!active) {
+      active = true;
+      const b = probe.getBoundingClientRect();
+      from = { left: b.left, width: b.width };
+      shell.dataset.heroWork = 'active';
+      dispatchEvent(new CustomEvent('band:pause', { detail: { owner: 'hero-work' } }));
+    }
+
+    const left  = lerp(from.left, 0, p);
+    const width = lerp(from.width, innerWidth, p);
+    /* the band itself widens with the same numbers */
+    shell.style.setProperty('--reveal-pos', (((left + width / 2) / innerWidth) * 100) + '%');
+    shell.style.setProperty('--reveal-w', width + 'px');
+    /* and the pinned section is cut to that rectangle */
+    pin.style.setProperty('--hw-left',  Math.max(0, left) + 'px');
+    pin.style.setProperty('--hw-right', Math.max(0, innerWidth - (left + width)) + 'px');
+    pin.style.setProperty('--hw-top', '0px');
+    pin.style.setProperty('--hw-bottom', '0px');
+  };
+
+  let t = false;
+  const on = () => { if (t) return; t = true; requestAnimationFrame(() => { paint(); t = false; }); };
+  addEventListener('scroll', on, { passive: true });
+  addEventListener('resize', on, { passive: true });
+  /* §10: geometry must be recomputed once the fonts land, or every rect is
+     measured against text that has not reflowed yet */
+  addEventListener('load', on, { once: true });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(on);
+  paint();
 })();
 
 /* ══ The runway: wipe + row focus ══════════════════════════════════════════
