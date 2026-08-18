@@ -41,9 +41,29 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      PROVIDER: mistral
-      JUDGE_MODEL: ${JUDGE_MODEL:-mistral-small}
+
+      # PROVIDER was pinned to the literal `mistral` here, so deploy/.env could
+      # not change it and the six settings the 18.08 engine rework introduced
+      # never reached the container at all. Deploying that rework against this
+      # file gave "Invalid model: gpt-4.1" from Mistral - the judge model from
+      # .env, sent to the provider this file forced. Anything config.py reads
+      # has to be listed here; `--env-file` only feeds interpolation below.
+      PROVIDER: ${PROVIDER:-azure}
+
+      # The judge.
+      AZURE_URL: ${AZURE_URL:-}
+      AZURE_KEY: ${AZURE_KEY:-}
+      AZURE_AUTH: ${AZURE_AUTH:-api-key}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gpt-4.1}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+
+      # The target under attack. mode="model" refuses to run without these two
+      # (backend/scanner.py:72), and the frontend dropdown is mode="model".
+      TARGET_URL: ${TARGET_URL:-}
+      TARGET_KEY: ${TARGET_KEY:-}
+      TARGET_MODEL: ${TARGET_MODEL:-gpt-4.1-mini}
+      TARGET_AUTH: ${TARGET_AUTH:-api-key}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-60}
       # 3 is the measured ceiling for the free Mistral tier. At 5, three
       # back-to-back scans produced enough 429s to void a grade.
       CONCURRENCY: ${CONCURRENCY:-3}
