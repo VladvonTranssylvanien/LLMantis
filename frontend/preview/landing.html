@@ -94,9 +94,12 @@ a{color:inherit}
    a 1px gap. Make the cells transparent and the container background floods the
    whole block instead of the gaps - a pale rectangle over the band. */
 .layer--reveal .rv{opacity:1;transform:none}
-/* the hairline axis itself, drawn on the base layer */
-.layer--base::before{content:'';position:absolute;top:0;bottom:0;left:var(--axis);
-  width:1px;background:var(--accent-line);pointer-events:none;z-index:0}
+/* No axis is drawn up front. The hairline that runs down the page IS the band,
+   frozen where it stopped on the first scroll — so there is never a moment
+   with two vertical lines on screen. */
+.shell[data-band-frozen="true"] .layer--base::after{content:'';position:absolute;
+  top:0;bottom:0;left:var(--reveal-pos);width:1px;background:var(--accent-line);
+  pointer-events:none;z-index:0}
 /* The head no longer needs to sit above the band: the reveal layer is given a
    second canvas of its own and the same geometry is painted into it with an
    inverted palette, so the head shows through the band like everything else. */
@@ -364,8 +367,8 @@ footer a:hover{color:var(--accent)}
   <button class="close" id="closeBtn">Schließen ✕</button>
   <nav>
     <a href="#signal"><span>01</span> Signal</a>
-    <a href="#problem"><span>02</span> Warum</a>
-    <a href="#verfahren"><span>03</span> Verfahren</a>
+    <a href="#verfahren"><span>02</span> Verfahren</a>
+    <a href="#problem"><span>03</span> Warum</a>
     <a href="#grenzen"><span>04</span> Grenzen</a>
     <a href="#preise"><span>05</span> Preise</a>
     <a href="#team"><span>06</span> Team</a>
@@ -406,10 +409,37 @@ footer a:hover{color:var(--accent)}
   <div class="runway" id="runway">
     <div class="pin">
 
-      <section class="pane pane--a" id="problem">
+      <section class="pane pane--a" id="verfahren">
         <div class="pane-in">
           <div class="pane-head">
-            <p class="label"><b>02</b> <i>/</i> Warum</p>
+            <p class="label"><b>02</b> <i>/</i> Verfahren</p>
+            <p class="focus mono">IM FOKUS <b class="fnum">01</b> / 05</p>
+          </div>
+          <h2>Fünf Schritte, und Sie<br>sehen jeden davon.</h2>
+          <div class="axis-rows" data-rows>
+            <div class="trail" aria-hidden="true"></div>
+            <article class="arow"><div class="an">Ziel</div><span class="chip mono">01</span>
+              <div class="ad"><p>Systemprompt oder Endpunkt. Bei einem Live-Bot erst nach
+                nachgewiesener Verfügungsberechtigung.</p></div></article>
+            <article class="arow"><div class="an">Angriffe</div><span class="chip mono">02</span>
+              <div class="ad"><p>Die Bibliothek läuft gegen den Bot. Jeder Angriff ist
+                dokumentiert und versioniert.</p></div></article>
+            <article class="arow"><div class="an">Antworten</div><span class="chip mono">03</span>
+              <div class="ad"><p>Wir zeichnen wörtlich auf, was der Bot geantwortet hat.</p></div></article>
+            <article class="arow"><div class="an">Bewertung</div><span class="chip mono">04</span>
+              <div class="ad"><p>Ebene 1: Canary, ein Zeichenvergleich. Ebene 2: ein
+                separates Modell, immer mit Zitat.</p></div></article>
+            <article class="arow"><div class="an">Prüfbericht</div><span class="chip mono">05</span>
+              <div class="ad"><p>Note, Befunde mit Beleg und Behebung. Datiert, mit
+                Bibliotheksversion.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane pane--b" id="problem">
+        <div class="pane-in">
+          <div class="pane-head">
+            <p class="label"><b>03</b> <i>/</i> Warum</p>
             <p class="focus mono">IM FOKUS <b class="fnum">01</b> / 04</p>
           </div>
           <h2>Keine dieser Situationen<br>braucht einen Hacker.</h2>
@@ -464,32 +494,6 @@ footer a:hover{color:var(--accent)}
         </div>
       </section>
 
-      <section class="pane pane--b" id="verfahren">
-        <div class="pane-in">
-          <div class="pane-head">
-            <p class="label"><b>03</b> <i>/</i> Verfahren</p>
-            <p class="focus mono">IM FOKUS <b class="fnum">01</b> / 05</p>
-          </div>
-          <h2>Fünf Schritte, und Sie<br>sehen jeden davon.</h2>
-          <div class="axis-rows" data-rows>
-            <div class="trail" aria-hidden="true"></div>
-            <article class="arow"><div class="an">Ziel</div><span class="chip mono">01</span>
-              <div class="ad"><p>Systemprompt oder Endpunkt. Bei einem Live-Bot erst nach
-                nachgewiesener Verfügungsberechtigung.</p></div></article>
-            <article class="arow"><div class="an">Angriffe</div><span class="chip mono">02</span>
-              <div class="ad"><p>Die Bibliothek läuft gegen den Bot. Jeder Angriff ist
-                dokumentiert und versioniert.</p></div></article>
-            <article class="arow"><div class="an">Antworten</div><span class="chip mono">03</span>
-              <div class="ad"><p>Wir zeichnen wörtlich auf, was der Bot geantwortet hat.</p></div></article>
-            <article class="arow"><div class="an">Bewertung</div><span class="chip mono">04</span>
-              <div class="ad"><p>Ebene 1: Canary, ein Zeichenvergleich. Ebene 2: ein
-                separates Modell, immer mit Zitat.</p></div></article>
-            <article class="arow"><div class="an">Prüfbericht</div><span class="chip mono">05</span>
-              <div class="ad"><p>Note, Befunde mit Beleg und Behebung. Datiert, mit
-                Bibliotheksversion.</p></div></article>
-          </div>
-        </div>
-      </section>
 
     </div>
   </div>
@@ -850,6 +854,22 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
     start();
   };
 
+  /* The first scroll ends the pointer phase permanently: the band stops where
+     it is and becomes the page's vertical axis. Their band keeps following
+     forever; this is Bogdan's call and it is deliberate. */
+  const freeze = () => {
+    if (shell.dataset.bandFrozen === 'true') return;
+    shell.dataset.bandFrozen = 'true';
+    clearTimeout(idleTimer);
+    cancelAnimationFrame(raf); raf = 0;
+    cur = tgt;                      /* stop mid-flight, do not spring */
+    write();
+    collapse();                     /* back to the 1px hairline */
+    removeEventListener('pointermove', onMove);
+  };
+  addEventListener('scroll', () => { if (scrollY > 0) freeze(); },
+                   { passive: true, once: false });
+
   const enable = () => {
     if (on) return;
     on = true; build();
@@ -923,8 +943,13 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
     }
     if (!active) {
       active = true;
+      /* The band has already frozen and collapsed by the time this runs, so the
+         growth starts from the hairline it became - not from the 7rem it was
+         while the pointer still owned it. Width is 1 by definition here, which
+         also removes the last way the probe could feed back into itself. */
       const b = probe.getBoundingClientRect();
-      from = { left: b.left, width: b.width };
+      const centre = b.left + b.width / 2;
+      from = { left: centre - 0.5, width: 1 };
       shell.dataset.heroWork = 'active';
       dispatchEvent(new CustomEvent('band:pause', { detail: { owner: 'hero-work' } }));
     }
