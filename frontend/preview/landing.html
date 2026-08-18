@@ -102,6 +102,11 @@ a{color:inherit}
 .shell[data-band-frozen="true"] .runway::after{content:'';position:absolute;
   top:0;bottom:0;left:var(--axis-x,60%);width:1px;background:var(--accent-line);
   pointer-events:none;z-index:3}
+/* The clone carries a copy of the runway, so it drew a second axis; and the
+   band itself is still a 1px sliver at a drifting position, which was a third.
+   Exactly one line survives: the axis on the base layer. */
+.layer--reveal .runway::after{display:none}
+.shell[data-band-frozen="true"] .layer--reveal{display:none}
 /* --axis-x, not --reveal-pos: the growing rectangle's centre necessarily
    drifts toward the middle of the screen as it widens, and the axis must not
    drift with it. Measured 55.71% against chips at 57.45% before this split. */
@@ -309,7 +314,7 @@ footer a:hover{color:var(--accent)}
 .arow.act .ad .ax{color:var(--muted)}
 .arow:not(.act){opacity:.72}
 /* the lit segment of the axis, spanning exactly the row in focus */
-.trail{position:absolute;left:calc(57% + 9px);width:2px;
+.trail{position:absolute;left:var(--trail-x,57%);width:2px;
   top:var(--trail-top,0px);height:var(--trail-h,0px);opacity:var(--trail-o,0);
   background:var(--accent);pointer-events:none;z-index:1;
   transition:top var(--focus-dur) var(--ease-expo),
@@ -954,7 +959,12 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
     const r = track.getBoundingClientRect();
     /* progress from "track top touches the bottom of the screen" to
        "track top reaches the top of the screen" */
-    const p = clamp01((innerHeight - r.top) / innerHeight);
+    /* The first stretch of the scroll is the hairline holding still; growth
+       only starts once the section is properly on its way in. Without this
+       the line never exists as a line - it is already a block. */
+    const HOLD = .45;
+    const raw = (innerHeight - r.top) / innerHeight;
+    const p = clamp01((raw - HOLD) / (1 - HOLD));
 
     if (p <= 0 || p >= 1) {
       if (active) {
@@ -1052,6 +1062,14 @@ addEventListener('band:resume', e => bandLocks.delete(e.detail.owner));
           const rr = rows[i].getBoundingClientRect();
           trail.style.setProperty('--trail-top', (rr.top - rb.top) + 'px');
           trail.style.setProperty('--trail-h', rr.height + 'px');
+          /* the segment has to sit on the chip column, measured, not at a
+             percentage of the rows box - those are two different x values */
+          const ch = rows[i].querySelector('.chip');
+          if (ch) {
+            const cb = ch.getBoundingClientRect();
+            trail.style.setProperty('--trail-x',
+              (cb.left + cb.width / 2 - rb.left - 1) + 'px');
+          }
           trail.style.setProperty('--trail-o', '1');
         }
       };
