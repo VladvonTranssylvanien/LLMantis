@@ -638,7 +638,22 @@ footer.site .sp { margin-left: auto; }
     <!-- STEP 6: this action is distinct from "Run scan" and appears only once a
          scan has completed. It must never share a button with starting a scan. -->
     <div class="report-cta">
-      <a class="btn" id="openReport" href="/static/report.html" target="_blank" rel="noopener">
+      <!-- rel="opener" is REQUIRED and must not be "corrected" to noopener.
+           The report is handed over in sessionStorage (below). Since Chrome 88
+           target="_blank" implies noopener, and a non-auxiliary browsing context
+           does NOT inherit a copy of sessionStorage — so the report tab saw
+           nothing and rendered the built-in SAMPLE every single time. That is
+           why this page appeared to produce a mock report.
+
+           Measured 18.08 in Chrome, same click, three variants:
+               rel="noopener"  -> sessionStorage seen: NO   (as shipped)
+               rel removed     -> sessionStorage seen: NO   (implied noopener)
+               rel="opener"    -> sessionStorage seen: YES
+           Removing the attribute is NOT a fix. Opting back in is.
+
+           Safe here because the opened page is our own same-origin static
+           report; noopener exists to protect against untrusted link targets. -->
+      <a class="btn" id="openReport" href="/static/report.html" target="_blank" rel="opener">
         Download PDF report
       </a>
       <span style="color:var(--muted);font-size:13px">Opens the <span lang="de">Prüfbericht</span>, then print to PDF.</span>

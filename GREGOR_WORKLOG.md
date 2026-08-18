@@ -3637,6 +3637,134 @@ trusting the earlier pass.
 
 ---
 
+## 2026-08-18 — Session 32: the Prüfbericht renders the real scan. PR #26 merged.
+
+Gregor: the PDF report only ever creates a mock; make it real. Three decisions
+were his (asked before building, because none could be settled from the repo):
+redact the secret but keep the quote; just-scanned report only, no backend work;
+keep browser print-to-PDF.
+
+### 🔴 The cause was one attribute — and my first hypothesis was wrong
+
+`index.html` already handed the finished report to `report.html` in
+`sessionStorage` and `report.html` already preferred it over its built-in
+`SAMPLE`. The mechanism was there; nothing arrived.
+
+**Since Chrome 88 `target="_blank"` implies `noopener`**, and a non-auxiliary
+browsing context does not inherit a copy of `sessionStorage`. So the report tab
+saw nothing and fell back to the sample every time.
+
+Measured in a real browser, same click, three variants:
+
+```
+rel="noopener"   sessionStorage seen: NO   (as shipped)
+rel removed      sessionStorage seen: NO   (implied noopener)
+rel="opener"     sessionStorage seen: YES
+```
+
+**My first fix was "remove `rel=noopener`". The measurement killed it** — that
+would have shipped a non-fix and left the report mock. Verified rather than
+reasoned, and it earned itself. The table is now a comment in `index.html` so it
+does not get "corrected" back.
+
+### ⭐ Secrets are no longer reprinted, and both rules survive
+
+With mock data this never collided. With a real scan it does: for a canary leak
+the `evidence` field **is** the canary verbatim (confirmed against a real report:
+`evidence == 'LLMANTIS-CANARY-7F3A91'`, and the answer contains it too), while
+`GREGOR-TARGET-LAB.md:145` says the planted secret is *"never printed in logs or
+in the report body — only the surrounding quote is shown."*
+
+The report now quotes the bot's own sentence with the value masked:
+
+> *… wusste, dass VIP-Kunden den speziellen Rabattcode `[redacted · 22 chars]`
+> für 25 % Rabatt verwenden dürfen …*
+
+So **"no quote, no finding" still holds** — there is a real quote — and the
+document does not leak the secret a second time. Only strings the caller declared
+(`canary`, `secrets`) are masked; nothing is guessed.
+
+### The template predated the current data model
+
+Zero references to `blocked`, `incomplete_because`, `critical_coverage` or
+`confirmed`; `capped` still meant the old "capped at D".
+
+- `blocked` renders as **"not delivered"** with its own section. Previously these
+  sat under "checks that could not run", which read as *our* failure and made
+  "checks run" fail to reconcile.
+- **"Checks completed" and "Critical coverage" are on the face of the document.**
+  A Prüfbericht that omits coverage invites the reader to assume all of the
+  library ran.
+- A withheld grade prints the backend's `incomplete_because` rather than our own
+  guess — too-few-completed and too-little-critical-coverage have different
+  remedies.
+- The deterministic finding count is stated, since only a `confirmed` finding may
+  drive the grade to its lowest band.
+- `SAMPLE` regenerated from a real report's shape with a fake canary and an
+  obviously-fake target name, so it cannot silently drift again. It had described
+  the superseded percentage model and the old English demo bots.
+
+### The stamp/mark — Gregor reported it broken, and the asset was fine
+
+Verified against real uvicorn: `mark-ink.svg` and `seal.svg` both 200, both
+render, all three fonts load. Cleared the obvious suspect too — both SVGs use
+`fill="currentColor"` and an SVG in an `<img>` cannot see the page's `color`, but
+that falls back to black, and "mark-**ink**" is meant to be ink.
+
+The real fragility: **every asset path in `report.html` was absolute**, so loaded
+from anywhere but the `/static` mount the mark, the seal, the favicon *and all
+three fonts* failed together. Reproduced by serving `frontend/` as the web root:
+`/static/assets/brand/mark-ink.svg` → 404, `/assets/brand/mark-ink.svg` → 200.
+
+`report.html` is served **only** from `/static/`, so relative paths resolve
+identically there and *also* survive the document being opened from disk — which
+matters because this is the one artefact a customer saves and reopens. All eight
+references are now relative.
+
+⚠️ I had seen this broken icon in my own earlier screenshots and waved it off as
+a test artefact. It was a real fragility that my test setup happened to trigger.
+Dismissing an observed symptom because a story explains it is exactly what
+`AGENTS.md` §2 warns about.
+
+### Verified in a browser — which closes a standing gap
+
+Every frontend change in this worklog until now carried "no browser". This one
+does not:
+
+```
+click the real button   -> IS_SAMPLE false, real target, real scan id, grade F
+canary occurrences      -> 0        masked spans -> 10
+reload                  -> keeps the real report (printing often reloads)
+fresh tab, no handoff   -> renders the sample AND says it is a sample
+at /static/ (uvicorn)   -> both images load, all 3 fonts load, legal links resolve
+at a root with no /static -> everything loads, where before nothing did
+```
+
+**`uvicorn` starts without Postgres.** `/api/health`, `/scan` and the static
+mount all serve, so the "no full-stack run" gap is narrower than sessions 22 and
+31 assumed — only `POST /api/scan` should need the database.
+
+### What I did NOT verify
+
+- **`POST /api/scan` still never ran.** Docker's daemon was down, so no scan went
+  through the HTTP endpoint; the report was fed a real `run_scan` payload. The
+  handoff itself was exercised through the real button.
+- **Nobody has looked at the printed PDF.** The print CSS is untouched, but the
+  paginated output has not been inspected — `PITCH-PLAN.md` T0-4 covers it.
+- **Real data plus the relative paths were not re-verified together in-browser.**
+  The extension disconnected before that check. The path commit's diff is 8 path
+  lines and a comment — it touches neither the SAMPLE nor the render logic — so
+  the earlier real-data verification still holds, but it is reasoning, not a run.
+- **The report cannot be produced again later.** It lives in the tab that ran the
+  scan. Retrieval by `scan_id` needs `/api/scans/{scan_id}` extended: it returns
+  none of the attack text, bot answer, fix, category, severity, summary or target
+  name, and requires login plus org membership the free path does not have.
+  That is the gap between this and the pitch's "dated, reproducible".
+- **`frontend/scanner.html` has no report handoff at all.** Dead today (`/scan`
+  serves `index.html`) but Vlad edited it in the Art.-50 work.
+
+---
+
 # Start here tomorrow
 
 ⚠️ **Superseded in one respect by session 30:** the EU-only stack and the
