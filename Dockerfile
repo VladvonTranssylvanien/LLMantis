@@ -24,7 +24,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 # rather than in a separate service because the Art.-50 check is an endpoint of
 # this app, not a pipeline stage. --with-deps installs the apt packages Chromium
 # links against; without them the browser is present and every launch fails.
+#
+# PLAYWRIGHT_BROWSERS_PATH is not decoration. Playwright installs into the HOME
+# of whoever runs the install, and this line runs as root while the app runs as
+# llmantis (USER, below). Without it the browsers land in /root/.cache, the app
+# looks in /home/llmantis/.cache, and every launch fails with "Executable
+# doesn't exist" while 656 MB of Chromium sits in the image unreachable --
+# /root is 0700, so llmantis cannot even read it. Measured in the running
+# container on 19.08; the Art.-50 check had never worked in production.
+#
+# A fixed path outside any home makes the install independent of which user
+# performs it, which is what the official Playwright images do. It is set as
+# ENV rather than passed to the RUN so that the RUNTIME lookup agrees with the
+# install; the two must not be allowed to disagree.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN python -m playwright install --with-deps chromium && \
+    chmod -R a+rX /ms-playwright && \
     rm -rf /root/.cache/pip
 
 COPY backend/  ./backend/
