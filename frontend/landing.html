@@ -156,9 +156,13 @@ header{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--ground)}
 .overlay{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:50;background:var(--accent);
   width:max-content;max-width:min(90vw,460px);
   display:flex;flex-direction:column;padding:var(--pad);
-  transform:translateX(100%);visibility:hidden;
-  transition:transform var(--dur) var(--ease-expo),visibility var(--dur)}
-.overlay[data-open="true"]{transform:none;visibility:visible}
+  transform:translateX(100%);visibility:hidden;overflow-y:auto;
+  /* visibility is NOT animated -- see the note on the app pages. Animated, it
+     stayed hidden through the opening frame, so focus() landed on nothing and
+     the keyboard caller was left on the button behind the strip. */
+  transition:transform var(--dur) var(--ease-expo),visibility 0s var(--dur)}
+.overlay[data-open="true"]{transform:none;visibility:visible;
+  transition:transform var(--dur) var(--ease-expo),visibility 0s}
 .overlay .close{align-self:flex-end;background:none;border:0;font:inherit;font-size:15px;
   color:var(--ground);cursor:pointer;padding:8px 0}
 .overlay nav{margin:auto 0;display:grid;gap:6px}
@@ -847,7 +851,18 @@ const setOv = open => {
 mb.addEventListener('click', () => setOv(ov.dataset.open !== 'true'));
 $('#closeBtn').addEventListener('click', () => setOv(false));
 ov.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setOv(false)));
-addEventListener('keydown', e => { if (e.key === 'Escape' && ov.dataset.open === 'true') setOv(false); });
+addEventListener('keydown', e => {
+  if (ov.dataset.open !== 'true') return;
+  if (e.key === 'Escape') { setOv(false); return; }
+  /* aria-modal="true" was a claim, not a behaviour: Tab walked off the last
+     link into the page behind the strip. Tab only, open only. */
+  if (e.key !== 'Tab') return;
+  const f = ov.querySelectorAll('button, a[href]');
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 
 /* ── scroll reveal ───────────────────────────────────────────────────────── */
 const rv = [...document.querySelectorAll('.rv')];

@@ -207,6 +207,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
      --ease above is already the landing's --ease-expo, same curve. */
   --pad:clamp(20px,4.4vw,64px);
   --dur:.35s;
+  /* Header height, so body padding and scroll-padding agree with the bar.
+     It lives HERE and not in a :root of its own next to the header rules: a
+     second `:root{` at column 0 opened a second range in the awk check this
+     block documents below, and the check went from one hash to four. The
+     detector broke, not the palette. */
+  --hdr:110px;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }

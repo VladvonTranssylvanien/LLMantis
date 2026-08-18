@@ -205,6 +205,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
      --ease above is already the landing's --ease-expo, same curve. */
   --pad:clamp(20px,4.4vw,64px);
   --dur:.35s;
+  /* Header height, so body padding and scroll-padding agree with the bar.
+     It lives HERE and not in a :root of its own next to the header rules: a
+     second `:root{` at column 0 opened a second range in the awk check this
+     block documents below, and the check went from one hash to four. The
+     detector broke, not the palette. */
+  --hdr:110px;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
@@ -281,7 +287,7 @@ body {
    two halves of the product are one object rather than two that agree about
    colour. FIXED, not sticky, because the overlay is fixed and a sticky bar
    scrolls out from under it. Anything below must clear --hdr. */
-:root{ --hdr:110px; }   /* 84px seal + 13px + 12px + 1px rule, measured */
+html{scroll-padding-top:var(--hdr)}   /* or a focused field lands behind the bar */
 header.topbar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--bg)}
 .hbar{display:flex;align-items:center;justify-content:space-between;
   padding:13px var(--pad) 12px;border-bottom:1px solid var(--border)}
@@ -306,20 +312,42 @@ header.topbar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--bg
 .overlay{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:50;background:var(--accent);
   width:max-content;max-width:min(90vw,460px);
   display:flex;flex-direction:column;padding:var(--pad);
-  transform:translateX(100%);visibility:hidden;
-  transition:transform var(--dur) var(--ease),visibility var(--dur)}
-.overlay[data-open="true"]{transform:none;visibility:visible}
+  transform:translateX(100%);visibility:hidden;overflow-y:auto;
+  /* visibility is NOT animated. With `visibility var(--dur)` it stayed hidden
+     for the whole opening frame, so the focus() that follows the attribute
+     change was a no-op on a hidden element and the keyboard caller was left
+     on the button behind the strip. 0s here, delayed by --dur in the closed
+     state, gives the same look: shown at once, hidden only after the slide. */
+  transition:transform var(--dur) var(--ease),visibility 0s var(--dur)}
+.overlay[data-open="true"]{transform:none;visibility:visible;
+  transition:transform var(--dur) var(--ease),visibility 0s}
 .overlay .close{align-self:flex-end;background:none;border:0;font:inherit;font-size:15px;
   color:var(--bg);cursor:pointer;padding:8px 0}
 .overlay nav{margin:auto 0;display:grid;gap:6px}
 .overlay a{display:flex;align-items:baseline;gap:22px;text-decoration:none;
-  color:rgba(242,241,235,.82);                       /* 4.51:1 on the accent */
+  /* On the accent this measures 4.510:1 quantised to 8 bits, which is what a
+     screen actually shows (#CAD9C9), and 4.501:1 if the blend is left in
+     floats. The original comment said 4.51, which was right by luck: it was
+     rounded up from the float. Either figure clears 4.5, and the margin is
+     thinner than it looks, because .overlay a span below is 13px at weight
+     400 -- small text, so 4.5 is the bar, not 3. Re-measure that span before
+     touching this alpha. */
+  color:rgba(242,241,235,.82);
   font-size:clamp(26px,3.2vw,38px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
   padding:6px 0;transition:color var(--dur) var(--ease)}
 .overlay a:hover,.overlay a[aria-current="page"]{color:var(--bg)}   /* 5.86:1 */
 .overlay a span{font-family:var(--mono);font-size:13px;font-weight:400;
   letter-spacing:.1em;color:rgba(242,241,235,.82)}
-@media (prefers-reduced-motion:reduce){ .overlay{transition:none} }
+@media (prefers-reduced-motion:reduce){ .overlay,.overlay[data-open="true"]{transition:none} }
+/* The landing shrinks its header below 900px (landing.html:385). The port did
+   not carry that, so tapping through from the landing on a phone made the seal
+   jump 60px->84px and the bar 86->110, on the one journey this work exists to
+   make continuous. */
+@media (max-width:900px){
+  :root{--hdr:90px}
+  .brand img{width:60px;height:60px}
+  .brand .name{margin-left:-9px;font-size:25px}
+}
 
 
 /* ------------------------------------------------------------------ layout */
@@ -351,11 +379,11 @@ footer.site a { color: var(--muted); }
     <a class="brand" href="/" aria-label="LLMantis — Startseite">
       <img src="/static/assets/brand/seal.svg" alt="">
       <span class="name"><span class="ll">LL</span>Mantis
-        <span class="sub">Chatbot-Pr&uuml;fung</span>
+        <span class="sub" lang="de">Chatbot-Pr&uuml;fung</span>
       </span>
     </a>
     <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="ov">
-      Men&uuml; <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span lang="de">Men&uuml;</span> <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
     </button>
   </div>
 </header>
@@ -367,7 +395,7 @@ footer.site a { color: var(--muted); }
      at "/" — the landing — on both pages, when index.html is served at /scan
      (backend/main.py:1167). -->
 <div class="overlay" id="ov" role="dialog" aria-modal="true" aria-label="Navigation">
-  <button class="close" id="closeBtn">Schlie&szlig;en &#10005;</button>
+  <button class="close" id="closeBtn" lang="de">Schlie&szlig;en &#10005;</button>
   <nav>
     <a href="/#verfahren"><span>01</span> Product</a>
     <a href="/#problem"><span>02</span> Why</a>
@@ -501,7 +529,19 @@ footer.site a { color: var(--muted); }
     a.addEventListener('click', function () { setOv(false); });
   });
   addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && ov.dataset.open === 'true') setOv(false);
+    if (ov.dataset.open !== 'true') return;
+    if (e.key === 'Escape') { setOv(false); return; }
+    /* aria-modal="true" claims the rest of the page is unavailable, and without
+       this it is not: Tab walked off the last link into the controls behind the
+       strip, which are scroll-locked and covered. Measured -- the eighth Tab
+       reached the demo-bot select. preventDefault fires for Tab only, and only
+       while the strip is open, so nothing a form field expects is touched. */
+    if (e.key !== 'Tab') return;
+    var f = ov.querySelectorAll('button, a[href]');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 })();
 </script>
