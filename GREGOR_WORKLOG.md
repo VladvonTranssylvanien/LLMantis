@@ -3558,10 +3558,62 @@ Q&A ("the same bot can answer differently to the same sentence twice"), so it is
 honest rather than embarrassing. But slide 5 must not promise "D → A".
 Bogdan's slide; flagged, not edited.
 
+### ⭐ Self-review found four defects, one of them a regression I introduced
+
+Gregor asked for a review before merging. Done as a hunt for defects rather than
+a confirmation pass (session 25's precedent), and it earned itself.
+
+1. 🔴 **REGRESSION — the target path had lost its retry/backoff.** `prompt` mode
+   used to go through `chat()` and inherit `llm.py`'s 5 attempts at 2/4/8/16 s.
+   That backoff exists because a 429 became ERROR and suppressed grades outright
+   (Vlad's `171b06b`, session 22). Attacking the deployment directly dropped it,
+   so one rate-limited attack would have become an immediate ERROR counting
+   toward gradability. **The very failure this engine change was celebrating
+   having fixed, reintroduced by the same change.**
+
+   Fixed by extracting `openai_compatible_chat()` in `llm.py`, now shared by the
+   judge provider and the target — they were near-identical copies, so this
+   removed real duplication as well as the gap, and it keeps `llm.py`'s stated
+   invariant true: still the only place that talks to a model. It returns
+   `choices[0]` rather than the text so the caller can read `finish_reason`,
+   because an empty answer means different things to the judge and to a scan.
+
+2. 🔴 **`mode="model"` could scan with no system prompt at all.**
+   `main.py:1008` validated `system_prompt` only for `mode == "prompt"`, so the
+   new name skipped the check.
+
+3. `main.py`'s ownership comment claimed prompt mode *"only tests a copy of text
+   the caller submitted themselves, never a live third-party endpoint."* Half of
+   that became false. The conclusion still holds, and the reason is now stated
+   correctly: the endpoint is **ours, fixed in config, never caller-supplied**.
+
+4. Three strings in `lab/harness/scan_bots.py` and one comment in
+   `demo/targets.yaml` still told the reader a scan replays the prompt on
+   `mistral-small` — printed at the top of every run.
+
+**Verified by simulation rather than by hoping:** the empty-answer guard raises
+on both empty and whitespace-only content; a 429 recovers on the third attempt;
+exhausted retries raise instead of returning silently. Then re-verified live —
+F(0) → A(100), the `prompt` alias unchanged at A(100), 0 errors, calibration
+29/29 on three runs, `check_demo_sync` in sync.
+
+**Merged as `2bcf680`** (PR #25): 0 conflict markers, `origin/main` unmoved, no
+overlap with files changed there. No CI exists in this repo, so "clean" means no
+conflicts, not a green suite.
+
+⚠️ The machine was powered off mid-session, after the fixes were verified but
+before they were committed. They survived as uncommitted changes; each was
+re-checked for presence and the behaviour re-run before committing, rather than
+trusting the earlier pass.
+
 ### What I did NOT verify
 
 - **One sample per bot on the 78-attack corpus.** Given the F↔D movement, those
   are indicative, not settled.
+- **The 78-attack corpus was not re-run after the retry refactor.** The figures
+  above come from before it. The refactor changed the transport, not the
+  judging, and the 21-attack results are identical either side of it — but the
+  78-attack numbers were not re-measured.
 - **No scan through `POST /api/scan`.** `run_scan` was called directly, so org
   resolution, ownership checks and persistence are still unexercised — the same
   gap as session 22.
@@ -3681,4 +3733,14 @@ labelling round.
 
 ## State of the tree at session end
 
-`main`, clean, level with `origin/main`.
+`main`, clean, level with `origin/main`, at `2bcf680` — the engine rework merged.
+
+The engine now runs the judge on **gpt-4.1** and the target on **gpt-4.1-mini**,
+both on Azure, and a scan attacks a **real deployment over HTTP** instead of
+replaying a prompt on our own provider. Two problems in the list above are
+closed by it: judge non-determinism (#1, now 29/29 every run) and the
+provider-quota coin flip (#2/#4, now 0 errors in every scan). Mistral stays
+registered so the recorded 94.3 % baseline remains reproducible.
+
+⚠️ Anyone pulling this needs new `.env` values: `AZURE_URL`, `AZURE_KEY`,
+`TARGET_URL`, `TARGET_KEY`, `TARGET_MODEL`. Documented in `.env.example`.
