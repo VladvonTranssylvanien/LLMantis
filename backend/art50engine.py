@@ -556,6 +556,15 @@ async def _read_greeting(page, launcher: dict) -> tuple[bool, str, str]:
         on_top = await page.evaluate(_WHAT_IS_ON_TOP, [x, y])
     except Exception:
         on_top = {}
+    async def _press(tag: int, use_mouse: bool) -> None:
+        """One press. Mouse when the button is reachable, element when it is not."""
+        if use_mouse:
+            await page.mouse.click(x, y)
+        else:
+            await page.evaluate(
+                "(t) => { const el = document.querySelector("
+                "`[data-llmantis-launcher=\"${t}\"]`); if (el) el.click(); }", tag)
+
     bypassed = False
     if on_top.get("consent"):
         # Their cookie wall covers the coordinates. We click the ELEMENT instead.
@@ -573,19 +582,35 @@ async def _read_greeting(page, launcher: dict) -> tuple[bool, str, str]:
         #     there — by a different route. The report says we did this, because a
         #     reader has to know the widget was opened past a banner rather than in
         #     front of one.
+        bypassed = True
+
+    # PRESS MORE THAN ONCE IF NOTHING OPENS.
+    #
+    # The first press is regularly lost, and this was the last of six wrong
+    # hypotheses about myposter.de. Instrumented proof: the selector finds a
+    # BUTTON labelled "Hilfe", el.click() fires, and page.frames stays at 1 —
+    # then an identical second press opens the widget and the verdict appears.
+    #
+    # The reason is ordering. A standalone script that clicked eight seconds after
+    # load worked every time; the engine clicks after _settle and twelve probes,
+    # roughly a minute in, by which point Didomi's consent layer has delayed
+    # Zendesk's SDK and the button's handler is not bound yet. The button exists
+    # before the thing it calls does.
+    #
+    # So: press, watch for a frame, press again. Three attempts, and it stops the
+    # moment something opens rather than hammering someone's widget.
+    opened_frames = False
+    for attempt in range(3):
         try:
-            await page.evaluate(
-                "(t) => { const el = document.querySelector("
-                "`[data-llmantis-launcher=\"${t}\"]`); if (el) el.click(); }",
-                launcher.get("tag", 0))
-            bypassed = True
+            await _press(launcher.get("tag", 0), use_mouse=not bypassed)
         except Exception:
-            return False, "", "blocked-by-consent"
-    else:
-        try:
-            await page.mouse.click(x, y)
-        except Exception:
-            return False, "", ""
+            if attempt == 0:
+                return False, "", ("blocked-by-consent" if bypassed else "")
+        await page.wait_for_timeout(2500)
+        if len(page.frames) > len(before_frames):
+            opened_frames = True
+            break
+    del opened_frames
     # WAIT FOR THE GREETING. Do not sleep and hope.
     #
     # This was a flat 4.5 s, and it was the actual reason myposter.de came back
