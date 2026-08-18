@@ -54,27 +54,6 @@ Use relevant skills. Keep a task list.
 
 ## STEP 3 — Hard constraints. These are not preferences.
 
-### EU-ONLY STACK
-Never propose or add: AWS, Azure, GCP, Google Fonts, Google Analytics,
-Stripe, Clerk, Auth0, Supabase Auth, Sentry US, any US CDN.
-
-Use instead: Hetzner (hosting), mailbox.org (mail), Brevo (email sending),
-Mollie (payments), self-hosted auth, self-hosted Plausible (analytics),
-GlitchTip (errors), self-hosted fonts via next/font/local or equivalent.
-
-Reason: US companies fall under the US CLOUD Act. We sell EU compliance.
-Every US vendor in the stack is a contradiction a customer will notice
-and a competitor will use.
-
-### THE JUDGE MODEL RUNS IN THE EU
-The judge processes customer system prompts — those are trade secrets —
-and full conversation transcripts that may contain personal data.
-It must run on Mistral (France) or Aleph Alpha (Germany).
-OpenAI, Anthropic and Google are forbidden for this role.
-
-If the current code uses a US provider, that is TECH DEBT #1.
-Flag it loudly in your report. Do not quietly leave it.
-
 ### THE WORD "CERTIFIED" IS BANNED
 Never write "certified", "zertifiziert", "Zertifikat", "AI-Act-compliant",
 "AI-Act-konform", "GDPR-compliant", "DSGVO-konform", "legally required",
