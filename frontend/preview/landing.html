@@ -85,7 +85,7 @@ a{color:inherit}
    whole block instead of the gaps - a pale rectangle over the band. */
 .layer--reveal .rv{opacity:1;transform:none}
 /* the hairline axis itself, drawn on the base layer */
-.layer--base::before{content:'';position:absolute;top:0;bottom:0;left:var(--reveal-pos);
+.layer--base::before{content:'';position:absolute;top:0;bottom:0;left:var(--axis);
   width:1px;background:var(--accent-line);pointer-events:none;z-index:0}
 /* The head no longer needs to sit above the band: the reveal layer is given a
    second canvas of its own and the same geometry is painted into it with an
@@ -226,19 +226,66 @@ footer{padding:44px var(--pad) 96px;display:flex;gap:26px;flex-wrap:wrap;align-i
 footer a{color:var(--muted)}
 footer a:hover{color:var(--accent)}
 
-/* ── focus trail: a lit segment of the axis that tracks the active row ─────
-   after .axis-section__focus-trail — top and height are written from JS, the
-   slide is a CSS transition, the fade is opacity. */
-.tracks{position:relative}
-.trail{position:absolute;left:calc(var(--reveal-pos) - 1px);width:2px;
+/* ── The pinned runway ────────────────────────────────────────────────────
+   A tall scroll track holds a sticky viewport; two full-screen panes stack
+   inside it; the top one is wiped away from the top with clip-path. */
+.runway{position:relative;min-height:360vh}
+.pin{position:sticky;top:0;height:100vh;overflow:clip}
+.pane{position:absolute;inset:0;display:flex;align-items:center;
+  padding:0;border:0;background:var(--ground)}
+.pane--b{z-index:1}
+/* Pane A is solid accent, the way their "Selected work" section is solid blue.
+   Without the colour change the wipe has no visible edge: both panes are the
+   same paper and the reader just sees two texts overlapping. */
+.pane--a{z-index:2;clip-path:inset(var(--wipe,0%) 0 0 0);
+  background:var(--band);color:#F6F6F4;
+  --ink:#F6F6F4;--body:rgba(246,246,244,.9);--muted:rgba(246,246,244,.72);
+  --faint:rgba(246,246,244,.55);--hairline:rgba(246,246,244,.26);
+  --accent:#F6F6F4;--accent-line:rgba(246,246,244,.5)}
+.pane--a .chip{border-color:rgba(246,246,244,.5);color:rgba(246,246,244,.8)}
+.pane--a .arow.act .chip{background:#F6F6F4;color:var(--band);border-color:#F6F6F4}
+.pane--a .trail{background:#F6F6F4}
+/* inside the reveal band the accent pane inverts the other way, back to paper */
+.layer--reveal .pane--a{background:var(--ground);color:var(--ink-solid);
+  --ink:#121210;--body:#3A3A36;--muted:#706E63;--faint:#B6B5AB;
+  --hairline:rgba(18,18,16,.14);--accent:#116B2E;--accent-line:rgba(17,107,46,.42)}
+.layer--reveal .pane--a .chip{border-color:rgba(17,107,46,.42);color:#116B2E}
+.layer--reveal .pane--a .arow.act .chip{background:#116B2E;color:#F6F6F4}
+.layer--reveal .pane--a .trail{background:#116B2E}
+.pane-in{width:100%;max-width:1180px;margin:0 auto;padding:0 var(--pad)}
+.pane-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+.pane .label{margin-bottom:18px}
+.pane h2{font-size:clamp(24px,3.4vw,46px);max-width:none;margin-bottom:30px}
+.focus{font-size:12px;letter-spacing:.13em;color:var(--muted);margin:0}
+.focus b{color:var(--accent);font-weight:500}
+
+/* rows on the axis: name, numbered chip, description */
+.axis-rows{position:relative;border-top:1px solid var(--hairline)}
+.arow{display:grid;grid-template-columns:57% 46px 1fr;align-items:center;
+  gap:0 18px;padding:clamp(10px,1.7vh,20px) 0;border-bottom:1px solid var(--hairline);
+  transition:color .22s var(--ease),opacity .22s var(--ease)}
+.an{text-align:right;font-size:clamp(19px,2.5vw,34px);font-weight:700;
+  letter-spacing:-.032em;line-height:1.1;color:var(--muted);
+  transition:color .22s var(--ease)}
+.chip{justify-self:center;border:1px solid var(--accent-line);color:var(--accent);
+  background:transparent;padding:3px 7px;font-size:11.5px;letter-spacing:.06em;
+  transition:background .26s var(--ease),color .22s var(--ease),border-color .22s var(--ease)}
+.ad{color:var(--muted)}
+.ad p{margin:0;font-size:14.5px;line-height:1.45}
+.ad p + p{margin-top:6px}
+.ad .ax{color:var(--faint)}
+.arow.act .an{color:var(--ink)}
+.arow.act .chip{background:var(--accent);color:#F6F6F4;border-color:var(--accent)}
+.arow.act .ad{color:var(--body)}
+.arow.act .ad .ax{color:var(--muted)}
+.arow:not(.act){opacity:.72}
+/* the lit segment of the axis, spanning exactly the row in focus */
+.trail{position:absolute;left:calc(57% + 9px);width:2px;
   top:var(--trail-top,0px);height:var(--trail-h,0px);opacity:var(--trail-o,0);
   background:var(--accent);pointer-events:none;z-index:1;
   transition:top .26s cubic-bezier(.2,.75,.2,1),height .26s cubic-bezier(.2,.75,.2,1),
-             opacity .22s ease-out}
-.row.act .k,.step.act b{color:var(--accent)}
-.row,.step{transition:opacity .26s var(--ease)}
-.tracks[data-tracking="true"] .row:not(.act),
-.tracks[data-tracking="true"] .step:not(.act){opacity:.45}
+             opacity .2s ease-out}
+.pane .note{margin-top:20px}
 
 /* ── scroll reveal — IntersectionObserver, no library, no CDN ────────────── */
 .rv{opacity:0;transform:translateY(18px);
@@ -248,6 +295,12 @@ footer a:hover{color:var(--accent)}
 @media (max-width:900px){
   :root{--axis:100%}
   .layer--base::before,.trail{display:none}
+  .runway{min-height:auto}
+  .pin{position:static;height:auto;overflow:visible}
+  .pane{position:static;display:block;padding:64px 0;clip-path:none!important}
+  .arow{grid-template-columns:1fr;gap:8px}
+  .an{text-align:left}
+  .chip{justify-self:start}
   .hero-row{grid-template-columns:1fr}
   .netwrap{order:-1;width:min(78%,300px);justify-self:start}
   .row{grid-template-columns:1fr;gap:12px}
@@ -260,6 +313,10 @@ footer a:hover{color:var(--accent)}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
   .layer--reveal{display:none!important}
+  .pane--a{clip-path:none!important}
+  .pin{position:static;height:auto}
+  .runway{min-height:auto}
+  .pane{position:static;padding:64px 0}
   html{scroll-behavior:auto}
   .rv{opacity:1;transform:none}
 }
@@ -316,70 +373,104 @@ footer a:hover{color:var(--accent)}
   </section>
 
   <!-- 02 ───────────────────────────────────────────────────────────────── -->
-  <section id="problem">
-    <p class="label rv"><b>02</b> <i>/</i> Warum</p>
-    <h2 class="rv">Keine dieser Situationen braucht einen Hacker.</h2>
-    <p class="sub rv">Es reicht, dass der Bot zu hilfsbereit ist.</p>
+  <!-- ══ 02 + 03 — one pinned runway, two panes ═══════════════════════════
+       After work-practice-motion: a tall scroll runway holds a sticky
+       viewport, two full-screen panes sit stacked inside it, and the top one
+       is wiped away from the top with clip-path as you scroll. Rows inside
+       each pane take focus in turn, exactly as their axis-section does.
+       Built with sticky + clip-path only: GSAP and Lenis are what they use,
+       and PLAYBOOK bans both. -->
+  <div class="runway" id="runway">
+    <div class="pin">
 
-    <div class="rows tracks" data-track="row"><div class="trail" aria-hidden="true"></div>
-      <div class="row rv">
-        <div class="k">Restaurant</div>
-        <p>Ihr Buchungs-Bot bestätigt einen Tisch für zwanzig Personen am Samstag.
-           Einen Tisch für zwanzig haben Sie nicht. Der Gast steht mit der
-           Bestätigung auf dem Handy vor der Tür.</p>
-        <!-- REVIEW: Kwabena — Air Canada, CRT, Februar 2024 -->
-        <p class="out"><b>Sie sind an das gebunden, was Ihr Bot sagt.</b>
-           Air Canada hat 2024 vor einem Tribunal argumentiert, der Chatbot sei ein
-           eigenständiges System. Das Gericht ist dem nicht gefolgt.</p>
-      </div>
-      <div class="row rv">
-        <div class="k">Friseursalon</div>
-        <p>Jemand fragt am Telefon nach den Terminen von morgen, und der Bot liest
-           den Namen und die Uhrzeit einer anderen Kundin vor.</p>
-        <!-- REVIEW: Kwabena — Art. 33 DSGVO, 72 Stunden -->
-        <p class="out"><b>Das ist eine Datenpanne</b>, und die Frist, sie zu melden,
-           beträgt 72 Stunden (Art. 33 DSGVO). Dass es niemand so gemeint hat,
-           ändert daran nichts.</p>
-      </div>
-      <div class="row rv">
-        <div class="k">Physiotherapie</div>
-        <p>Ein Patient beschreibt dem Terminbot Schmerzen in der Brust, und der Bot
-           schlägt vor, was er dagegen nehmen kann.</p>
-        <p class="out"><b>Ihr Bot hat gerade in Ihrem Namen einen medizinischen Rat
-           gegeben.</b></p>
-      </div>
-      <div class="row rv">
-        <div class="k">Handwerk</div>
-        <p>Der Bot erfindet 30 % Rabatt — oder nennt einen Festpreis für einen
-           Auftrag, den nie jemand gesehen hat.</p>
-        <p class="out"><b>Ihr Kunde hält jetzt ein schriftliches Angebot in der
-           Hand.</b></p>
-      </div>
+      <section class="pane pane--a" id="problem">
+        <div class="pane-in">
+          <div class="pane-head">
+            <p class="label"><b>02</b> <i>/</i> Warum</p>
+            <p class="focus mono">IM FOKUS <b class="fnum">01</b> / 04</p>
+          </div>
+          <h2>Keine dieser Situationen<br>braucht einen Hacker.</h2>
+          <div class="axis-rows" data-rows>
+            <div class="trail" aria-hidden="true"></div>
+            <article class="arow">
+              <div class="an">Restaurant</div>
+              <span class="chip mono">01</span>
+              <div class="ad">
+                <p>Ihr Buchungs-Bot bestätigt einen Tisch für zwanzig Personen am
+                   Samstag. Einen Tisch für zwanzig haben Sie nicht.</p>
+                <!-- REVIEW: Kwabena — Air Canada, CRT, Februar 2024 -->
+                <p class="ax">Sie sind an das gebunden, was Ihr Bot sagt. Air Canada
+                   hat 2024 argumentiert, der Chatbot sei ein eigenständiges System.
+                   Das Gericht ist dem nicht gefolgt.</p>
+              </div>
+            </article>
+            <article class="arow">
+              <div class="an">Friseursalon</div>
+              <span class="chip mono">02</span>
+              <div class="ad">
+                <p>Der Bot liest am Telefon den Namen und die Uhrzeit einer anderen
+                   Kundin vor.</p>
+                <!-- REVIEW: Kwabena — Art. 33 DSGVO, 72 Stunden -->
+                <p class="ax">Das ist eine Datenpanne, und die Frist zur Meldung
+                   beträgt 72 Stunden (Art. 33 DSGVO).</p>
+              </div>
+            </article>
+            <article class="arow">
+              <div class="an">Physiotherapie</div>
+              <span class="chip mono">03</span>
+              <div class="ad">
+                <p>Ein Patient beschreibt dem Terminbot Schmerzen in der Brust, und
+                   der Bot schlägt vor, was er nehmen kann.</p>
+                <p class="ax">Ihr Bot hat in Ihrem Namen einen medizinischen Rat gegeben.</p>
+              </div>
+            </article>
+            <article class="arow">
+              <div class="an">Handwerk</div>
+              <span class="chip mono">04</span>
+              <div class="ad">
+                <p>Der Bot erfindet 30 % Rabatt oder nennt einen Festpreis für einen
+                   Auftrag, den nie jemand gesehen hat.</p>
+                <p class="ax">Ihr Kunde hält jetzt ein schriftliches Angebot in der Hand.</p>
+              </div>
+            </article>
+          </div>
+          <!-- REVIEW: Kwabena — Art. 50 AI Act, Geltung seit 02.08.2026 -->
+          <p class="note">Seit dem 2. August 2026 verlangt Artikel 50 der KI-Verordnung,
+            dass Menschen erfahren, wenn sie mit einer KI sprechen. — Die vier
+            Situationen sind Beispiele, keine Messergebnisse.</p>
+        </div>
+      </section>
+
+      <section class="pane pane--b" id="verfahren">
+        <div class="pane-in">
+          <div class="pane-head">
+            <p class="label"><b>03</b> <i>/</i> Verfahren</p>
+            <p class="focus mono">IM FOKUS <b class="fnum">01</b> / 05</p>
+          </div>
+          <h2>Fünf Schritte, und Sie<br>sehen jeden davon.</h2>
+          <div class="axis-rows" data-rows>
+            <div class="trail" aria-hidden="true"></div>
+            <article class="arow"><div class="an">Ziel</div><span class="chip mono">01</span>
+              <div class="ad"><p>Systemprompt oder Endpunkt. Bei einem Live-Bot erst nach
+                nachgewiesener Verfügungsberechtigung.</p></div></article>
+            <article class="arow"><div class="an">Angriffe</div><span class="chip mono">02</span>
+              <div class="ad"><p>Die Bibliothek läuft gegen den Bot. Jeder Angriff ist
+                dokumentiert und versioniert.</p></div></article>
+            <article class="arow"><div class="an">Antworten</div><span class="chip mono">03</span>
+              <div class="ad"><p>Wir zeichnen wörtlich auf, was der Bot geantwortet hat.</p></div></article>
+            <article class="arow"><div class="an">Bewertung</div><span class="chip mono">04</span>
+              <div class="ad"><p>Ebene 1: Canary, ein Zeichenvergleich. Ebene 2: ein
+                separates Modell, immer mit Zitat.</p></div></article>
+            <article class="arow"><div class="an">Prüfbericht</div><span class="chip mono">05</span>
+              <div class="ad"><p>Note, Befunde mit Beleg und Behebung. Datiert, mit
+                Bibliotheksversion.</p></div></article>
+          </div>
+        </div>
+      </section>
+
     </div>
+  </div>
 
-    <!-- REVIEW: Kwabena — Art. 50 AI Act, Geltung seit 02.08.2026 -->
-    <p class="note rv">Seit dem 2. August 2026 verlangt Artikel 50 der KI-Verordnung,
-      dass Menschen erfahren, wenn sie mit einer KI sprechen. Auch der kleinste Bot.
-      — Die vier Situationen sind Beispiele, keine Messergebnisse.</p>
-  </section>
-
-  <!-- 03 ───────────────────────────────────────────────────────────────── -->
-  <section id="verfahren">
-    <p class="label rv"><b>03</b> <i>/</i> Verfahren</p>
-    <h2 class="rv">Fünf Schritte, und Sie sehen jeden davon.</h2>
-    <div class="steps tracks" data-track="step"><div class="trail" aria-hidden="true"></div>
-      <div class="step rv"><b>01</b><h3>Ziel</h3><p>Systemprompt oder Endpunkt. Bei einem
-        Live-Bot erst nach nachgewiesener Verfügungsberechtigung.</p></div>
-      <div class="step rv"><b>02</b><h3>Angriffe</h3><p>Die Bibliothek läuft gegen den Bot.
-        Jeder Angriff ist dokumentiert und versioniert.</p></div>
-      <div class="step rv"><b>03</b><h3>Antworten</h3><p>Wir zeichnen auf, was der Bot
-        tatsächlich geantwortet hat — wörtlich.</p></div>
-      <div class="step rv"><b>04</b><h3>Bewertung</h3><p>Ebene 1: Canary, ein Zeichenvergleich.
-        Ebene 2: ein separates Modell, immer mit Zitat.</p></div>
-      <div class="step rv"><b>05</b><h3>Prüfbericht</h3><p>Note, Befunde mit Beleg und
-        Behebung. Datiert, mit Bibliotheksversion.</p></div>
-    </div>
-  </section>
 
   <!-- 04 ───────────────────────────────────────────────────────────────── -->
   <section id="grenzen">
@@ -757,34 +848,57 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   sync();
 })();
 
-/* ══ Focus trail ══════════════════════════════════════════════════════════
-   The axis grows a lit segment that snaps to whichever row or step is at the
-   reading line, and dims the rest. Top and height are written here; the slide
-   is the CSS transition, exactly as .axis-section__focus-trail does it.    */
-(function trails() {
-  const groups = [...document.querySelectorAll('.tracks')];
-  if (!groups.length || REDUCED) return;
-  const LINE = .42;                       // reading line, fraction of viewport
+/* ══ The runway: wipe + row focus ══════════════════════════════════════════
+   One scroll track drives three things in order, the way work-practice-motion
+   does: pane A cycles its rows, pane A is wiped away from the top, pane B
+   cycles its rows. Progress is read from the runway's own rect, so there is
+   no scroll library and nothing to load.                                    */
+(function runway() {
+  const track = document.getElementById('runway');
+  if (!track || REDUCED) {
+    document.querySelectorAll('.arow').forEach(r => r.classList.add('act'));
+    return;
+  }
+  const pins = [...document.querySelectorAll('.runway')];   // base + clone
+  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+
+  /* the wipe occupies the middle of the track; the rest is row time */
+  const A_END = .42, W_END = .58;
 
   const paint = () => {
-    const focus = innerHeight * LINE;
-    groups.forEach(g => {
-      const items = [...g.querySelectorAll('.' + g.dataset.track)];
-      const box = g.getBoundingClientRect();
-      const visible = box.top < innerHeight * .92 && box.bottom > innerHeight * .08;
-      let best = null, bestD = Infinity;
-      items.forEach(it => {
-        const r = it.getBoundingClientRect();
-        const d = Math.abs(r.top + r.height / 2 - focus);
-        if (d < bestD) { bestD = d; best = it; }
-      });
-      items.forEach(it => it.classList.toggle('act', it === best));
-      g.dataset.tracking = String(visible);
-      if (!best || !visible) { g.style.setProperty('--trail-o', '0'); return; }
-      const r = best.getBoundingClientRect();
-      g.style.setProperty('--trail-top', (r.top - box.top) + 'px');
-      g.style.setProperty('--trail-h', r.height + 'px');
-      g.style.setProperty('--trail-o', '1');
+    const rect = track.getBoundingClientRect();
+    const span = rect.height - innerHeight;
+    const p = clamp(-rect.top / (span || 1), 0, 1);
+
+    pins.forEach(t => {
+      const a = t.querySelector('.pane--a'), b = t.querySelector('.pane--b');
+      if (!a || !b) return;
+
+      /* 1. the wipe */
+      const wipe = clamp((p - A_END) / (W_END - A_END), 0, 1);
+      a.style.setProperty('--wipe', (wipe * 100).toFixed(2) + '%');
+
+      /* 2. which row has focus in each pane */
+      const focus = (pane, from, to) => {
+        const rows = [...pane.querySelectorAll('.arow')];
+        if (!rows.length) return;
+        const local = clamp((p - from) / (to - from), 0, .9999);
+        const i = Math.floor(local * rows.length);
+        rows.forEach((r, k) => r.classList.toggle('act', k === i));
+        const num = pane.querySelector('.fnum');
+        if (num) num.textContent = String(i + 1).padStart(2, '0');
+        const rows_box = pane.querySelector('.axis-rows');
+        const trail = pane.querySelector('.trail');
+        if (rows_box && trail) {
+          const rb = rows_box.getBoundingClientRect();
+          const rr = rows[i].getBoundingClientRect();
+          trail.style.setProperty('--trail-top', (rr.top - rb.top) + 'px');
+          trail.style.setProperty('--trail-h', rr.height + 'px');
+          trail.style.setProperty('--trail-o', '1');
+        }
+      };
+      focus(a, 0, A_END);
+      focus(b, W_END, 1);
     });
   };
 
@@ -797,6 +911,8 @@ const canReveal = matchMedia('(min-width: 64rem) and (hover: hover) and (pointer
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll, { passive: true });
   paint();
+  /* the clone is built when the reveal band turns on, after this ran once */
+  setTimeout(paint, 60);
 })();
 
 /* ── pause control for the head ──────────────────────────────────────────── */
