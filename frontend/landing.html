@@ -838,7 +838,11 @@ const setOv = open => {
   const gutter = innerWidth - document.documentElement.clientWidth;
   document.body.style.overflow = open ? 'hidden' : '';
   document.body.style.paddingRight = open ? gutter + 'px' : '';
-  if (open) ov.querySelector('a').focus(); else mb.focus();
+  /* Not in this tick: the overlay is visibility:hidden until the attribute
+     change lands, and a visibility:hidden element cannot take focus. Measured
+     on the app pages that copied this code -- activeElement stayed BODY. */
+  if (open) requestAnimationFrame(() => ov.querySelector('a').focus());
+  else mb.focus();
 };
 mb.addEventListener('click', () => setOv(ov.dataset.open !== 'true'));
 $('#closeBtn').addEventListener('click', () => setOv(false));

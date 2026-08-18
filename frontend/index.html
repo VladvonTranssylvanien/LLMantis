@@ -199,6 +199,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
   --ring:rgba(17,107,46,.30);
   --ease:cubic-bezier(0.16,1,0.3,1);
   --r:12px;
+  /* The landing's two chrome values, so the header ported from it is the same
+     object here and not a lookalike: --pad is the page gutter the header and
+     the overlay both sit on, --dur the transition the overlay slides with.
+     --ease above is already the landing's --ease-expo, same curve. */
+  --pad:clamp(20px,4.4vw,64px);
+  --dur:.35s;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
@@ -245,14 +251,15 @@ body{font-family:var(--sans)}
    =========================================================================== */
 
 body {
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    radial-gradient(1000px 700px at 8% -10%, var(--bloom-warm), transparent 62%),
-    radial-gradient(900px 800px at 100% 4%, var(--bloom-cool), transparent 62%),
-    linear-gradient(180deg, var(--bg-2), var(--bg) 46%);
-  background-size: 64px 64px, 64px 64px, auto, auto, auto;
-  background-attachment: fixed;
+  /* Flat, like the landing. This was a 64px grid, two radial blooms and a
+     white-to-ground gradient — a texture the landing does not have, which is
+     what made the two halves read as two products even once the palette was
+     shared. --grid-line, --bloom-warm, --bloom-cool and --bg-2 are now unused
+     by any page; they stay in :root only because that block is byte-identical
+     across six files and deleting a token is a six-file edit for no behaviour. */
+  background: var(--bg);
+  /* The header is fixed now, so content must clear it. */
+  padding-top: var(--hdr);
   color: var(--text);
   font-size: 15px;
   line-height: 1.6;
@@ -260,42 +267,53 @@ body {
 }
 
 /* ------------------------------------------------------------------ header */
-.topbar {
-  position: sticky; top: 0; z-index: 60;
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px clamp(16px, 4vw, 40px);
-  border-width: 0 0 1px 0;
-}
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-.brand img { width: 26px; height: 26px; display: block; }
-.brand .name { font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
-.brand .name .ll { color: var(--accent); }
+/* ── header, ported from landing.html ────────────────────────────────────────
+   The app used to carry its own bar: a 26px mark, six inline links and a
+   collapse-at-760px menu. The landing carries an 84px seal with the wordmark
+   lying ON it, a Chatbot-Pruefung label hanging under, and one Menue button
+   opening a green strip. This is that header, on the app's token names, so the
+   two halves of the product are one object rather than two that agree about
+   colour. FIXED, not sticky, because the overlay is fixed and a sticky bar
+   scrolls out from under it. Anything below must clear --hdr. */
+:root{ --hdr:110px; }   /* 84px seal + 13px + 12px + 1px rule, measured */
+header.topbar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--bg)}
+.hbar{display:flex;align-items:center;justify-content:space-between;
+  padding:13px var(--pad) 12px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;text-decoration:none;color:var(--text)}
+.brand img{width:84px;height:84px;display:block}
+/* The wordmark comes after the seal in the DOM so it paints over the ring, and
+   the negative margin pulls it back across the seal's right edge. */
+.brand .name{position:relative;margin-left:-12px;
+  font-size:33px;font-weight:700;letter-spacing:-.035em;line-height:1}
+.brand .name .ll{color:var(--accent)}
+/* Out of flow, so the flex centres the seal against the WORDMARK alone. */
+.brand .sub{position:absolute;top:100%;left:0;
+  display:block;font-family:var(--mono);font-size:10px;font-weight:400;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+.menu-btn{display:flex;align-items:center;gap:11px;background:none;border:0;padding:8px 0;
+  font:inherit;font-size:15px;color:var(--text);cursor:pointer}
+.dots{display:grid;grid-template-columns:repeat(2,5px);gap:3px}
+.dots i{width:5px;height:5px;background:var(--accent);display:block}
 
-.nav { margin-left: auto; display: flex; gap: 4px; align-items: center; }
-.nav a.link {
-  color: var(--muted); text-decoration: none; font-size: 14px;
-  padding: 7px 11px; border-radius: 7px;
-  transition: color .2s var(--ease), background .2s var(--ease);
-}
-.nav a.link:hover { color: var(--text); background: var(--surface-2); }
-.nav a.link[aria-current="page"] { color: var(--accent); background: var(--surface-2); }
-.nav .btn { margin-left: 8px; }
-
-.menu-btn {
-  display: none; margin-left: auto; background: transparent; border: 1px solid var(--border);
-  color: var(--text); border-radius: 8px; padding: 8px 11px; cursor: pointer; font: inherit;
-}
-@media (max-width: 760px) {
-  .menu-btn { display: block; }
-  .nav {
-    display: none; position: absolute; top: 100%; left: 0; right: 0;
-    flex-direction: column; align-items: stretch; gap: 2px;
-    padding: 10px clamp(16px, 4vw, 40px) 16px;
-    background: var(--glass-fallback); border-bottom: 1px solid var(--border);
-  }
-  .nav.open { display: flex; }
-  .nav .btn { margin: 8px 0 0; text-align: center; }
-}
+/* ── overlay navigation ──────────────────────────────────────────────────── */
+/* A green strip out of the right edge, only as wide as its labels need. */
+.overlay{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:50;background:var(--accent);
+  width:max-content;max-width:min(90vw,460px);
+  display:flex;flex-direction:column;padding:var(--pad);
+  transform:translateX(100%);visibility:hidden;
+  transition:transform var(--dur) var(--ease),visibility var(--dur)}
+.overlay[data-open="true"]{transform:none;visibility:visible}
+.overlay .close{align-self:flex-end;background:none;border:0;font:inherit;font-size:15px;
+  color:var(--bg);cursor:pointer;padding:8px 0}
+.overlay nav{margin:auto 0;display:grid;gap:6px}
+.overlay a{display:flex;align-items:baseline;gap:22px;text-decoration:none;
+  color:rgba(242,241,235,.82);                       /* 4.51:1 on the accent */
+  font-size:clamp(26px,3.2vw,38px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
+  padding:6px 0;transition:color var(--dur) var(--ease)}
+.overlay a:hover,.overlay a[aria-current="page"]{color:var(--bg)}   /* 5.86:1 */
+.overlay a span{font-family:var(--mono);font-size:13px;font-weight:400;
+  letter-spacing:.1em;color:rgba(242,241,235,.82)}
+@media (prefers-reduced-motion:reduce){ .overlay{transition:none} }
 
 /* ------------------------------------------------------------------ layout */
 .wrap {
@@ -490,21 +508,37 @@ footer.site .sp { margin-left: auto; }
 </head>
 <body>
 
-<header class="topbar glass">
-  <a class="brand" href="/">
-    <img src="/static/assets/brand/mark-ink.svg" alt="" width="26" height="26">
-    <span class="name"><span class="ll">LL</span>Mantis</span>
-  </a>
-  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
-  <nav class="nav" id="nav" aria-label="Main">
-    <a class="link" href="/#verfahren">Product</a>
-    <a class="link" href="/#problem">Why</a>
-    <a class="link" href="/#preise">Pricing</a>
-    <a class="link" href="/#team">About</a>
-    <a class="link" href="/" aria-current="page">Run scan</a>
-    <a class="btn" href="/static/art50check.html">Start free check</a>
-  </nav>
+<header class="topbar">
+  <div class="hbar">
+    <a class="brand" href="/" aria-label="LLMantis — Startseite">
+      <img src="/static/assets/brand/seal.svg" alt="">
+      <span class="name"><span class="ll">LL</span>Mantis
+        <span class="sub">Chatbot-Pr&uuml;fung</span>
+      </span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="ov">
+      Men&uuml; <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    </button>
+  </div>
 </header>
+
+<!-- Navigation lives in the overlay, as on the landing. Two destinations were
+     wrong before this and are fixed here: art50check pointed at /#produkt,
+     /#warum and /#ueber-uns, none of which exist (the landing's sections are
+     signal, verfahren, problem, grenzen, preise, team), and "Run scan" pointed
+     at "/" — the landing — on both pages, when index.html is served at /scan
+     (backend/main.py:1167). -->
+<div class="overlay" id="ov" role="dialog" aria-modal="true" aria-label="Navigation">
+  <button class="close" id="closeBtn">Schlie&szlig;en &#10005;</button>
+  <nav>
+    <a href="/#verfahren"><span>01</span> Product</a>
+    <a href="/#problem"><span>02</span> Why</a>
+    <a href="/#preise"><span>03</span> Pricing</a>
+    <a href="/#team"><span>04</span> About</a>
+    <a href="/scan" aria-current="page"><span>05</span> Run scan</a>
+    <a href="/static/art50check.html"><span>06</span> Start free check</a>
+  </nav>
+</div>
 
 <div class="wrap">
 
@@ -910,6 +944,39 @@ function card(r, i) {
     '<div class="fbody" id="' + bodyId + '">' + body + '</div>' +
   '</div>';
 }
+</script>
+
+<script>
+/* Overlay navigation, ported from landing.html. */
+(function () {
+  var ov = document.getElementById('ov'), mb = document.getElementById('menuBtn');
+  if (!ov || !mb) return;
+  function setOv(open) {
+    ov.dataset.open = String(open);
+    mb.setAttribute('aria-expanded', String(open));
+    /* Locking the body removes the scrollbar, and where scrollbars take real
+       width that widens the content box and every centred column shifts.
+       Handing back exactly the scrollbar's width keeps the layout the same
+       size. Measured before the lock, or it is already gone. */
+    var gutter = innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = open ? 'hidden' : '';
+    document.body.style.paddingRight = open ? gutter + 'px' : '';
+    /* Not in this tick. The overlay is visibility:hidden until the attribute
+       change is applied, and a visibility:hidden element cannot take focus --
+       measured: activeElement stayed BODY, so opening the menu by keyboard
+       left the caller nowhere. One frame later it is visible and focusable. */
+    if (open) requestAnimationFrame(function () { ov.querySelector('a').focus(); });
+    else mb.focus();
+  }
+  mb.addEventListener('click', function () { setOv(ov.dataset.open !== 'true'); });
+  document.getElementById('closeBtn').addEventListener('click', function () { setOv(false); });
+  ov.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () { setOv(false); });
+  });
+  addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && ov.dataset.open === 'true') setOv(false);
+  });
+})();
 </script>
 </body>
 </html>

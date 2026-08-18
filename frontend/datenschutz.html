@@ -201,6 +201,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
   --ring:rgba(17,107,46,.30);
   --ease:cubic-bezier(0.16,1,0.3,1);
   --r:12px;
+  /* The landing's two chrome values, so the header ported from it is the same
+     object here and not a lookalike: --pad is the page gutter the header and
+     the overlay both sit on, --dur the transition the overlay slides with.
+     --ease above is already the landing's --ease-expo, same curve. */
+  --pad:clamp(20px,4.4vw,64px);
+  --dur:.35s;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
