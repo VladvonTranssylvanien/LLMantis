@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prüfbericht — LLMantis</title>
-<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
 <style>
 /* ---- primitives lifted from assets/base.css (tokens stripped) ---- */
 /* ===========================================================================
@@ -20,21 +20,21 @@
    fallback and reflows once the file lands, rather than blocking on it. */
 @font-face {
   font-family: 'Inter';
-  src: url('/static/assets/fonts/InterVariable.woff2') format('woff2-variations');
+  src: url('assets/fonts/InterVariable.woff2') format('woff2-variations');
   font-weight: 100 900;          /* one variable file covers the whole ramp */
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JetBrains Mono';
-  src: url('/static/assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  src: url('assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JetBrains Mono';
-  src: url('/static/assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  src: url('assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -556,7 +556,15 @@ function evidenceFor(r) {
 const isBlocked = r => /content_filter|content management policy/i
   .test(String(r.reason == null ? '' : r.reason));
 
-const MARK = '<img src="/static/assets/brand/mark-ink.svg" alt="" width="26" height="26">';
+/* Asset paths in THIS file are relative, not "/static/...", and that is
+   deliberate. report.html is only ever served from the /static mount
+   (backend/main.py serves landing.html at / and index.html at /scan), so
+   "assets/..." and "/static/assets/..." resolve to the same file there — but
+   only the relative form still resolves when the document is opened directly
+   from disk, where an absolute /static/... path hits the filesystem root and
+   the mark, the seal and the fonts all fail to load. This is the one document a
+   customer saves and reopens, so it has to survive that. */
+const MARK = '<img src="assets/brand/mark-ink.svg" alt="" width="26" height="26">';
 
 function build() {
   const s = REPORT.summary;
@@ -829,8 +837,8 @@ build();
 </script>
 <footer style="max-width:190mm;margin:0 auto 24mm;padding:0 14mm;
   font-size:9pt;color:var(--muted)">
-  <a href="/static/impressum.html" style="color:var(--muted)">Impressum</a> ·
-  <a href="/static/datenschutz.html" style="color:var(--muted)">Datenschutzerklärung</a>
+  <a href="impressum.html" style="color:var(--muted)">Impressum</a> ·
+  <a href="datenschutz.html" style="color:var(--muted)">Datenschutzerklärung</a>
 </footer>
 <script>
 /* The stamp is filled from the same REPORT object the page already built from,
@@ -852,7 +860,7 @@ build();
   var lib  = REPORT.library_version || 'nicht angegeben';
   var d = document.createElement('div');
   d.className = 'stamp';
-  d.innerHTML = '<img src="/static/assets/brand/seal.svg" alt="">' +
+  d.innerHTML = '<img src="assets/brand/seal.svg" alt="">' +
     '<div class="ref">gepr&uuml;ft am ' + date +
     '<br>Scan #' + id +
     '<br>Bibliothek ' + lib + '</div>';
