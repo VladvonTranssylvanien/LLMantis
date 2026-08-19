@@ -64,6 +64,22 @@ services:
       TARGET_MODEL: ${TARGET_MODEL:-gpt-4.1-mini}
       TARGET_AUTH: ${TARGET_AUTH:-api-key}
       LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-60}
+      # The model that reads a page and finds the chat button, for the Art.-50
+      # check only (backend/art50opener.py). Deliberately its own variables and
+      # not AZURE_* : the scan and the Art.-50 check are two features owned by two
+      # people, and one shared key is one shared outage.
+      #
+      # Empty disables the fallback and the keyword opener still runs — but on
+      # o2online.de the keyword opener alone never reaches the assistant, because
+      # the chat lives at /service/aura/ and "aura" is a brand name no path list
+      # can guess. Left out of this file entirely, the feature would look present
+      # and quietly do less, which is what "the settings never reached the
+      # container" meant the first time.
+      ART50_AI_URL: ${ART50_AI_URL:-}
+      ART50_AI_KEY: ${ART50_AI_KEY:-}
+      ART50_AI_AUTH: ${ART50_AI_AUTH:-api-key}
+      ART50_AI_MODEL: ${ART50_AI_MODEL:-gpt-4.1-mini}
+      ART50_AI_TIMEOUT_S: ${ART50_AI_TIMEOUT_S:-20}
       # 3 is the measured ceiling for the free Mistral tier. At 5, three
       # back-to-back scans produced enough 429s to void a grade.
       CONCURRENCY: ${CONCURRENCY:-3}

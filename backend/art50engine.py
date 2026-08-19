@@ -71,6 +71,7 @@ from urllib.request import Request, urlopen
 from urllib.robotparser import RobotFileParser
 
 from . import art50probes as probes
+from . import art50opener
 from .art50probes import ProbeResult
 from .netguard import UnsafeUrlError, assert_public_host, is_private_url
 
@@ -147,6 +148,11 @@ class Art50Report:
     # the end, by which time a panel may have closed or a later page loaded.
     widget_shot_b64: str = ""
     greeting_source: str = ""           # "iframe" or "panel" — where the text came from
+    # Every button we pressed, in order. Both evidence and reproducibility: a
+    # reader has to be able to see that we reached the first message rather than
+    # stopping at a pre-chat screen, which is the mistake o2online.de exposed.
+    click_path: list[str] = field(default_factory=list)
+    consent_rejected: str = ""          # the refusal we pressed, if one existed
     pages_tried: list[dict] = field(default_factory=list)
     probe_log: list[dict] = field(default_factory=list)
     blocked_requests: int = 0           # private-host requests the guard aborted
@@ -449,8 +455,20 @@ async def _chat_frames(page, before_urls: set[str]) -> list[dict]:
         if url.startswith(("data:", "javascript:")):
             continue
         name = frame.name or ""
-        if probes.NOT_CHAT.search(url) or probes.NOT_CHAT.search(name):
+        # The frame's own title attribute, which is the site telling us what this
+        # frame is. o2online.de labels its chat iframe title="Live-Chat" and its
+        # forum title="inSided in-page support" — decisive, and previously unused.
+        title = ""
+        try:
+            title = await (await frame.frame_element()).evaluate(
+                "e => e.getAttribute('title') || ''") or ""
+        except Exception:
+            pass
+        if any(probes.NOT_CHAT.search(x) for x in (url, name, title)):
             continue
+        # A title that names the thing outranks anything structural, and it is
+        # decided before the text is looked at — see the note below.
+        titled = bool(probes.CHATTY_TEXT.search(title))
         try:
             info = await frame.evaluate(_FRAME_PROBE)
         except Exception:
@@ -458,7 +476,22 @@ async def _chat_frames(page, before_urls: set[str]) -> list[dict]:
         text = (info.get("text") or "").strip()
         if len(text) < 8:
             continue
-        if probes.NOT_CHAT.search(text[:400]):
+        # NOT_CHAT ON THE TEXT ONLY IF THE FRAME HAS NOT IDENTIFIED ITSELF.
+        #
+        # Identity is decided above, from url, name and title. Once a frame says
+        # title="Live-Chat", what it CONTAINS cannot un-say that — and applying the
+        # consent-wall exclusions to a chat's own words is how the check rejected
+        # the one thing it came for. o2online.de's assistant opens with
+        #
+        #     "Hallo. Ich bin Aura, deine KI-gestützte Assistenz … Datenschutzerklärung."
+        #
+        # and "datenschutz" is in NOT_CHAT because cookie banners are full of it.
+        # So a bot that names its privacy policy — which a compliant bot does — was
+        # classified as a cookie banner and thrown away, greeting and all.
+        #
+        # Text remains a useful filter for anonymous frames, where it is the only
+        # signal there is. It must never overrule a name.
+        if not titled and probes.NOT_CHAT.search(text[:400]):
             continue
         # Reject frames too small to be a conversation — ad slots and pixels.
         area = 0.0
@@ -471,16 +504,27 @@ async def _chat_frames(page, before_urls: set[str]) -> list[dict]:
                     continue
         except Exception:
             pass
-        chatty = bool(probes.CHATTY_TEXT.search(url + " " + name + " " +
-                                                (info.get("title") or "")))
+        chatty = titled or bool(probes.CHATTY_TEXT.search(
+            url + " " + name + " " + (info.get("title") or "")))
         out.append({
-            "how": "cross-origin chat frame with a message box" if info.get("hasInput")
-                   else ("cross-origin chat frame" if chatty else "iframe"),
+            "how": (f"frame titled {title!r} with a message box" if titled and info.get("hasInput")
+                    else f"frame titled {title!r}" if titled
+                    else "cross-origin chat frame with a message box" if info.get("hasInput")
+                    else "cross-origin chat frame" if chatty else "iframe"),
             "text": text, "hasInput": bool(info.get("hasInput")),
-            "chatty": chatty, "fresh": url not in before_urls, "area": area,
+            "titled": titled, "chatty": chatty,
+            "fresh": url not in before_urls, "area": area,
         })
-    out.sort(key=lambda c: (not c["hasInput"], not c["chatty"], not c["fresh"],
-                            c["area"] or 1e12))
+    # RANKED BY WHAT THE SITE CALLS IT, then by whether you can reply in it.
+    #
+    # The old order put hasInput first, and on o2online.de that handed us the
+    # community forum: "inSided in-page support" ships an input immediately, while
+    # the frame titled "Live-Chat" has none until the visitor presses Chat starten.
+    # A title is the site's own statement of what a frame is; an input is a guess
+    # about what it does.
+    out.sort(key=lambda c: (not (c["titled"] and c["hasInput"]),
+                            not c["titled"], not c["hasInput"],
+                            not c["chatty"], not c["fresh"], c["area"] or 1e12))
     return out
 
 
@@ -516,7 +560,91 @@ _WHAT_IS_ON_TOP = r"""
 """
 
 
-async def _read_greeting(page, launcher: dict) -> tuple[bool, str, str]:
+# Refuse the cookie banner where a refusal exists. NEVER accept one.
+#
+# WHY REJECT IS FINE AND ACCEPT IS NOT
+#     Rejecting is the privacy-preserving choice and changes the least. Accepting
+#     records consent to data processing in the site's own CMP, attributed to a
+#     visitor who does not exist — and those records are the compliance artefacts
+#     they would show an authority. Polluting them uninvited, at scale, from a
+#     company selling diligence, is not a trade we make. /static/scanner.html also
+#     promises in writing that we do not accept a banner on anyone's behalf, and a
+#     false statement about our own practice is the § 5 UWG problem this project
+#     refuses everywhere else.
+#
+#     The banner in a screenshot is solved by clipping the shot to the widget
+#     instead, which is what _widget_shot does.
+_REJECT_CONSENT = r"""
+() => {
+  const WANT = /^(alle )?ablehnen$|^ablehnen|nur (essenzielle|notwendige|erforderliche|technisch)|only essential|reject all|^decline|weiter ohne einwilligung|ohne zustimmung|essenzielle cookies/i;
+  const ACCEPT = /akzeptier|zustimmen|alle zulassen|einverstanden|accept|agree|allow all|erlauben/i;
+  const roots = [document];
+  for (const el of document.querySelectorAll('*')) if (el.shadowRoot) roots.push(el.shadowRoot);
+  for (const root of roots) {
+    // No submit inputs here either. A consent banner's refuse control is a
+    // button, not a form submission, and we must not be the thing that posts a
+    // form on someone's site. Same rule as art50opener's candidate list.
+    for (const el of root.querySelectorAll('button,a,[role=button],input[type=button]')) {
+      if ((el.type || '').toLowerCase() === 'submit') continue;
+      const t = ((el.innerText || el.value || el.getAttribute('aria-label') || '') + '').trim();
+      if (!t || t.length > 70) continue;
+      if (ACCEPT.test(t)) continue;          // never, under any circumstances
+      if (WANT.test(t)) { el.click(); return t; }
+    }
+  }
+  return null;
+}
+"""
+
+# Is there still a button that would take us further into the conversation?
+#
+# THE RULE THIS ENFORCES
+#     o2online.de was reported as not_disclosed on the strength of a pre-chat
+#     screen — "Chatte mit mir! Aura … Mit dem Starten des Chats nimmst du unsere
+#     Datenschutz…". Vlad opened it by hand: the bot DOES say it is AI, several
+#     clicks further in. We had accused a compliant company on the evidence of an
+#     intermediate panel.
+#
+#     So while a start-the-chat button is still sitting there unpressed, we are
+#     not at the first message — we are in front of it, and the only honest
+#     verdict is not_determinable.
+_NEXT_STEP = r"""
+() => {
+  // "starten" on its own was far too loose: on o2online.de it matched "Suche
+  // starten" and we pressed the site's SEARCH button four times. Every phrase
+  // here now carries chat context of its own.
+  // "Kontaktoptionen anzeigen" is o2online.de's actual route to its chat, and no
+  // pattern here knew about contact panels — so the keyword opener pressed a
+  // Sprinklr teaser bubble instead and reported the widget unreadable.
+  const GO = /chat starten|chat beginnen|unterhaltung starten|neue unterhaltung|neuen chat|nachricht schreiben|jetzt chatten|zum chat|mit uns chatten|start chat|new conversation|send a message|kontaktoptionen|kontakt-?optionen|contact options/i;
+  const SKIP = /akzeptier|zustimmen|accept|cookie|einwillig|schlie(ss|ß)en|close|abbrechen|suche|search|anmelden|login|warenkorb|newsletter|absenden|abschicken|senden$|submit|bestellen|kaufen|bezahlen|speichern|abonnieren|teilnehmen/i;
+  for (const el of document.querySelectorAll('button,a,[role=button],[tabindex="0"]')) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 12 || r.height < 12) continue;
+    const t = ((el.innerText || el.getAttribute('aria-label') || '') + '').trim();
+    if (!t || t.length > 70) continue;
+    if (SKIP.test(t)) continue;
+    if (GO.test(t)) { el.click(); return t; }
+  }
+  return null;
+}
+"""
+
+
+async def _advance(page) -> str | None:
+    """Press one 'start the chat' button, wherever it lives. Frames included."""
+    for frame in page.frames:
+        try:
+            hit = await frame.evaluate(_NEXT_STEP)
+        except Exception:
+            continue
+        if hit:
+            return hit
+    return None
+
+
+async def _read_greeting(page, launcher: dict, *, use_ai: bool = False,
+                         ai_note=None) -> tuple[bool, str, str, list[str]]:
     """
     Click the launcher once, then read ONLY what opened. Returns
     (opened, greeting, how) where `how` names the surface it came from, or
@@ -629,32 +757,103 @@ async def _read_greeting(page, launcher: dict) -> tuple[bool, str, str]:
     # Cross-origin frames are checked first: that is where third-party widgets
     # live, and the in-page detector is structurally blind to them.
     suffix = " (opened past your cookie banner)" if bypassed else ""
-    frames: list[dict] = []
-    waited = 0
-    while waited < 14000:
-        await page.wait_for_timeout(1200)
-        waited += 1200
-        frames = await _chat_frames(page, before_frames)
-        if frames and (frames[0]["hasInput"] or frames[0]["chatty"]):
-            return True, frames[0]["text"], frames[0]["how"] + suffix
-        # Something readable but not obviously a conversation. Keep waiting a
-        # little in case the real panel is still coming, then settle for it.
-        if waited >= 6000 and frames:
+    path: list[str] = [launcher.get("visible") or launcher.get("technical") or "chat button"]
+
+    # WAIT FOR THE GREETING, then KEEP GOING IF THERE IS FURTHER TO GO.
+    #
+    # The wait replaced a flat 4.5 s, which was the reason myposter.de came back
+    # unreadable four runs of four: the click works, frames appear, but the widget
+    # has not fetched its greeting yet, so the frame is empty and gets filtered
+    # for having no text.
+    #
+    # The stepping is o2online.de's lesson. Its bot does disclose that it is AI —
+    # several clicks in. We read the pre-chat panel instead and reported
+    # not_disclosed against a compliant company. While a "Chat starten" button is
+    # still there unpressed we are in front of the first message, not at it.
+    best: dict | None = None
+    for step in range(4):
+        waited = 0
+        while waited < 12000:
+            await page.wait_for_timeout(1200)
+            waited += 1200
+            frames = await _chat_frames(page, before_frames)
+            if frames and (frames[0]["hasInput"] or frames[0]["chatty"]):
+                best = frames[0]
+                break
+            if waited >= 6000 and frames:
+                best = frames[0]
+                break
+
+        nxt = await _advance(page)
+        if not nxt:
+            break                      # nothing further to press: we are there
+        # Let the step land. "Chat starten" on o2online.de fetches the
+        # conversation into the frame it was pressed in; re-reading straight away
+        # measures the welcome screen it has just left, which is how a bot that
+        # says "Ich bin Aura, deine KI-gestützte Assistenz" was recorded as
+        # unreadable.
+        await page.wait_for_timeout(3000)
+        if nxt in path:
+            # The same button came back, so the last press changed nothing.
+            # Pressing it again would just be knocking on someone's door.
             break
+        path.append(nxt)
+        best = None                    # whatever we had was an intermediate screen
+
+    # THE AI FALLBACK. Only here, only when the deterministic opener did not
+    # reach a message box, and never allowed to decide the verdict — see
+    # art50opener for the reasoning. A site the heuristic already handles costs
+    # nothing, which matters on a 50-request-per-minute tier the red-team scan
+    # already saturates.
+    # IN-PAGE PANELS COUNT TOO.
+    #
+    # This read only `best`, which comes from _chat_frames and therefore only sees
+    # IFRAMES. phishing.workshop.bogdanorel.de renders its assistant as a plain
+    # fixed div — 370x520, ocmc-panel open, a message box, and the greeting
+    # "Hallo! Ich beantworte Fragen zum Phishing-Workshop" already on screen — so
+    # reached_box was False, the model was invited to help with a chat that was
+    # already open, and it did the two worst available things: pressed the 💬
+    # launcher again, which TOGGLED THE PANEL SHUT, and then pressed "Anmeldung
+    # absenden".
+    #
+    # A conversation is open if there is a message box anywhere we can read, frame
+    # or page. Ask before calling for help.
+    reached_box = bool(best and best.get("hasInput"))
+    if not reached_box:
+        try:
+            panel_now = await page.evaluate(_WIDGET_PANEL, before)
+        except Exception:
+            panel_now = None
+        if panel_now and panel_now.get("hasInput") and panel_now.get("text"):
+            best = panel_now
+            reached_box = True
+    if use_ai and not reached_box:
+        ai_path = await art50opener.open_with_ai(
+            page, page.url, [p for p in path], reached_box, on_note=ai_note)
+        if ai_path:
+            path += ai_path
+            waited = 0
+            while waited < 10000:
+                await page.wait_for_timeout(1200)
+                waited += 1200
+                frames = await _chat_frames(page, before_frames)
+                if frames and frames[0]["hasInput"]:
+                    best = frames[0]
+                    break
+                if waited >= 4800 and frames and not best:
+                    best = frames[0]
+
+    if best:
+        return True, best["text"], best["how"] + suffix, path
 
     try:
         panel = await page.evaluate(_WIDGET_PANEL, before)
     except Exception:
         panel = None
     if panel and panel.get("text"):
-        return True, panel["text"].strip(), panel.get("how", "") + suffix
+        return True, panel["text"].strip(), panel.get("how", "") + suffix, path
 
-    # A frame with readable text but no message box and no chat wording. Real
-    # enough to report, not attributable enough to accuse on — the caller only
-    # accuses when the source names an iframe or a message box.
-    if frames:
-        return True, frames[0]["text"], frames[0]["how"] + suffix
-    return True, "", ("consent-covered" if bypassed else "")
+    return True, "", ("consent-covered" if bypassed else ""), path
 
 
 async def _settle(page, budget_ms: int = 18000) -> None:
@@ -690,10 +889,19 @@ async def _settle(page, budget_ms: int = 18000) -> None:
 
 async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                 open_widget: bool = True, allow_private: bool = False,
-                on_progress=None, timeout_ms: int = 25000) -> Art50Report:
+                use_ai: bool = True, on_progress=None,
+                timeout_ms: int = 25000) -> Art50Report:
     """
     One Art.-50 check.
 
+    use_ai       let a model choose the next button when the keyword opener has
+                 not reached a message box. Default TRUE — the team asked for it on
+                 18.08 so that every site gets opened, not only the ones whose
+                 phrasing we guessed. It decides only WHICH ELEMENT TO CLICK; the
+                 verdict stays on the deterministic rule, because a compliance
+                 finding that depends on what a model felt like is the thing this
+                 product sells against. Every choice it makes is recorded in
+                 click_path with an "ai:" prefix.
     open_widget  click the launcher and read what the assistant says first.
                  DEFAULT TRUE, including for the free check — team decision 18.08.
 
@@ -762,6 +970,10 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(args=["--disable-dev-shm-usage"])
+        # Filled by visit(), on whichever page actually carries the launcher —
+        # see the note there for why it cannot wait until the sweep is over.
+        greeting = {"read": False, "opened": False, "text": "", "source": "",
+                    "path": [], "shot": "", "viewport": ""}
         merged: list[ProbeResult] = []
         launchers: list[dict] = []
         page = ctx = None
@@ -817,6 +1029,16 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                                         "http": st, "error": err})
                 if err:
                     return [], [], err
+                # Refuse the banner if a refusal is offered. NEVER accept one —
+                # see _REJECT_CONSENT for the reasoning. A widget that stays gated
+                # behind consent is reported as gated, not worked around.
+                try:
+                    refused = await page.evaluate(_REJECT_CONSENT)
+                except Exception:
+                    refused = None
+                if refused:
+                    rep.consent_rejected = refused
+                    await page.wait_for_timeout(1800)
                 await _settle(page)
                 res = await probes.run_all(page, requests, sockets, SIGS)
                 for p in res:
@@ -828,6 +1050,47 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                            if e.get("chatty")]
                 except Exception:
                     els = []
+
+                # READ THE GREETING HERE, ON THIS PAGE, NOW.
+                #
+                # It used to happen once at the very end of check(), after the
+                # whole sweep. With exhaustive=True — which is what the endpoint
+                # runs — the sweep keeps going after the launcher is found, so by
+                # then the browser is on page 20 and the launcher's coordinates
+                # belong to a page it left long ago. Measured on o2online.de: the
+                # non-exhaustive run reads "Ich bin Aura, deine KI-gestützte
+                # Assistenz" and the exhaustive one presses a stale button, lets
+                # the model suggest "Kontakt", and reports the widget unreadable
+                # after 240 seconds.
+                #
+                # A greeting belongs to the page it was spoken on. Read it while
+                # we are standing there.
+                if open_widget and els and not greeting["read"]:
+                    (greeting["opened"], greeting["text"], greeting["source"],
+                     greeting["path"]) = await _read_greeting(
+                        page, els[0], use_ai=use_ai,
+                        ai_note=(lambda m: emit("ai", note=m)) if use_ai else None)
+                    greeting["read"] = True
+                    greeting["viewport"] = label
+                    if greeting["opened"]:
+                        try:
+                            import base64 as _b64
+                            shot = None
+                            for fr in page.frames:
+                                if fr is page.main_frame:
+                                    continue
+                                try:
+                                    box = await (await fr.frame_element()).bounding_box()
+                                except Exception:
+                                    continue
+                                if box and box["width"] > 150 and box["height"] > 150:
+                                    shot = await page.screenshot(clip=box)
+                                    break
+                            greeting["shot"] = _b64.b64encode(
+                                shot or await page.screenshot(full_page=False)).decode()
+                        except Exception:
+                            pass
+
                 return res, els, ""
 
             results, here, err = await visit(url)
@@ -837,29 +1100,101 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
             elif not rep.viewport:
                 rep.viewport = label
 
+            # WHERE TO LOOK NEXT — the model FIRST, guesses last.
+            #
+            # CANDIDATE_PATHS guesses /hilfe, /kontakt, /service and five more.
+            # That is eight page loads per form factor, most of them 404s, and it
+            # cannot find what it does not already know: o2online.de keeps its
+            # assistant on /service/aura/, and "aura" is a brand name that exists
+            # in no list anyone could write in advance. Its homepage carries only a
+            # Sprinklr teaser bubble that leads nowhere, so guessing first meant
+            # spending most of a 213-second check on wrong pages and then reporting
+            # the widget unreadable while the real chat sat one link away.
+            #
+            # A model reading the site's own link texts picks the right page in one
+            # call of about a second. So it goes first, the site's own Hilfe/Kontakt
+            # navigation second, and the blind guesses only as a last resort.
+            #
+            # Same-origin is enforced in suggest_page rather than trusted from the
+            # model, and every request is still re-checked by the SSRF interceptor:
+            # a suggestion is a hint, never an authority.
             if exhaustive or not probes.launchers_from(results):
-                targets: list[str] = []
-                try:
-                    for l in await page.evaluate(_HELP_LINKS):
-                        if urlparse(l["href"]).netloc == urlparse(url).netloc:
-                            targets.append(l["href"])
-                except Exception:
-                    pass
-                targets += [urljoin(url, p) for p in CANDIDATE_PATHS]
                 tried = {url.rstrip("/")}
-                for t in targets:
-                    if t.rstrip("/") in tried or len(tried) > MAX_PAGES_PER_VIEWPORT:
-                        continue
-                    tried.add(t.rstrip("/"))
-                    r2, l2, e2 = await visit(t)
+
+                async def try_page(target: str) -> bool:
+                    """Visit one page, fold its probes in. True if a widget fired."""
+                    nonlocal merged, launchers
+                    # Nothing left to look for once the assistant has spoken.
+                    if greeting["read"] and greeting["text"]:
+                        return True
+                    if not target or target.rstrip("/") in tried:
+                        return False
+                    if len(tried) > MAX_PAGES_PER_VIEWPORT:
+                        return False
+                    tried.add(target.rstrip("/"))
+                    r2, l2, e2 = await visit(target)
                     if e2:
-                        continue
+                        return False
                     merged = _merge(merged, r2)
                     if l2 and not launchers:
                         launchers, rep.viewport = l2, label
-                    if probes.launchers_from(r2) and not exhaustive:
-                        break
+                    return probes.launchers_from(r2)
 
+                found = False
+
+                # 1. Ask the model where the chat lives.
+                if use_ai:
+                    for _ in range(2):
+                        try:
+                            nxt = await art50opener.suggest_page(
+                                page, [q["url"] for q in rep.pages_tried],
+                                on_note=(lambda m: emit("ai", note=m)))
+                        except Exception:
+                            nxt = None
+                        if not nxt:
+                            break
+                        if await try_page(nxt):
+                            found = True
+                            if not exhaustive:
+                                break
+
+                # 2. The site's own Hilfe / Kontakt / Service navigation.
+                if exhaustive or not found:
+                    try:
+                        own = [l["href"] for l in await page.evaluate(_HELP_LINKS)
+                               if urlparse(l["href"]).netloc == urlparse(url).netloc]
+                    except Exception:
+                        own = []
+                    for t in own:
+                        if await try_page(t):
+                            found = True
+                            if not exhaustive:
+                                break
+
+                # 3. Blind guesses, last, and only if nothing above worked.
+                if exhaustive or not found:
+                    for t in (urljoin(url, q) for q in CANDIDATE_PATHS):
+                        if await try_page(t):
+                            found = True
+                            if not exhaustive:
+                                break
+
+            # STOP VISITING PAGES once the assistant has spoken. NOTHING ELSE
+            # IS REMOVED.
+            #
+            # All twelve probes still run on every page visited, and every route to
+            # finding a widget stays in place: the model asked where the chat lives,
+            # the site's own Hilfe/Kontakt navigation, the eight guessed paths, both
+            # form factors. A site built differently still gets all of it.
+            #
+            # What ends here is only the walking. The exhaustive sweep exists so
+            # that "no widget found" is defensible — a negative is worth exactly the
+            # list of pages behind it. A POSITIVE needs no such list: once the
+            # assistant's own words are in hand, a further page cannot change them.
+            # Measured on o2.de: 20 pages and 218 s to produce a greeting that was
+            # readable several pages earlier.
+            if greeting["read"] and greeting["text"]:
+                break
             if probes.launchers_from(merged) and not exhaustive:
                 break
 
@@ -904,10 +1239,18 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                     rep.reason = ("The chat launcher itself identifies the assistant "
                                   "as AI, visible before any interaction.")
 
-                if open_widget and launchers and not hit:
-                    await emit("opening", label=launchers[0].get("visible", "")[:80])
-                    (rep.opened_widget, rep.first_message,
-                     rep.greeting_source) = await _read_greeting(page, launchers[0])
+                # Use what visit() already read, on the page that had the
+                # launcher. Nothing is opened here: by now the browser may be
+                # twenty pages away from where the chat was.
+                if open_widget and greeting["read"] and not hit:
+                    rep.opened_widget = greeting["opened"]
+                    rep.first_message = greeting["text"]
+                    rep.greeting_source = greeting["source"]
+                    rep.click_path = greeting["path"]
+                    if greeting["shot"]:
+                        rep.widget_shot_b64 = greeting["shot"]
+                    if greeting["viewport"]:
+                        rep.viewport = greeting["viewport"]
                     if not rep.opened_widget:
                         if rep.greeting_source == "blocked-by-consent":
                             rep.greeting_source = ""
@@ -922,17 +1265,6 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                         else:
                             rep.reason = ("The chat button was found but would not "
                                           "open, so nothing is claimed either way.")
-                    # Photograph the open chat before anything else can close it.
-                    # A quote with no picture beside it is a claim; a quote beside
-                    # a screenshot of the thing that said it is checkable in two
-                    # seconds, which is what the customer is actually buying.
-                    if rep.opened_widget:
-                        try:
-                            import base64 as _b64
-                            rep.widget_shot_b64 = _b64.b64encode(
-                                await page.screenshot(full_page=False)).decode()
-                        except Exception:
-                            pass
                     if rep.opened_widget:
                         rep.impersonation = first_match(IMPERSONATION,
                                                         rep.first_message, context=30)
@@ -941,19 +1273,32 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                             rep.verdict, rep.evidence = "disclosed", hit
                             rep.reason = ("The assistant's first message discloses "
                                           "that it is AI.")
-                        # ATTRIBUTABLE means "something you could have talked to".
-                        # An iframe filtered against NOT_CHAT, or a panel with a
-                        # message box in it. A bare floating card is not a chat and
-                        # its text is not a greeting: measured on 10 German sites,
-                        # bare panels produced two false accusations out of three —
-                        # ionos.de's customer testimonial ("Simone Rapp-Scheider,
-                        # Wohlfühlmomente Landau") and flaschenpost.de's shopping
-                        # cart ("Mindestbestellwert Gesamt Noch 0,00 €"), both
-                        # quoted under a verdict of not_disclosed. o2online.de's
-                        # real bot came through an iframe and survived.
-                        elif (rep.first_message
-                              and ("iframe" in rep.greeting_source
-                                   or "message box" in rep.greeting_source)):
+                        # ACCUSING REQUIRES A MESSAGE BOX. Nothing weaker.
+                        #
+                        # Not "an iframe", not "some text", not "no start button
+                        # was found" — a box the visitor could type into, in the
+                        # same surface as the words we read. That is the only
+                        # positive evidence that we reached the conversation rather
+                        # than a screen in front of it.
+                        #
+                        # Three false accusations taught this, each weaker than the
+                        # last and each caught by reading the report rather than
+                        # the code:
+                        #   * a whole-page text diff quoted myposter.de's cookie
+                        #     banner and five Trustpilot reviews as the greeting;
+                        #   * a bare floating panel quoted ionos.de's customer
+                        #     testimonial and flaschenpost.de's shopping cart;
+                        #   * "iframe, and no next-step button found" quoted
+                        #     o2online.de's PRE-CHAT panel — "Chatte mit mir! Aura
+                        #     … Mit dem Starten des Chats nimmst du unsere
+                        #     Datenschutz…". Vlad opened it by hand: o2's bot DOES
+                        #     say it is AI, several clicks further in. We had
+                        #     accused a compliant company.
+                        #
+                        # The absence of a button we know how to recognise proves
+                        # nothing about buttons we do not. Presence of an input
+                        # proves where we are.
+                        elif rep.first_message and "message box" in rep.greeting_source:
                             rep.verdict = "not_disclosed"
                             rep.evidence = rep.first_message[:300]
                             rep.reason = (

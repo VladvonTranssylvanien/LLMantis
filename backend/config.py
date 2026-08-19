@@ -143,6 +143,43 @@ def available_libraries() -> list[str]:
     return sorted(p.name for p in ATTACKS_DIR.glob("*.yaml") if p.is_file())
 
 
+# --- The model that reads a page and finds the chat button -------------------
+# Used ONLY by backend/art50opener.py, to decide which element to click when the
+# keyword opener cannot reach a message box.
+#
+# SEPARATE FROM THE SCAN'S PROVIDER, ON PURPOSE.
+#
+# The original reason was data category: the judge reads customer system prompts
+# (trade secrets) while this reads button labels off a public page. That argument
+# stood while the judge was pinned to Mistral for the CLOUD Act. It no longer
+# applies — the EU-only stack was withdrawn in PR #24, PROVIDER now defaults to
+# azure and JUDGE_MODEL to gpt-4.1, so both engines happen to sit on the same
+# vendor today.
+#
+# The separation stays for a plainer reason: these are two features owned by two
+# people. AZURE_URL/AZURE_KEY and TARGET_* belong to the vulnerability scan and
+# Gregor decides them (docs/ENGINE-REWORK.md). If the Art.-50 opener read those,
+# his next provider change would silently retarget page-reading too, and a
+# re-pointed lab would break a customer-facing check. One shared key is one
+# shared outage.
+#
+# What DOES still need saying out loud: with this configured, page content from
+# third-party sites goes to the configured vendor. Nothing on a slide may claim
+# our stack is EU-only — it is not, deliberately, since PR #24. Kwabena's call
+# on whether the privacy notice needs a line.
+# Empty URL or key disables the fallback; the keyword opener still runs.
+ART50_AI_URL = os.getenv("ART50_AI_URL", "")
+ART50_AI_KEY = os.getenv("ART50_AI_KEY", "")
+ART50_AI_AUTH = os.getenv("ART50_AI_AUTH", "api-key").lower()   # or "bearer"
+ART50_AI_MODEL = os.getenv("ART50_AI_MODEL", "gpt-4.1-mini")
+ART50_AI_TIMEOUT_S = int(os.getenv("ART50_AI_TIMEOUT_S", "20"))
+
+
+def art50_ai_ready() -> bool:
+    """The page-reading fallback is only attempted when it is configured."""
+    return bool(ART50_AI_URL and ART50_AI_KEY)
+
+
 # --- Database ----------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis")
 
