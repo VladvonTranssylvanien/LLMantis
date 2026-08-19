@@ -591,9 +591,14 @@ footer.site .sp { margin-left: auto; }
     <div class="row">
       <div>
         <label class="field" for="mode">What to test</label>
+        <!-- Live endpoint first, and therefore selected on load. Landing on the
+             prompt form meant "paste an address and we find it" opened with a
+             box demanding a system prompt and refused the button until one was
+             typed. The Starter tier still arrives on its own form: the landing
+             CTA carries ?mode=prompt and the handler below acts on it. -->
         <select id="mode">
-          <option value="prompt">A system prompt — pasted here</option>
           <option value="api">A live endpoint — the bot as deployed</option>
+          <option value="prompt">A system prompt — pasted here</option>
         </select>
       </div>
       <div>
@@ -603,7 +608,7 @@ footer.site .sp { margin-left: auto; }
     </div>
 
 
-    <div id="promptFields">
+    <div id="promptFields" hidden>
       <!-- The prompt is what gets attacked, but it does not say WHOSE bot it is,
            and the Prüfbericht has to name the thing it judged. Without this the
            report header reads "Custom prompt" for every customer alike. Optional
@@ -616,7 +621,7 @@ footer.site .sp { margin-left: auto; }
       <textarea id="prompt" placeholder="You are the customer support assistant for..."></textarea>
     </div>
 
-    <div id="apiFields" hidden>
+    <div id="apiFields">
       <label class="field" for="apiUrl" style="margin-top:16px">Your bot's address</label>
       <input id="apiUrl" class="mono" placeholder="https://example.com">
       <!-- Nobody outside this team thinks of their bot as a POST endpoint, so a
