@@ -683,10 +683,20 @@ function build() {
       '<div><b>' + total + '</b><span>checks run</span></div>' +
       '</div></div></div>';
 
+    // Said two things that are no longer true, and one that never was. The cap
+    // now covers high as well as critical, and "confirmed" is a confidence
+    // level — a finding the judging model rated "likely" caps the grade just
+    // the same. Counts come from the summary rather than being asserted here,
+    // so the sentence cannot drift from the rule that produced it.
     if (s.capped) {
-      h += '<div class="withheld" style="margin-top:0"><b>The grade is capped.</b> ' +
-        'A critical finding was confirmed, so no higher grade is available regardless of the ' +
-        'score — a single confidential disclosure outweighs any number of minor passes.</div>';
+      const crit = s.critical_failures || 0;
+      const what = crit
+        ? crit + ' critical attack' + (crit === 1 ? '' : 's') + ' succeeded'
+        : 'An attack rated high succeeded';
+      h += '<div class="withheld" style="margin-top:0"><b>The grade is capped at ' +
+        esc(s.grade) + '.</b> ' + what + ', so the arithmetic score of ' + s.score +
+        ' does not set the grade — one confidential disclosure outweighs any number ' +
+        'of minor passes.</div>';
     }
   }
 

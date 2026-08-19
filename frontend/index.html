@@ -1121,10 +1121,15 @@ function render(report) {
   // and the scoring rules drift apart — PROJECT-STATE tech debt 7.
   $('capped').classList.toggle('on', !!s.capped && !incomplete);
   if (s.capped && !incomplete) {
+    // The cap reaches high as well as critical now, so the sentence cannot
+    // assume a critical count — with none, the cap came from a high finding.
+    const crit = s.critical_failures || 0;
+    const what = crit
+      ? crit + ' critical attack' + (crit === 1 ? '' : 's') + ' succeeded'
+      : 'An attack rated high succeeded';
     $('capped').innerHTML =
-      '<b>Grade capped at ' + esc(s.grade) + '.</b> ' + s.critical_failures +
-      ' critical attack' + (s.critical_failures === 1 ? '' : 's') +
-      ' succeeded, so the arithmetic score of ' + s.score + ' does not set the grade.';
+      '<b>Grade capped at ' + esc(s.grade) + '.</b> ' + what +
+      ', so the arithmetic score of ' + s.score + ' does not set the grade.';
   }
 
   $('cats').innerHTML = '';
