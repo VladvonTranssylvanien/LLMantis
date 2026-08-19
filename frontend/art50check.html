@@ -11,7 +11,7 @@
 /* ===========================================================================
    LLMantis — shared foundation
    ---------------------------------------------------------------------------
-   Fonts, tokens and primitives for all three pages. Served from our own
+   Fonts, tokens and primitives for every page. Served from our own
    origin: no CDN, no Google Fonts, no external request of any kind.
    PLAYBOOK.md §3 is the source of truth for every value here.
    =========================================================================== */
@@ -132,11 +132,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
 }
 
 :root{
-  /* This block is copied verbatim into all SIX pages: index, scanner, report,
-     impressum, datenschutz, art50check. That duplication is why the app and
-     the landing drifted into two palettes in the first place: a colour changed
-     in one file only. Change it in all six, and keep them byte-identical:
-       for f in index scanner report impressum datenschutz art50check; do
+  /* This block is copied verbatim into all SEVEN pages: index, scanner, report,
+     impressum, datenschutz, art50check, art50report. That duplication is why
+     the app and the landing drifted into two palettes in the first place: a
+     colour changed in one file only. Change it in all seven, and keep them
+     byte-identical:
+       for f in index scanner report impressum datenschutz art50check art50report; do
          awk '/^:root\{/,/^\}/' frontend/$f.html | md5; done   # one hash
      art50check.html was the last page to join, and it joined by dropping its
      <link> to assets/base.css — which nothing loads any more. */
@@ -420,60 +421,6 @@ input:focus-visible {
 }
 .p-probe .conf { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 
-/* ------------------------------------------------------------- printed sheet */
-/* Starter's Prüfbericht is a page of its own (report.html). This one is not:
-   the free check's evidence is ALREADY on screen, and art50engine.py:22 says
-   why that matters -- "the value of no widget found is entirely in the list of
-   things that were tried", so the deliverable is the list, not a summary of
-   it. Printing the page itself keeps paper and screen provably identical. */
-.sheet-only { display: none; }
-.printrow { display: flex; align-items: center; gap: 14px; margin-top: 22px; flex-wrap: wrap; }
-.printrow .note { color: var(--muted); font-size: 13px; flex: 1; min-width: 220px; }
-
-@media print {
-  @page { margin: 18mm 16mm; }
-  /* Everything that is screen furniture. #progress keeps ONLY its fold: the bar
-     and the running commentary describe a thing that already happened. */
-  header.topbar, .overlay, .intro, #formPanel, .printrow, .cta-row,
-  footer.site, #pUrl, .p-bar, .p-line, .p-quip, .fold-hint { display: none !important; }
-  body { background: #fff; padding-top: 0; }
-  .wrap { max-width: none; padding: 0; gap: 20px; }
-  .panel { border: 0; box-shadow: none; padding: 0; background: #fff; }
-  .sheet-only { display: block; }
-  /* The verdict must come before the method list, and in the DOM it does not:
-     #progress is written first because that is the order things HAPPEN. Paper
-     is read in the other order. */
-  #result { order: 1; }
-  #progress { order: 2; }
-  .sheet-foot { order: 3; }
-  .probes-fold { border-top: 1px solid #ccc; break-inside: auto; }
-  .probes-fold summary { list-style: none; font-weight: 600; color: #000; }
-  .probes-fold summary::-webkit-details-marker { display: none; }
-  .p-probe { break-inside: avoid; }
-  /* On screen a fired probe's finding is clipped to 46% with an ellipsis and
-     the whole string lives in the title attribute -- a hover. Paper has no
-     hover, so this printed "script_src fired: /assets/c..." and the evidence
-     for the claim was the part that got cut. On a sheet whose entire argument
-     is "no quote, no finding", that is the one thing that may not be trimmed. */
-  .p-probe .detail { white-space: normal; overflow: visible; text-overflow: clip;
-    max-width: none; word-break: break-word; }
-  #rShot, .w-shot { max-height: 90mm; object-fit: contain; break-inside: avoid; }
-  .sheet-head { border-bottom: 2px solid #000; padding-bottom: 12px; }
-  .sh-brand { font-family: var(--mono); font-size: 10pt; letter-spacing: .1em;
-    text-transform: uppercase; }
-  .sh-brand span { color: #555; }
-  .sh-title { font-size: 20pt; margin: 10px 0 14px; letter-spacing: -.02em; }
-  .sh-meta { display: grid; grid-template-columns: max-content 1fr; gap: 3px 18px;
-    font-size: 9.5pt; margin: 0; }
-  .sh-meta dt { color: #555; }
-  .sh-meta dd { margin: 0; font-family: var(--mono); }
-  .sheet-foot { border-top: 1px solid #ccc; padding-top: 12px; font-size: 8.5pt;
-    line-height: 1.5; color: #333; break-inside: avoid; }
-  .sheet-foot h3 { font-size: 9.5pt; margin: 0 0 6px; }
-  .sheet-foot p { margin: 0 0 6px; }
-  .sf-mark { font-family: var(--mono); color: #555; }
-}
-
 /* --------------------------------------------------------------- the verdict */
 .v-badge {
   display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
@@ -599,7 +546,7 @@ footer.site .sp { margin-left: auto; }
 
 <div class="wrap">
 
-  <div class="intro">
+  <div>
     <h1>Art. 50 disclosure check</h1>
     <p class="lede">
       We open your site in a real browser and run <b>twelve detection methods</b>
@@ -617,7 +564,7 @@ footer.site .sp { margin-left: auto; }
     </p>
   </div>
 
-  <div class="panel" id="formPanel">
+  <div class="panel">
     <form id="checkForm">
       <label class="field" for="url">Website URL</label>
       <input id="url" placeholder="your-company.de" autocomplete="off" required>
@@ -637,34 +584,32 @@ footer.site .sp { margin-left: auto; }
          says "no widget" is worth exactly the list behind it, and this is the only
          place a reader can see which steps a model chose. Folded, not removed. -->
     <details class="probes-fold" id="pFold">
-      <summary><span id="pCount">0</span> of 12 methods run<span class="fold-hint"> — show what we tried</span></summary>
+      <summary><span id="pCount">0</span> of 12 methods run — show what we tried</summary>
       <div id="pProbes" class="p-grid"></div>
     </details>
   </div>
 
   <div class="panel" id="result" role="status" aria-live="polite">
-    <!-- Print only. The evidence below is already on screen, so the sheet is
-         this page with its chrome removed rather than a second rendering — a
-         reader can hold the paper against the screen and see the same words.
-         The frame is German because the sheet goes into a German company's
-         file; the body stays English because it is the SAME DOM the screen
-         shows, and the probe descriptions come from the backend in English
-         (backend/art50probes.py:341). -->
-    <div class="sheet-only sheet-head">
-      <div class="sh-brand">LLMantis <span>Chatbot-Prüfung</span></div>
-      <h2 class="sh-title">Art.-50-Prüfprotokoll</h2>
-      <dl class="sh-meta">
-        <dt>Geprüfte Adresse</dt><dd id="shUrl"></dd>
-        <dt>Geprüft am</dt><dd id="shWhen"></dd>
-      </dl>
-    </div>
     <div class="r-url" id="rUrl"></div>
     <div id="rBody"></div>
     <img id="rShot" alt="" hidden>
-    <div class="printrow">
-      <button class="btn" id="printBtn" type="button">Save as PDF</button>
-      <span class="note">One sheet: the verdict, the exact words we judged on,
-        and all twelve methods with what each one found.</span>
+    <!-- The Prüfprotokoll is its own page, exactly as the Starter scan's
+         Prüfbericht is (index.html:718). Two different objects: this panel is
+         the check running, that sheet is the record of it.
+
+         rel="opener" is load-bearing and NOT a typo for noopener. Since Chrome
+         88 a target=_blank tab is implicitly noopener, and an implicitly-
+         noopened tab does not inherit sessionStorage -- so the report tab would
+         open on its own sample and quietly show placeholder text instead of
+         the customer's result. index.html:704 records the same measurement.
+         Safe here for the same reason it is safe there: the target is our own
+         same-origin static page, and noopener exists to guard against
+         untrusted ones. -->
+    <div class="cta-row">
+      <a class="btn" id="openReport" href="/static/art50report.html"
+         target="_blank" rel="opener">Download PDF report</a>
+      <span style="color:var(--muted);font-size:13px">Opens the
+        <span lang="de">Prüfprotokoll</span>, then print to PDF.</span>
     </div>
     <div class="cta-row">
       <a class="btn" href="/">Run the full test on your own prompt</a>
@@ -674,29 +619,6 @@ footer.site .sp { margin-left: auto; }
         <span lang="de">Eigentumsnachweis</span>.
       </span>
     </div>
-  </div>
-
-  <!-- Print only, and load-bearing: "Prüfprotokoll" with a green badge on it
-       WILL be waved at an auditor. Three claims are made here that the badge
-       alone cannot make - that this is not a certificate, that it speaks only
-       for the pages listed above at the time listed above, and that whoever
-       started the check is its author. The middle one is the honest reading of
-       an anonymous public endpoint: anybody may run this against anybody's
-       site. The wording carries that, not a gate. The Rechtsberatung sentence
-       is the landing's own (frontend/landing.html:617), word for word. -->
-  <div class="sheet-only sheet-foot">
-    <h3>Was dieses Protokoll ist — und was nicht</h3>
-    <p>Es hält fest, was am oben genannten Zeitpunkt auf den oben aufgeführten
-      Seiten technisch beobachtet wurde: welche Nachweismethoden liefen, was sie
-      gefunden haben, und — falls ein Chat geöffnet wurde — den Wortlaut der
-      Begrüßung. Wir haben nichts eingegeben und dem Bot keine Nachricht
-      gesendet.</p>
-    <p>Es ist <b>keine Bescheinigung und keine Rechtsberatung</b>. Wir prüfen
-      technisch — für eine rechtsverbindliche Bewertung: Fachanwalt für
-      IT-Recht. Die Aussage gilt für die geprüften Seiten zum genannten
-      Zeitpunkt, nicht für die gesamte Website und nicht für später. Erstellt
-      von der Person, die die Prüfung gestartet hat.</p>
-    <p class="sf-mark">llmantis.de</p>
   </div>
 
 </div>
@@ -897,33 +819,23 @@ function renderResult(rep) {
     shot.hidden = false;
   } else { shot.hidden = true; }
 
-  /* The sheet's only two facts that are not already on screen. The clock is
-     the browser's, read when the verdict lands. The report carries how LONG
-     the run took (art50engine.py:144, duration_s) but no wall clock at all,
-     so this is "when the sheet was produced" -- within a second of the run
-     finishing, and what the German label claims. Undated it would be
-     reusable forever,
-     which is the one way a technical record turns into a false certificate. */
-  const now = new Date();
-  $('shUrl').textContent = rep.url || $('url').value.trim();
-  $('shWhen').textContent =
-    now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-    ', ' + now.toLocaleTimeString('de-DE',
-      { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) + ' Uhr';
+  /* Hand the report to its own page, the way index.html:1063 hands a scan to
+     report.html. The whole object goes across: probe_log carries all twelve
+     methods with what each one found (art50engine.py:157), so the sheet is
+     built from this alone and never re-runs anything.
+
+     checked_at is added HERE because the check has no wall clock of its own --
+     art50engine.py returns duration_s and no timestamp. Stamped when the
+     verdict lands, it dates the record. Stamped by the report page instead, it
+     would date whenever the sheet was reopened, which is how a technical record
+     turns into a false certificate. */
+  try {
+    sessionStorage.setItem('llmantis:lastArt50',
+      JSON.stringify(Object.assign({}, rep, { checked_at: new Date().toISOString() })));
+  } catch (e) { /* private mode or quota: the report page falls back to its sample */ }
 
   result.classList.add('on');
 }
-
-/* The twelve methods are the deliverable, and a closed <details> prints
-   closed -- CSS cannot open it, the content is not merely display:none.
-   So it is opened in script, on both routes into printing: the button, and
-   the browser's own Cmd-P, which fires beforeprint without touching us. */
-function unfoldForPrint() { const f = $('pFold'); if (f) f.open = true; }
-addEventListener('beforeprint', unfoldForPrint);
-$('printBtn').addEventListener('click', function () {
-  unfoldForPrint();
-  window.print();
-});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
