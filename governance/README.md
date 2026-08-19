@@ -1,453 +1,52 @@
-# PromptGuard Governance, Risk and Compliance Framework
+# LLMantis — Governance V2
 
 ## Overview
 
-This directory contains the Governance, Risk and Compliance (GRC)
-framework for PromptGuard.
+Governance V2 is the current governance framework for this repository, assessed against commit `114ebc9`. It **supersedes Governance V1** (the prior `GOV-01`..`GOV-10`/`LOG-01`/`LOG-02` framework, assessed against commit `f48fdbf`), which has been removed from the working tree per a team decision to close it out cleanly rather than carry it forward as archived clutter.
 
-The framework provides a structured and evidence-based approach for
-assessing the current state of the PromptGuard repository and identifying
-governance, security, AI risk, logging, traceability and compliance-related
-improvements.
+**Governance V1 remains fully recoverable via git history** even though it no longer exists as files: `git show 474b20e:governance/reports/GOVERNANCE_REPORT.md` (and any other V1 path) will return its exact content, since `474b20e` remains a permanent ancestor commit. Nothing about V1 was lost — it was deliberately not archived in the working tree, by explicit instruction, not deleted without a recovery path.
 
-The framework covers:
+**No V1 finding was carried forward into V2.** Every one of the 17 V2 controls below was independently reassessed against the current implementation.
 
-- AI governance
-- AI risk management
-- Attack governance
-- AI evaluation and validation
-- Target authorization
-- Sensitive data protection
-- Change management
-- Human oversight
-- Evidence and traceability
-- Regression and monitoring
-- Security and application logging
-- Governance audit logging
-- Legal and claims governance
+## Scope
 
-The purpose is to establish a measurable governance baseline and track
-improvement as PromptGuard develops.
+17 controls across two domains:
 
----
+**Frontend (5):** FE-01 AI Transparency and User Disclosure · FE-02 Legal and Regulatory Information · FE-03 User-Facing Security and Privacy · FE-04 Output, Report and Claim Integrity · FE-05 Accessibility, User Understanding and Human Interaction
 
-## Core Principles
+**Backend / Platform (12):** BE-01 AI Component and Provider Governance · BE-02 AI Attack Library Governance · BE-03 AI Risk and Scoring Governance · BE-04 AI Judge Validation and Calibration · BE-05 Target Authorization and Active Testing Control · BE-06 Authentication and Access Control · BE-07 Sensitive Data and Secret Protection · BE-08 Application and Network Security · BE-09 Evidence, Traceability and Data Integrity · BE-10 Change, Dependency and Configuration Management · BE-11 Regression Testing and Operational Monitoring · BE-12 Security and Governance Logging
 
-### Evidence-Based
+Full definitions: `controls/frontend-controls.yaml`, `controls/backend-controls.yaml`. Full assessment: `reports/GOVERNANCE_V2_REPORT.md`. Per-control evidence: `evidence/<CONTROL-ID>/EVIDENCE.md`.
 
-Every governance assessment should be supported by available evidence.
+## Assessment methodology
 
-Evidence may include:
+Every control was assessed against the **feature + code path + enforcement** principle — a security or compliance feature existing somewhere in the repository is not, by itself, evidence that the control it relates to is compliant. The clearest example: SSRF protection (BE-08) is real and thorough on the Art. 50 Check path but absent from the active-scan path, despite shared documentation claiming both are covered — this was found by tracing actual code usage, not by confirming a guard module exists.
 
-- source code
-- configuration files
-- tests
-- test results
-- documentation
-- Git history
-- logs
-- runtime output
-- official legal sources
+## Status vocabulary
 
-### No Source, No Claim
+- **COMPLIANT** — every sub-requirement of the control's intent is met, with direct evidence, and no known gap remains.
+- **PARTIALLY COMPLIANT — XX%** — some but not all of the control's intent is met.
+- **NON-COMPLIANT** — the core thing the control checks for is absent or contradicted by evidence.
 
-Legal, regulatory, certification or compliance claims should not be made
-without an appropriate supporting source.
+## Percentage methodology
 
-Primary sources should be preferred.
+Each control decomposes into 2–4 explicit sub-checks derived from its Control Explanation. Where sub-checks are cleanly countable, percentage = `(sub-checks met ÷ total) × 100`. Where a control is genuinely continuous (e.g. "how well do these legal claims hold up"), the percentage reflects explicit, stated qualitative reasoning rather than a forced ratio — every `EVIDENCE.md` in this framework shows its work rather than asserting a bare number. No percentage in this framework should be read as more precise than the reasoning behind it.
 
-### Technical Testing Is Not Legal Compliance
+## Regulatory reference discipline
 
-A successful technical test does not automatically establish that a system
-is legally compliant.
+Every control's regulatory/reference basis distinguishes **LEGAL REQUIREMENT** (a binding law/article, cited with its specific number) from **BEST-PRACTICE** (an industry convention, e.g. OWASP) from **INTERNAL POLICY** (an LLMantis decision, not an external requirement). Where a regulation's *direct* applicability to a specific control has not been independently verified, this framework says so explicitly rather than asserting it — see, for example, BE-01's GDPR Art. 44 note, or FE-01's note on Art. 50(1)'s applicability to LLMantis's own architecture. This framework does not perform new legal research; it records what has been verified and flags what hasn't.
 
-PromptGuard may test technical controls and document the results, but legal
-compliance depends on factors outside the scope of automated testing.
+## Legal and claims governance
 
-### Test Report, Not Certification
+This framework is a technical governance assessment, not legal advice, and does not establish legal compliance with any statute referenced in it. See `docs/legal/DISCLAIMERS.md`, `docs/legal/LEGAL-MAP.md`, and `docs/legal/FORBIDDEN-WORDS.md` (retained outside this migration; not part of Governance V1's retirement). LLMantis is not a certification body and this framework does not certify anything — see EU AI Act Art. 43 and FE-02/BE-... references throughout.
 
-PromptGuard should describe its output as a technical assessment, test result,
-evidence or report unless there is a valid basis for a certification claim.
+## Distribution
 
-### Record Uncertainty
+This is an **internal working baseline**. It is not to be published or pushed externally in its current form without separate review and approval.
 
-Where evidence is insufficient, the correct result may be:
+## How to use this framework going forward
 
-**UNCLEAR**
-
-It is better to document uncertainty than to make unsupported conclusions.
-
----
-
-# Governance Controls
-
-The initial framework contains ten governance controls.
-
-## GOV-01 — AI Component Inventory
-
-Verify that relevant AI components can be identified.
-
-Checks may include:
-
-- AI models
-- AI providers
-- AI judges
-- model configuration
-- AI-related dependencies
-- component purpose
-- version information
-
-Reference guidance:
-
-- ISO/IEC 42001
-
----
-
-## GOV-02 — Attack Governance
-
-Verify that attack definitions are structured and traceable.
-
-Checks may include:
-
-- attack files exist
-- attack identifiers exist
-- attack categories exist
-- attack descriptions exist
-- duplicate attacks are identified
-- attack tests can be executed
-
-Reference guidance:
-
-- ISO/IEC 42001
-- ISO/IEC 23894
-
----
-
-## GOV-03 — AI Risk and Scoring
-
-Verify that findings and risks are assessed consistently.
-
-Checks may include:
-
-- risk scoring logic exists
-- severity levels are defined
-- scoring logic can be tested
-- critical findings can be identified
-- scoring documentation exists
-
-Reference guidance:
-
-- ISO/IEC 23894
-- ISO 31000
-
----
-
-## GOV-04 — AI Judge Validation
-
-Verify that AI-based judging or evaluation can be identified and assessed.
-
-Checks may include:
-
-- judge implementation exists
-- model or provider can be identified
-- evaluation logic is documented
-- tests exist where practical
-- limitations can be documented
-
-Reference guidance:
-
-- ISO/IEC 42001
-
----
-
-## GOV-05 — Target Authorization
-
-Verify whether controls exist to prevent unauthorized targets from being tested.
-
-Checks may include:
-
-- target validation
-- allow lists
-- authorization mechanisms
-- rejection of invalid targets
-- tests for target restrictions
-
-Reference guidance:
-
-- ISO/IEC 42001
-- ISO/IEC 27001
-
----
-
-## GOV-06 — Sensitive Data Protection
-
-Verify that the repository does not contain obvious exposed secrets.
-
-Checks may include:
-
-- API keys
-- passwords
-- access tokens
-- private keys
-- environment files
-- sensitive data handling
-- secret scanning
-
-Reference guidance:
-
-- ISO/IEC 27001
-
----
-
-## GOV-07 — Change Management
-
-Verify that significant changes can be traced.
-
-Checks may include:
-
-- Git repository exists
-- branch information
-- commit history
-- change review process
-- documentation of significant changes
-
-Reference guidance:
-
-- ISO/IEC 42001
-- ISO/IEC 27001
-
----
-
-## GOV-08 — Human Oversight
-
-Assess whether significant findings or uncertain decisions can receive human review.
-
-Checks may include:
-
-- escalation mechanisms
-- manual review
-- critical finding review
-- low-confidence decision review
-- documented responsibility
-
-Reference guidance:
-
-- ISO/IEC 42001
-
----
-
-## GOV-09 — Evidence and Traceability
-
-Verify whether important findings can be traced.
-
-Checks may include:
-
-- scan identifiers
-- attack identifiers
-- target identifiers
-- timestamps
-- result records
-- version information
-- supporting evidence
-
-Reference guidance:
-
-- ISO/IEC 42001
-- ISO/IEC 27001
-
----
-
-## GOV-10 — Regression and Monitoring
-
-Verify whether changes can be tested for unintended regressions.
-
-Checks may include:
-
-- automated tests
-- test directories
-- regression testing
-- continuous integration
-- repeatable test execution
-
-Reference guidance:
-
-- ISO/IEC 42001
-- ISO/IEC 23894
-
----
-
-# Logging Controls
-
-## LOG-01 — Security and Application Logging
-
-Verify whether significant application and security events are logged.
-
-Checks may include:
-
-- application logging
-- errors
-- security failures
-- scan failures
-- timestamps
-- severity levels
-
-Reference guidance:
-
-- ISO/IEC 27001
-
----
-
-## LOG-02 — Governance Audit Logging
-
-Verify whether governance-relevant activities can be traced.
-
-Checks may include:
-
-- scan start
-- scan completion
-- authorization decisions
-- critical findings
-- governance failures
-- configuration changes
-- review decisions
-
-Reference guidance:
-
-- ISO/IEC 42001
-
----
-
-# Assessment Status
-
-Each control receives one of the following results:
-
-- PASS — implemented and evidence is available
-- PARTIAL — partly implemented or evidence is incomplete
-- FAIL — missing or insufficient
-- N/A — not applicable
-- UNCLEAR — insufficient evidence to make a reliable decision
-
----
-
-# Assessment Process
-
-```text
-DEFINE CONTROL
-      ↓
-INSPECT REPOSITORY
-      ↓
-RUN AUTOMATED CHECKS
-      ↓
-COLLECT EVIDENCE
-      ↓
-MANUAL REVIEW WHERE REQUIRED
-      ↓
-PASS / PARTIAL / FAIL / N/A / UNCLEAR
-      ↓
-DOCUMENT FINDING
-      ↓
-RECOMMEND IMPROVEMENT
-      ↓
-RE-ASSESS
-```
-
----
-
-# Legal and Claims Governance
-
-PromptGuard's product is itself a legal/compliance-adjacent claim (a
-"Prüfbericht" documenting that a chatbot was tested). That means the
-governance framework must also govern what PromptGuard is allowed to *say*
-about itself and its results, not only what it technically does.
-
-This is implemented in `docs/legal/`:
-
-| File | Purpose |
-|---|---|
-| `docs/legal/LEGAL-MAP.md` | Every legal source relevant to the product, split into: requirement, applicability, technical testability, what PromptGuard actually tests, and what PromptGuard may claim — each with a status of `VERIFIED`, `UNDER REVIEW`, `UNCLEAR`, or `NOT APPLICABLE`. |
-| `docs/legal/HOOKS.md` | Marketing/compliance hooks, each with citation and status. Hooks without a citation are marked as not drafted rather than invented. |
-| `docs/legal/DISCLAIMERS.md` | Required disclaimer wording and where it must appear. |
-| `docs/legal/FORBIDDEN-WORDS.md` | Controlled wording list (`zertifiziert`, `certified`, `garantiert`, `guaranteed`, etc.) that requires evidence and sign-off before use. |
-
-## Distinction: testing vs. compliance vs. certification
-
-This distinction is load-bearing for the whole framework and for the product
-itself:
-
-- **Testing** — PromptGuard runs documented attack patterns against a
-  chatbot and records PASS/FAIL/ERROR per attack, with evidence. This is the
-  only thing PromptGuard actually does.
-- **Compliance** — a legal determination that a system meets a specific
-  statute's requirements. PromptGuard's technical PASS does **not**
-  establish this. See `docs/legal/LEGAL-MAP.md`, "Technical Testing Is Not
-  Legal Compliance."
-- **Certification** — issuance of a conformity certificate by an accredited,
-  officially notified body, and only for high-risk AI systems (AI Act Art.
-  29, 43). PromptGuard is not a notified body, does not issue certificates,
-  and this framework's own control implementation must never be described as
-  ISO/IEC certification — the standards referenced in
-  `governance/controls/controls.yaml` are structuring references, not
-  certification claims.
-
-A governance control marked `PASS` in this framework means: *evidence was
-found in the repository that the described technical or process control
-exists and functions.* It does not mean the product is legally compliant,
-and it does not mean PromptGuard holds any certification.
-
----
-
-# Running the Framework
-
-## How to run the governance checker
-
-From the repository root:
-
-```bash
-python governance/scripts/run_governance.py
-```
-
-This inspects the repository (read-only), runs safe checks against actual
-source files, attempts to execute any existing automated tests it can find,
-and writes the result to `governance/reports/GOVERNANCE_REPORT.md`. It does
-not modify production code, does not require network access, and does not
-require a working `PROVIDER=anthropic` API key. If optional dependencies
-(e.g. PyYAML) are not installed in the environment running the script, it
-degrades to text-based inspection rather than failing.
-
-## How to run the governance tests
-
-```bash
-python -m unittest governance/tests/test_governance.py -v
-```
-
-Or, if `pytest` is available in the environment:
-
-```bash
-pytest governance/tests/test_governance.py -v
-```
-
-The tests use only the Python standard library, so they run without
-installing project dependencies. They verify the governance directory
-structure, that `controls.yaml` defines all 12 controls, that the governance
-script runs and produces a report, and that the required legal documentation
-exists.
-
-## Continuous improvement
-
-This framework is a baseline, not a finished state. As PromptGuard's code
-changes:
-
-- Re-run `governance/scripts/run_governance.py` after any change to
-  `backend/`, `attacks/`, or authorization/logging logic, and compare the new
-  report against the previous one in `governance/reports/`.
-- Treat every `FAIL` or `PARTIAL` result as a backlog item, not a permanent
-  state — `governance/reports/GOVERNANCE_REPORT.md` lists concrete
-  recommendations per control.
-- Update `governance/controls/controls.yaml` when a control's automated or
-  manual checks change, so the checker and its documentation do not drift
-  apart.
-- Update `docs/legal/LEGAL-MAP.md` whenever a claim moves from `UNDER REVIEW`
-  or `UNCLEAR` to a primary-sourced `VERIFIED` status, or the reverse.
-- This framework does not self-certify its own completeness. A human
-  reviewer should periodically re-read `governance/reports/GOVERNANCE_REPORT.md`
-  against the live repository, not just trust the last automated run.
+1. Re-run the checker (`scripts/run_governance_v2.py`) after any change to `backend/`, `frontend/`, `attacks/`, or `calibration/`, and compare its output against `reports/GOVERNANCE_V2_REPORT.md`.
+2. Treat every `PARTIALLY COMPLIANT` and `NON-COMPLIANT` control as a tracked backlog item — the Top 5 Priority Recommendations in the report are the current starting point.
+3. Update `controls/*.yaml` when a control's scope or criteria change, so the checker and its documentation don't drift apart.
+4. This framework does not self-certify its own completeness or currency — a human reviewer should periodically re-read the report against the live repository, the same discipline that made Governance V1 outdated in the first place.

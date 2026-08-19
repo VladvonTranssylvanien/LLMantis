@@ -67,3 +67,9 @@ Brand/*
 
 # tool output
 art50-results.csv
+
+# Governance V2 — generated cross-check output only. GOVERNANCE_V2_REPORT.md
+# is the single official assessment of record; this file is a reproducible,
+# on-demand output of governance/scripts/run_governance_v2.py and must never
+# become a second, potentially-stale or -conflicting tracked source of truth.
+governance/reports/GOVERNANCE_V2_AUTOMATED_RERUN.md

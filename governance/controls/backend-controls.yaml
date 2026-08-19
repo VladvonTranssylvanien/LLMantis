@@ -1,0 +1,205 @@
+# =============================================================================
+# GOVERNANCE V2 — BACKEND / PLATFORM CONTROL DEFINITIONS
+# =============================================================================
+# LLMantis — assessed against commit 114ebc9.
+# See frontend-controls.yaml for the V1->V2 supersession note and the
+# reference-standard disclaimer; it applies equally here.
+# =============================================================================
+
+version: 2
+schema: "llmantis-governance-controls/v2"
+baseline_commit: "114ebc9"
+domain: backend
+
+controls:
+
+  - id: BE-01
+    name: AI Component and Provider Governance
+    description: >
+      Verifies that AI models/providers in use are identified and that their
+      configuration is consistent with a stated data-residency policy.
+    regulation: "LEGAL REQUIREMENT — GDPR (applicability not independently verified); INTERNAL POLICY — PLAYBOOK.md"
+    reference: "Art. 44 et seq.; PLAYBOOK.md §1 (EU-only invariant, explicitly withdrawn)"
+    automated_checks:
+      - "backend/config.py: PROVIDER default and AZURE_URL/AZURE_KEY/MISTRAL_API_KEY presence"
+      - "requirements.txt: no anthropic dependency"
+    assessment_criteria:
+      compliant: "Provider is identifiable and consistent with a documented, current residency policy."
+      partially_compliant: "Provider is identifiable, but no current residency policy exists to be consistent with."
+      non_compliant: "Provider cannot be identified from configuration, or contradicts a stated policy."
+
+  - id: BE-02
+    name: AI Attack Library Governance
+    description: >
+      Verifies the attack library is structured, validated, and unambiguous
+      about which version ran for a given scan.
+    regulation: "BEST-PRACTICE — OWASP Top 10 for LLM Applications"
+    reference: "N/A (general framework reference, no specific numbered item cited)"
+    automated_checks:
+      - "attacks/attacks.yaml and attacks_short.yaml both declare a version field"
+      - "backend/attacks.py:_validate() enforces unique id, declared category, valid severity across both files"
+      - "no automated test exercises this validation"
+    assessment_criteria:
+      compliant: "A single, unambiguous library version is used and tested."
+      partially_compliant: "Multiple libraries coexist with version fields but require checking more than one field to disambiguate, and/or no test protects validation."
+      non_compliant: "Library contents are unvalidated or version is not tracked at all."
+
+  - id: BE-03
+    name: AI Risk and Scoring Governance
+    description: >
+      Verifies the scoring/grading formula is sound, internally consistent,
+      and correctly reflected wherever it is displayed.
+    regulation: "BEST-PRACTICE — internal scoring methodology"
+    reference: "N/A (internal policy, no external reference number)"
+    automated_checks:
+      - "backend/scoring.py constants (severity penalties, confidence multipliers, grade bands, critical-fail cap) match calibration/scoring_v2.py"
+      - "frontend/report.html's displayed scoring_explanation matches backend/scoring.py's explain() output"
+    assessment_criteria:
+      compliant: "Formula is internally consistent and correctly displayed everywhere."
+      partially_compliant: "Formula is sound but not covered by an automated test (tracked under BE-11, not penalized twice here)."
+      non_compliant: "Formula is inconsistent between implementation and display, or undocumented."
+
+  - id: BE-04
+    name: AI Judge Validation and Calibration
+    description: >
+      Verifies the AI judge's accuracy has been measured against human
+      judgment, and that the measurement's limitations are disclosed.
+    regulation: "BEST-PRACTICE — ISO/IEC 42001"
+    reference: "Structuring reference only, not certification"
+    automated_checks:
+      - "calibration/calibrate.py imports and replays the production judge (backend/judge.py), not a reimplementation"
+      - "calibration/set-v1.yaml, set-v2.yaml contain human_label fields with no nulls"
+    manual_checks:
+      - "Confirm recorded agreement figures in PROJECT-STATE.md / GREGOR_WORKLOG.md"
+    assessment_criteria:
+      compliant: "A calibration program exists, has been executed, agreement is measured and stable, and all criteria are validated in both directions."
+      partially_compliant: "A real, executed, reproducible calibration exists with recorded results, but some criteria are validated only in one direction (e.g. false-positive only)."
+      non_compliant: "No calibration set or executed measurement exists."
+
+  - id: BE-05
+    name: Target Authorization and Active Testing Control
+    description: >
+      Verifies that an active scan against a live, customer-owned endpoint is
+      actually gated on verified proof of ownership.
+    regulation: "INTERNAL POLICY — PLAYBOOK.md"
+    reference: "Part II §4 (ownership-verification rule — active red-team testing requires verified ownership, no exceptions)"
+    automated_checks:
+      - "backend/ownership.py implements DNS-TXT challenge/verify with token + expires_at, both enforced"
+      - "backend/main.py's POST /api/scan checks is_domain_verified() before an api-mode scan"
+      - "backend/main.py: SCAN_UNVERIFIED_DOMAINS waiver list scoping (org-scoped or global)"
+    assessment_criteria:
+      compliant: "Ownership verification is enforced with no unscoped waiver mechanism."
+      partially_compliant: "Ownership verification is enforced and sound, but an org-unscoped waiver mechanism exists (even if empty by default)."
+      non_compliant: "No ownership verification is enforced before an active scan."
+
+  - id: BE-06
+    name: Authentication and Access Control
+    description: >
+      Verifies login, session, role-based permission, and API-key mechanisms
+      are implemented securely.
+    regulation: "LEGAL REQUIREMENT — GDPR (general); BEST-PRACTICE — OWASP Top 10"
+    reference: "Art. 32; A01, A02, A07"
+    automated_checks:
+      - "backend/auth.py uses bcrypt, JWT with token_version revocation, a dummy-hash comparison for timing safety"
+      - "backend/auth.py:require_membership enforces role rank, fails closed on unrecognized roles"
+      - "backend/apikeys.py: keys are SHA-256 hashed at rest, revocation checked on every use"
+    manual_checks:
+      - "Cross-tenant data isolation testing (not performed as part of this assessment)"
+    assessment_criteria:
+      compliant: "Auth, RBAC, and API keys are all implemented to a sound standard with no known gap in what was tested."
+      partially_compliant: "Mechanisms are sound but a specific dimension (e.g. cross-tenant isolation) remains untested."
+      non_compliant: "Any of auth, RBAC, or API keys is missing or trivially bypassable."
+
+  - id: BE-07
+    name: Sensitive Data and Secret Protection
+    description: >
+      Verifies that credentials and secrets are not hardcoded and are stored
+      safely.
+    regulation: "LEGAL REQUIREMENT — GDPR (general)"
+    reference: "Art. 32"
+    automated_checks:
+      - "pattern scan for hardcoded credential-shaped values across tracked files"
+      - "backend/config.py DATABASE_URL default value inspection"
+    assessment_criteria:
+      compliant: "No hardcoded credentials found anywhere, including defaults."
+      partially_compliant: "Secrets are hashed/handled correctly in most places, but a hardcoded default credential exists (e.g. a dev database password)."
+      non_compliant: "A production-relevant secret is committed in plaintext."
+
+  - id: BE-08
+    name: Application and Network Security
+    description: >
+      Verifies SSRF protection on every code path that makes outbound
+      requests to customer-supplied URLs, and effective rate limiting.
+      Assessed by code path and enforcement, not by feature existence alone.
+    regulation: "BEST-PRACTICE — OWASP Top 10"
+    reference: "A10 (SSRF), A04 (resource exhaustion)"
+    automated_checks:
+      - "backend/netguard.py usage confirmed in backend/art50check.py and art50engine.py"
+      - "backend/netguard.py usage confirmed (or absent) in backend/scanner.py"
+      - "backend/main.py: slowapi Limiter configuration and per-endpoint limits"
+    assessment_criteria:
+      compliant: "SSRF protection is applied consistently to every outbound-request code path, and rate limiting is per-IP and endpoint-aware."
+      partially_compliant: "SSRF protection is thorough on some paths but absent on at least one user-accessible active code path; OR rate limiting has a partial gap."
+      non_compliant: "No SSRF protection exists on any path, or rate limiting is absent/globally shared."
+
+  - id: BE-09
+    name: Evidence, Traceability and Data Integrity
+    description: >
+      Verifies a persisted scan record traces back to the scan, the attack
+      library version, and the content actually tested.
+    regulation: "LEGAL REQUIREMENT — GDPR (general); BEST-PRACTICE — internal traceability policy"
+    reference: "Art. 32; N/A (internal policy)"
+    automated_checks:
+      - "backend/main.py: _save_scan_to_db persists library_version and the real system_prompt"
+      - "backend/main.py: persisted Target.name is not a hardcoded placeholder"
+    assessment_criteria:
+      compliant: "Every persisted record includes the real target name, prompt, and library version, with at-rest encryption verified."
+      partially_compliant: "Version and prompt persist correctly, but target name is a placeholder and/or at-rest encryption is unverified."
+      non_compliant: "Core traceability fields (version, prompt) are not persisted at all."
+
+  - id: BE-10
+    name: Change, Dependency and Configuration Management
+    description: >
+      Verifies significant changes are reviewed, dependencies are complete
+      and accurate, and deployment configuration is hardened.
+    regulation: "BEST-PRACTICE — standard change-management practice"
+    reference: "N/A (general industry practice, no specific standard cited)"
+    automated_checks:
+      - "git log: ratio of 'Merge pull request' commits to total commits since the prior baseline"
+      - "requirements.txt completeness (sqlalchemy, psycopg, etc. present)"
+      - "docker-compose.prod.yml: --forwarded-allow-ips scope"
+    assessment_criteria:
+      compliant: "Changes are consistently reviewed via PR, dependencies are complete, and deployment config uses least-privilege defaults."
+      partially_compliant: "Some elements (e.g. dependency completeness) are solid, but PR-review rate is low and/or deployment config is permissive."
+      non_compliant: "No review process is evident and deployment configuration is materially insecure."
+
+  - id: BE-11
+    name: Regression Testing and Operational Monitoring
+    description: >
+      Verifies automated tests, CI, and operational monitoring exist to catch
+      regressions before production.
+    regulation: "BEST-PRACTICE — standard QA practice"
+    reference: "N/A (general industry practice, no specific standard cited)"
+    automated_checks:
+      - "find backend/ for test_*.py / *_test.py"
+      - "find .github/workflows/ for CI configuration"
+      - "search for monitoring/alerting configuration beyond /api/health"
+    assessment_criteria:
+      compliant: "Automated tests exist for core logic, CI runs them on every change, and monitoring/alerting is configured."
+      partially_compliant: "Some of the above exist but coverage is incomplete."
+      non_compliant: "No tests, no CI, and no monitoring exist."
+
+  - id: BE-12
+    name: Security and Governance Logging
+    description: >
+      Verifies security-relevant events are captured durably, and that
+      administrative/security actions can be reconstructed after the fact.
+    regulation: "LEGAL REQUIREMENT — GDPR (general); BEST-PRACTICE — OWASP Top 10"
+    reference: "Art. 32, Art. 5(2); A09"
+    automated_checks:
+      - "grep backend/*.py for 'import logging' / 'getLogger'"
+      - "grep backend/models.py for an AuditLog (or equivalent) entity"
+    assessment_criteria:
+      compliant: "Structured logging exists for security events, and a dedicated audit-log entity records auth/ownership/API-key events."
+      partially_compliant: "Some events are traceable via existing tables, but no structured logging or dedicated audit entity exists."
+      non_compliant: "No structured logging and no audit trail exist anywhere."

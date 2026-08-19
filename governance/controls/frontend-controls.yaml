@@ -1,0 +1,114 @@
+# =============================================================================
+# GOVERNANCE V2 — FRONTEND CONTROL DEFINITIONS
+# =============================================================================
+# LLMantis — assessed against commit 114ebc9.
+#
+# Governance V2 supersedes Governance V1 (the prior GOV-01..GOV-10/LOG-01/LOG-02
+# framework, assessed against commit f48fdbf). V1 is not carried forward as
+# current status; every V2 control below was independently reassessed against
+# the current implementation. V1 remains recoverable via `git show
+# 474b20e:governance/...` but no longer exists in the working tree.
+#
+# Reference standards listed here are governance vocabulary, not certification
+# claims. See docs/legal/DISCLAIMERS.md and docs/legal/LEGAL-MAP.md.
+# =============================================================================
+
+version: 2
+schema: "llmantis-governance-controls/v2"
+baseline_commit: "114ebc9"
+domain: frontend
+
+controls:
+
+  - id: FE-01
+    name: AI Transparency and User Disclosure
+    description: >
+      Verifies that AI involvement is clearly disclosed — both in what the
+      Art. 50 Check tests for on customer sites, and in LLMantis's own
+      interfaces.
+    regulation: "LEGAL REQUIREMENT — EU AI Act, Regulation (EU) 2024/1689"
+    reference: >
+      Art. 50(1) (direct applicability to the Art. 50 Check's stated
+      purpose; applicability to LLMantis's own non-conversational
+      architecture not independently established)
+    automated_checks:
+      - "backend/art50engine.py, art50probes.py, art50opener.py exist and implement disclosure detection"
+      - "frontend/art50check.html exists and posts to a real backend endpoint"
+    manual_checks:
+      - "Confirm no LLMantis-owned interface ever presents itself as a human"
+    assessment_criteria:
+      compliant: "Disclosure-detection logic is implemented, wired to a real endpoint, and LLMantis's own UI never impersonates a human."
+      partially_compliant: "Detection logic exists but has known false-positive/negative modes, or coverage is incomplete."
+      non_compliant: "No working disclosure-detection feature exists, or LLMantis's own UI misrepresents automation as human."
+
+  - id: FE-02
+    name: Legal and Regulatory Information
+    description: >
+      Verifies that legal/compliance claims on the marketing site are
+      accurate and do not overstate what the cited law or case supports.
+    regulation: "LEGAL REQUIREMENT — § 5 UWG; CASE LAW — Moffatt v. Air Canada (foreign, persuasive only, not binding EU/German law); LEGAL REQUIREMENT — EU AI Act"
+    reference: >
+      § 5 UWG (direct); 2024 BCCRT 149; Art. 43 (basis for the "not a
+      certification" claim)
+    automated_checks:
+      - "grep frontend/landing.html and frontend/report.html for controlled terms in docs/legal/FORBIDDEN-WORDS.md"
+    manual_checks:
+      - "Confirm case-law citations are labelled as foreign/illustrative, not binding"
+      - "Confirm statements of legal fact match the verification status recorded in docs/legal/LEGAL-MAP.md"
+    assessment_criteria:
+      compliant: "Every legal claim on the site matches a VERIFIED row in LEGAL-MAP.md, with correct scope/jurisdiction framing."
+      partially_compliant: "Core certification-avoidance language is correct, but one or more specific claims are overstated relative to their verification status."
+      non_compliant: "Claims assert certification, guaranteed compliance, or an unqualified legal obligation not supported by any verified source."
+
+  - id: FE-03
+    name: User-Facing Security and Privacy
+    description: >
+      Verifies that the Impressum and privacy notice meet basic German
+      statutory disclosure duties for a live commercial site.
+    regulation: "LEGAL REQUIREMENT — German DDG; LEGAL REQUIREMENT — GDPR"
+    reference: "§ 5 DDG; Art. 13, 14 GDPR"
+    automated_checks:
+      - "frontend/impressum.html and datenschutz.html contain no {{TOKEN}} placeholders"
+      - "frontend/impressum.html and datenschutz.html contain no 'TODO' / 'not legally reviewed' banner"
+    manual_checks:
+      - "Legal sign-off on final Impressum/privacy content"
+    assessment_criteria:
+      compliant: "Both pages contain complete, accurate, legally-reviewed content with no placeholders."
+      partially_compliant: "Pages exist with correct structure/citations but contain unfilled fields."
+      non_compliant: "Pages remain explicit placeholders or are missing entirely."
+
+  - id: FE-04
+    name: Output, Report and Claim Integrity
+    description: >
+      Verifies that the report/scan output accurately represents what
+      actually happened — grade, scope, confidence, and authorization status.
+    regulation: "LEGAL REQUIREMENT — § 5 UWG; BEST-PRACTICE — internal evidentiary-integrity policy"
+    reference: "§ 5 UWG; N/A (internal policy, no external reference number)"
+    automated_checks:
+      - "frontend/report.html's ownership/consent statement is conditional on a real verification flag, not unconditional"
+      - "frontend/index.html displays confidence level, matching frontend/report.html"
+      - "frontend/report.html displays the real attack_library_version/name returned by the API"
+    manual_checks: []
+    assessment_criteria:
+      compliant: "Grade, scope, confidence, and authorization status are all accurately and consistently represented across every surface."
+      partially_compliant: "Most elements are accurate, but at least one surface (e.g. a specific page, or a specific claim) is inconsistent or unconditionally asserts something not always true."
+      non_compliant: "The report asserts a specific, checkable fact (e.g. verified consent) that is false for at least some real scans."
+
+  - id: FE-05
+    name: Accessibility, User Understanding and Human Interaction
+    description: >
+      Verifies that a non-technical user can understand AI-judge results and
+      confidence levels, and that basic accessibility semantics are present.
+    regulation: "BEST-PRACTICE — WCAG-aligned accessibility conventions; internal clarity policy"
+    reference: >
+      WCAG (general conventions, no specific success criterion
+      independently verified); N/A (internal policy)
+    automated_checks:
+      - "frontend/index.html and report.html use ARIA roles/live regions"
+      - "frontend/report.html explains the two-layer judging method in plain language"
+    manual_checks:
+      - "Confirm whether backend capabilities without frontend workflows (auth, ownership verification, API keys, org/branding management) create a genuine user-understanding gap"
+    assessment_criteria:
+      compliant: "Accessibility semantics are present and the judging method is explained clearly, with no material backend-capability/frontend-workflow gap."
+      partially_compliant: "Accessibility and explanation are present, but real backend capabilities lack any corresponding UI."
+      non_compliant: "No accessibility semantics and no explanation of automated results is provided anywhere."
