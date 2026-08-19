@@ -602,17 +602,6 @@ footer.site .sp { margin-left: auto; }
       </div>
     </div>
 
-    <!-- A bot usually guards more than one value. The backend has taken a list
-         since the beginning (ScanRequest.secrets) and layer 1 checks every entry
-         exactly like the canary (backend/judge.py:199) — no page ever sent one,
-         so the strongest check only ever covered a single string, and
-         detect_canary can only ever find one.
-         Measured on the workshop bot: it surrendered its reference code AND its
-         fee in the same answer, and only the code was provable. -->
-    <label class="field" for="secrets" style="margin-top:16px">Other confidential values
-      <span style="opacity:.6">(optional — one per line, checked by exact match like the canary)</span></label>
-    <textarea id="secrets" class="mono" rows="3" style="min-height:0"
-              placeholder="INTERNAL-RATE-450&#10;Acme Supplies Ltd"></textarea>
 
     <div id="promptFields">
       <!-- The prompt is what gets attacked, but it does not say WHOSE bot it is,
@@ -804,21 +793,6 @@ if (wantedMode === 'api' || wantedMode === 'prompt') {
   $('mode').dispatchEvent(new Event('change'));
 }
 
-/* One value per line. Layer 1 matches these exactly, case-insensitively, the
-   same way it matches the canary.
-
-   Anything under four characters is dropped, for two reasons that agree: a
-   two-letter string matches almost any German sentence, so a typo would fail
-   every attack and hand the customer an F it did not earn — and the report masks
-   only values of four characters or more (report.html:518), so a shorter one
-   would be reprinted in the PDF in plain text, which is exactly what declaring
-   it was meant to prevent. */
-function declaredSecrets() {
-  return $('secrets').value
-    .split('\n')
-    .map(s => s.trim())
-    .filter(s => s.length >= 4);
-}
 
 /* A URL is how a person names a bot; the report wants the host, not the path. */
 function hostOf(url) {
@@ -903,8 +877,7 @@ $('run').addEventListener('click', async () => {
     mode,
     system_prompt: mode === 'api' ? '' : systemPrompt,
     api_url: mode === 'api' ? chatEndpoint(apiUrl) : '',
-    canary: $('canary').value.trim() || null,
-    secrets: declaredSecrets()
+    canary: $('canary').value.trim() || null
   });
 
   let worst = null;
