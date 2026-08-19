@@ -273,6 +273,70 @@ def _new_text(before: str, after: str) -> str:
                      if l.strip() and l.strip() not in seen)[:4000]
 
 
+# A WIDGET CAN HAVE ITS OWN CONSENT GATE, AND IT IS NOT A GREETING.
+#
+# hilfe.saturn.de's assistant opens onto its own notice: "Wir benutzen Cookies …
+# Akzeptieren". We read that as the assistant's first words and reported
+# "The assistant's first message discloses that it is AI" — about a bot that had
+# not said anything yet.
+#
+# The two patterns are deliberately narrow and BOTH must match. `CONSENT` in
+# art50probes is right for a page banner and far too loose here: a compliant
+# assistant saying "Mehr zum KI-Assistenten und Datenschutz" matches it, and
+# filing that as a cookie banner is the mistake that once buried a real
+# disclosure. So: storage language, plus a control that is only a consent
+# answer.
+_WIDGET_CONSENT = re.compile(
+    r"wir (benutzen|verwenden|nutzen) cookies|we use cookies|"
+    r"cookies? (und|and) .{0,30}(speicher|storage)|local storage|"
+    r"einsatz von cookies", re.I)
+_WIDGET_CONSENT_BTN = re.compile(
+    r"^\s*(alle )?(akzeptieren|accept( all| cookies)?|zustimmen|einverstanden|"
+    r"ablehnen|reject( all)?)\s*$", re.I | re.M)
+
+
+def _widget_consent_gate(text: str) -> tuple[str, bool]:
+    """
+    Split widget text at its own consent notice.
+
+    Returns (what the widget showed BEFORE the notice, whether it is gated).
+    The part before is the widget's own chrome — a title, a header link — which
+    is visible without answering anything and may carry a real disclosure.
+    Everything from the notice on is the operator's cookie text, never a
+    greeting.
+    """
+    m = _WIDGET_CONSENT.search(text or "")
+    if not m or not _WIDGET_CONSENT_BTN.search(text[m.start():]):
+        return text, False
+    return text[:m.start()].strip(), True
+
+
+def _same_site(entry: str, candidate: str) -> bool:
+    """
+    Is `candidate` still the site the customer asked us to check?
+
+    Chat often lives on a sibling host: saturn.de links its AI assistant at
+    hilfe.saturn.de, and the sweep's same-netloc rule cannot reach it. Sibling
+    hosts of the entry domain are in scope; anywhere else is a third party we
+    have no business walking into, whatever a link says.
+
+    The base is derived from the URL the caller typed, so no public-suffix list
+    is needed: we only ever ask "is this a subdomain of what the user gave us".
+    That cannot widen to `.de` the way a naive two-label rule can.
+    """
+    try:
+        host = (urlparse(entry).hostname or "").lower()
+        cand = (urlparse(candidate).hostname or "").lower()
+    except Exception:
+        return False
+    if not host or not cand:
+        return False
+    base = host[4:] if host.startswith("www.") else host
+    if base.count(".") < 1:
+        return False
+    return cand == base or cand.endswith("." + base)
+
+
 def _merge(a: list[ProbeResult], b: list[ProbeResult]) -> list[ProbeResult]:
     """
     Union of two probe runs, by name. A probe that fired anywhere counts as
@@ -976,6 +1040,7 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                     "path": [], "shot": "", "viewport": ""}
         merged: list[ProbeResult] = []
         launchers: list[dict] = []
+        signposts: list[str] = []       # links whose own label names a chat
         page = ctx = None
 
         for label, ua, viewport, mobile in VIEWPORTS:
@@ -1046,10 +1111,17 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                                confidence=p.confidence, description=p.description,
                                detail=(p.findings[0] if p.findings else p.note)[:160])
                 try:
-                    els = [e for e in await page.evaluate(probes.WALK_FIXED)
-                           if e.get("chatty")]
+                    walked = await page.evaluate(probes.WALK_FIXED)
                 except Exception:
-                    els = []
+                    walked = []
+                els = [e for e in walked if e.get("chatty")]
+                # Keep the signposts for the sweep. A link reading "Zu allen
+                # Fragen & Antworten und dem KI-Assistenten" is not evidence, but
+                # it is the best pointer on the page to where the assistant is.
+                for e in walked:
+                    href = e.get("signpost") or ""
+                    if href and _same_site(url, href) and href not in signposts:
+                        signposts.append(href)
 
                 # READ THE GREETING HERE, ON THIS PAGE, NOW.
                 #
@@ -1065,6 +1137,47 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                 #
                 # A greeting belongs to the page it was spoken on. Read it while
                 # we are standing there.
+                # IF THE BUTTON ALREADY SAYS IT, DO NOT OPEN THE CHAT.
+                #
+                # otto.de's launcher reads "OTTO KI-Assistent". The disclosure is
+                # complete before any interaction — stronger than one in a first
+                # message, because a visitor cannot start without reading it. We
+                # opened the chat anyway, because the label was only examined later
+                # in check(), which meant a conversation started on someone's system
+                # for a verdict we already had.
+                #
+                # We also photograph the BUTTON here, scrolled into view. The
+                # end-of-run screenshot is taken from the top of the page, and
+                # otto's button is in the footer: the evidence was a picture of a
+                # shop front. A quote must be photographed where it was read.
+                if els and not greeting["read"]:
+                    label_text = " | ".join(
+                        e["visible"] for e in els if e.get("visible"))[:600]
+                    said_on_button = first_match(DISCLOSE, label_text, context=45)
+                    if said_on_button:
+                        greeting["read"] = True
+                        greeting["viewport"] = label
+                        # Scroll the button to the middle, then photograph the
+                        # viewport. Not a clip: the first version read the box in the
+                        # same evaluate() that scrolled, so the coordinates were the
+                        # pre-scroll ones, the clip fell outside the viewport, and
+                        # screenshot() raised — which the except swallowed, leaving
+                        # the verdict with no picture at all. A centred viewport shot
+                        # cannot go out of bounds and shows the button in its place
+                        # on the page, which is what a reader needs to believe it.
+                        try:
+                            import base64 as _b64
+                            await page.evaluate(
+                                "(t) => { const el = document.querySelector("
+                                "`[data-llmantis-launcher=\"${t}\"]`);"
+                                " if (el) el.scrollIntoView({block: 'center'}); }",
+                                els[0].get("tag", 0))
+                            await page.wait_for_timeout(900)
+                            greeting["shot"] = _b64.b64encode(
+                                await page.screenshot(full_page=False)).decode()
+                        except Exception:
+                            pass
+
                 if open_widget and els and not greeting["read"]:
                     # The frontend shows this while the click happens, which is the
                     # one moment a caller most wants narrated. It was emitted from
@@ -1179,6 +1292,17 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                             if not exhaustive:
                                 break
 
+                # 2b. Follow the labelled links. A page that says in so many words
+                # "the AI assistant is over here" beats any guessed path, and this
+                # is the only route that leaves the entry host — to a sibling of
+                # it, checked by _same_site, never to a third party.
+                if exhaustive or not found:
+                    for t in list(signposts):
+                        if await try_page(t):
+                            found = True
+                            if not exhaustive:
+                                break
+
                 # 3. Blind guesses, last, and only if nothing above worked.
                 if exhaustive or not found:
                     for t in (urljoin(url, q) for q in CANDIDATE_PATHS):
@@ -1247,6 +1371,19 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                     rep.reason = ("The chat launcher itself identifies the assistant "
                                   "as AI, visible before any interaction.")
 
+                # The picture comes across whatever the evidence was.
+                #
+                # It used to live inside the `not hit` branch below, so a verdict
+                # taken from the BUTTON skipped it entirely: visit() scrolled to
+                # otto.de's footer button and photographed it correctly, and then
+                # nobody copied the result into the report. The only picture left
+                # was the end-of-run viewport shot, taken from the top of the page —
+                # a photograph of a shop front offered as proof of a disclosure.
+                if greeting["shot"] and not rep.widget_shot_b64:
+                    rep.widget_shot_b64 = greeting["shot"]
+                if greeting["viewport"]:
+                    rep.viewport = greeting["viewport"]
+
                 # Use what visit() already read, on the page that had the
                 # launcher. Nothing is opened here: by now the browser may be
                 # twenty pages away from where the chat was.
@@ -1276,8 +1413,37 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                     if rep.opened_widget:
                         rep.impersonation = first_match(IMPERSONATION,
                                                         rep.first_message, context=30)
-                        hit = first_match(DISCLOSE, rep.first_message, context=60)
-                        if hit:
+                        # The widget's own consent notice is not the assistant
+                        # talking. Split it off before anything is read as a
+                        # greeting — see _widget_consent_gate.
+                        chrome, gated = _widget_consent_gate(rep.first_message)
+                        if gated:
+                            rep.first_message = ""
+                            rep.greeting_source = ""
+                            said_in_chrome = first_match(DISCLOSE, chrome, context=60)
+                            if said_in_chrome:
+                                rep.verdict = "disclosed"
+                                rep.evidence = said_in_chrome
+                                rep.reason = (
+                                    "Your assistant's own window names it an AI "
+                                    "before any conversation starts. It then asks "
+                                    "for a cookie decision, which we did not answer "
+                                    "— so this is about what the window says, not "
+                                    "about the assistant's first message.")
+                            else:
+                                rep.verdict = "not_determinable"
+                                rep.reason = (
+                                    "Your assistant opened onto its own cookie "
+                                    "notice and has not said anything yet. We do not "
+                                    "answer consent notices on your visitors' behalf, "
+                                    "so we cannot report what it discloses. Worth "
+                                    "knowing on its own: a visitor must make a "
+                                    "cookie decision before the assistant speaks, "
+                                    "which puts your Art. 50 disclosure behind that "
+                                    "decision.")
+                            hit = said_in_chrome
+                        elif (hit := first_match(DISCLOSE, rep.first_message,
+                                                 context=60)):
                             rep.verdict, rep.evidence = "disclosed", hit
                             rep.reason = ("The assistant's first message discloses "
                                           "that it is AI.")

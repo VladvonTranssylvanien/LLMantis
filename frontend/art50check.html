@@ -767,6 +767,15 @@ function renderResult(rep) {
            '<img class="w-shot" alt="Your chat widget open on ' + escHtml(rep.url) +
            '" src="data:image/png;base64,' + rep.widget_shot_b64 + '">';
     }
+  } else if (rep.widget_shot_b64) {
+    /* The evidence came from the button, not from a greeting. Show the button —
+       scrolled to and cropped in place. Previously this branch showed nothing and
+       the only picture was the end-of-run viewport shot, taken from the top of the
+       page: on otto.de, whose button is in the footer, the proof of a disclosure
+       was a photograph of a shop front. */
+    h += '<dt class="q-label">Where we read it, on your page</dt>' +
+         '<img class="w-shot" alt="The chat button on ' + escHtml(rep.url) +
+         '" src="data:image/png;base64,' + rep.widget_shot_b64 + '">';
   }
   if (rep.impersonation) {
     h += '<p class="r-empty"><b>It introduces itself as a person</b> — ' +
