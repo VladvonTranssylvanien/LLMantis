@@ -3779,10 +3779,137 @@ mount all serve, so the "no full-stack run" gap is narrower than sessions 22 and
 
 ---
 
+## 2026-08-19 — Session 33: the README rewritten for the course jury
+
+No engine work, no measurement. Gregor's ask: the project is judged on the
+repository, so `README.md` had to become something a juror understands in five or
+six minutes — what the product is for, what problem it solves, why and how — with
+both layers highlighted and the free Art.-50 check named as the funnel.
+
+`README.md` renamed to `README_old.md` with `git mv` (history preserved) and a new
+one written from the repository's own sources rather than from the old file.
+**`README.md` is Product's file** (`README_old.md:353` assigns it to Bogdan) —
+edited on Gregor's instruction, and worth mentioning to Bogdan because the pitch
+narrative and the README now have to agree.
+
+### 🔴 The number Gregor asked for describes an engine we deleted
+
+Gregor asked for "the 94 % concurrency". **94.3 % is the retired `mistral-small`
+baseline** (mean of 10 runs, range 26–30 of 30). The current figure is stronger
+and was used instead: **29 of 29 judgeable items, identical in all 10 runs** on
+gpt-4.1, plus the deterministic layer at 11/11 and 13/13 with zero false
+positives. Publishing 94.3 % would have undersold the engine and left a juror to
+find the better number in `PROJECT-STATE.md` unaided.
+
+### Two features landed this morning that made my first draft wrong
+
+Both Bogdan's, both pulled before writing. Neither was in the 18.08 handoff, and
+both change what the README has to say a scan *is*:
+
+| Commit | What changed |
+|---|---|
+| `ac74878` | **A scan takes a website address.** A bare host is completed to `/api/chat` and the completed URL printed back before anything is sent. `SCAN_UNVERIFIED_DOMAINS` waives the key and the org requirement for listed demo domains; a customer domain still needs the DNS record |
+| `b8ae0fd` | **One press runs the library twice and reports the worse pass.** Three identical api-mode runs on one bot had returned A/100, A/90, B/79 |
+
+So the README leads with pasting a real bot's address, and the three lab bots are
+described as what the judge was calibrated against plus the on-site demo — which
+is what Gregor asked for. `b8ae0fd` also **turns the standing variance caveat into
+a feature**: sessions 31–32 recorded F↔D movement as an honest embarrassment, and
+the product now answers it by construction. Worth carrying to the pitch; slide 5's
+"promise a contrast, not two letters" warning is now weaker than it was.
+
+### Four things corrected rather than copied forward
+
+1. 🔴 **`backend/art50check.py:12` advertises a check that does not exist.** The
+   docstring lists five checks including *"does the widget load before cookie
+   consent?"*. Only four `Art50Finding`s are ever emitted — `widget_found`,
+   `ai_disclosure`, `privacy_link`, `impressum` — and the `cookie` regex at `:211`
+   is one of the *privacy-link* patterns, nothing to do with consent. The README
+   documents four. **Reported, not fixed** — Vlad's file.
+2. **"Layer 1 plants a canary in the system prompt" is false for the path that now
+   matters.** In api mode we hold no prompt. Rewritten as: the customer names a
+   string that must never appear, either a real secret or a planted canary. Matches
+   `ScanRequest.canary` / `.secrets` (`main.py:92-96`).
+3. **The frontend sends `canary` but never `secrets`.** Verified by grep:
+   `index.html:878` sends the one field, and `secrets` appears nowhere in the file.
+   Handoff problem #2 is still open. My first draft said a visitor may name "the
+   canary or secrets", which overstated the UI; corrected to one canary.
+4. **"Dated, reproducible" dropped from the Prüfbericht claim.** A report still
+   lives only in the tab that ran the scan (session 32). Asserting reproducibility
+   in the file a jury reads is the kind of claim they check.
+
+### llmantis.de is still password-gated
+
+`curl` → **HTTP 401**, `www-authenticate: Basic realm="restricted"`. Gregor asked
+for the link, so it is there with the restriction stated in the same sentence, on
+the reasoning `PITCH-PLAN.md` §8 already gives (Impressum and Datenschutz are
+templates). A juror who clicks a bare link into a password box reads that as a
+broken product — deciding whether the gate comes off before submission is Bogdan's.
+
+### Gregor's own edits after the handover, recorded because two have consequences
+
+He committed the file as `c15876b` and `f6c93b5`, cutting it further. Two are
+purely editorial (the `PLAYBOOK.md` pointer; the roadmap trimmed to its first
+sentences). Two are not, and are his call, not a defect:
+
+- **The whole `## Status` section is gone** — the honest-gaps list, including
+  "`POST /api/scan` has not been exercised with the database up" and the thin
+  `excessive_agency` category. `PITCH-PLAN.md` §1 slide 8 argues the opposite for
+  the pitch ("with a jury that grades method, admitting the gaps is worth more
+  than hiding them"). The gaps are still in `PROJECT-STATE.md`, so nothing is
+  concealed, but the README no longer volunteers them.
+- **Two defensibility paragraphs are gone:** that only a `confirmed` finding may
+  drive a grade to F (`PLAYBOOK.md:554`), and the note that one of the 30
+  calibration items is unjudgeable. Consequence worth knowing on stage: the table
+  now reads **"29 of 29 judgeable items"** against a set the same page calls 30
+  items, with nothing explaining the 30th. That is the first question a careful
+  juror asks, and the answer is good — it is the `jb_encoding` item whose recorded
+  answer *is* a content-filter error, excluded rather than counted either way. It
+  is simply no longer written down.
+
+### What I did NOT verify
+
+- **Nothing was run.** No scan, no calibration run, no browser. Every figure in
+  the README was lifted from `PROJECT-STATE.md` §7, `docs/ENGINE-REWORK.md` §7 and
+  sessions 31–32, not re-measured. The two features above were read from their
+  commits and the frontend source, never executed.
+- **The demo-bot grades in the README predate `b8ae0fd`.** F(0) / D(42) / A(94–100)
+  are single-pass numbers; the product now reports the worse of two passes, so
+  those figures describe the earlier methodology. Not restated as two-pass results,
+  but not re-measured either.
+- **The rendered file has not been looked at on GitHub.** Tables were checked for
+  pipe-count consistency by script; the one link (`llmantis.de`) was checked for
+  reachability, not for how it renders.
+- **Kwabena has not seen the legal wording.** The README necessarily carries
+  "Art. 50", "Art. 99", "§ 5 UWG" and "§ 5 DDG" — `PLAYBOOK.md` §11 invariant 5
+  territory. Every such sentence was reused from `README_old.md`, `PLAYBOOK.md` or
+  `PROJECT-STATE.md` rather than newly drafted, so no new claim is asserted. But
+  `PROJECT-STATE.md` §3 still marks the **Digital Omnibus scope** ⚠️ unconfirmed
+  and the README states it. If Kwabena cannot source it, that line goes.
+- **Bogdan has not seen any of this**, and it is his file and his narrative.
+- Whether the two new features changed any recorded number. `scan_bots.py` and
+  `calibrate.py` were not re-run.
+
+### Minor, found while citing
+
+**`PLAYBOOK.md:466` is the wrong line** for "only a `confirmed` finding may
+produce an F". Both `docs/ENGINE-REWORK.md` §3 and `PROJECT-STATE.md` §7 cite it;
+`:466` is a table about risk framing. The rule is at **`PLAYBOOK.md:554`**,
+verified by reading it. Either the file shifted or the citation was always wrong.
+Noted rather than chased — but it is the citation behind the product's strongest
+claim, so it should be right in the documents a juror might follow.
+
+---
+
 # Start here next session
 
-> Written at the end of **18.08**. The pitch is **21.08**, so two working days
-> follow this. Everything below is on `main` unless it says otherwise.
+> Written at the end of **18.08** and **stale in one important way**: session 33
+> (19.08) records two features that landed on `main` on the 19th and changed what
+> a scan does — a scan now takes a **website address**, and one press runs the
+> library **twice, reporting the worse pass** (`ac74878`, `b8ae0fd`, both
+> Bogdan's). Read session 33 before trusting the demo-beat figures below, which
+> are single-pass. The pitch is **21.08**. Everything below is on `main` unless it
+> says otherwise.
 
 ## 0. What a fresh session needs to know first
 

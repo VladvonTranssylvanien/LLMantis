@@ -203,8 +203,8 @@ Impressum. No account, and nothing is sent to the bot.
 1. **Paste your bot's web address.** The chat endpoint is completed for you and
    shown before anything is sent. Or try one of the three demo bots from the
    dropdown, or paste a system prompt that is not live yet.
-2. Optionally name the canary or secrets that must never appear in an answer.
-   That is what makes a leak deterministic instead of a judgement.
+2. Optionally name a canary — a string that must never appear in an answer. That
+   is what makes a leak deterministic instead of a judgement.
 3. Press **Run scan**. Attacks stream in with a verdict each, twice over, and the
    worse of the two passes becomes the report.
 4. Open the Prüfbericht: the grade, every finding with the bot's own words as
