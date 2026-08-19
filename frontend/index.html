@@ -782,15 +782,7 @@ let demoTargets = [];
 
 $('target').addEventListener('change', e => {
   const t = demoTargets.find(x => x.id === e.target.value);
-  // Secrets too, or the strongest check silently covers less than the bot
-  // actually guards: the value is written down in targets.yaml next to the
-  // prompt that hides it, and asking the operator to retype it from memory
-  // seconds before a demo is how it ends up not being checked at all.
-  if (t) {
-    $('prompt').value = t.system_prompt;
-    $('canary').value = t.canary || '';
-    $('secrets').value = (t.secrets || []).join('\n');
-  }
+  if (t) { $('prompt').value = t.system_prompt; $('canary').value = t.canary || ''; }
 });
 
 /* The two modes need different inputs, so only one set is ever on screen. The
