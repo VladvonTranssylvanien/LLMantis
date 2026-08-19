@@ -629,20 +629,41 @@ footer a:hover{color:var(--accent)}
       <div class="plan rv">
         <span class="n">Art.-50-Check</span>
         <div class="p">0 €</div>
+        <!-- This list described art50check.py, the passive GET that
+             art50engine.py replaced on 18.08 after it found 0 widgets on 24 real
+             German sites; no endpoint has called it since (backend/main.py:57).
+             Three of its four lines were false: it is a real browser, not a
+             passive fetch; it sweeps every candidate page on both form factors,
+             not "ein einziger Abruf"; and it DOES open the chat -- the greeting
+             lives inside the widget, not on the button, so the click is the
+             whole check (art50engine.py:28). The one line that survived is
+             "keine Freigabe, kein Konto". -->
         <ul>
-          <li>Passive Prüfung einer öffentlichen Seite</li>
-          <li>Ein einziger Abruf, keine Nachricht an den Bot</li>
+          <li>In einem echten Browser, wie ein Besucher — Desktop und Mobil</li>
+          <li>Zwölf Nachweismethoden auf jeder infrage kommenden Seite</li>
+          <li>Wir öffnen den Chat einmal und lesen die Begrüßung — genau darum
+              geht es in Art. 50(1)</li>
+          <li>Wir tippen nichts und senden Ihrem Bot keine Nachricht</li>
           <li>Keine Freigabe, kein Konto nötig</li>
-          <li class="cannot">Prüft die Seite — öffnet den Chat nicht</li>
+          <li class="cannot">Liest die Begrüßung — greift den Bot nicht an</li>
         </ul>
         <a class="cta" href="/static/art50check.html">Jetzt prüfen →</a>
       </div>
       <div class="plan rv">
         <span class="n">Starter</span>
         <div class="p">29 €<small> / Prüfung</small></div>
+        <!-- "Die VOLLE Angriffsbibliothek" was false on this deployment.
+             ATTACK_LIBRARY is unset in deploy/.env, so DEFAULT_ATTACK_LIBRARY
+             applies: attacks_short.yaml, 21 of the 78 we hold. That is a
+             measured choice, not a shortfall (backend/config.py:109) -- the
+             78-set cannot finish inside Mistral's rate window and DILUTES the
+             grade, taking the same leaking bot from D/52 to C/80. Either way
+             the word "volle" claimed something this scan does not do. -->
         <ul>
-          <li>Die volle Angriffsbibliothek gegen einen Bot</li>
+          <li>Die Angriffsbibliothek gegen einen Bot</li>
           <li>Aus seinem Systemprompt heraus</li>
+          <li>Jeder Angriff läuft zweimal — gewertet wird der schlechtere
+              Durchlauf</li>
           <li>Prüfbericht als PDF: Note, Befunde, Behebung</li>
           <li>Jeder Befund mit dem Zitat, das ihn belegt</li>
         </ul>
