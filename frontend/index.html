@@ -616,9 +616,15 @@ footer.site .sp { margin-left: auto; }
     </div>
 
     <div id="apiFields" hidden>
-      <label class="field" for="apiUrl" style="margin-top:16px">Endpoint URL</label>
-      <input id="apiUrl" class="mono" placeholder="https://example.com/api/chat">
-      <label class="field" for="apiKey" style="margin-top:16px">API key</label>
+      <label class="field" for="apiUrl" style="margin-top:16px">Your bot's address</label>
+      <input id="apiUrl" class="mono" placeholder="https://example.com">
+      <!-- Nobody outside this team thinks of their bot as a POST endpoint, so a
+           bare site address is completed rather than rejected — and the result is
+           printed back, because silently scanning a different URL than the one on
+           screen is how a report ends up describing something the reader never
+           asked about. -->
+      <p class="method" id="apiResolved" style="margin-top:8px"></p>
+      <label class="field" for="apiKey" style="margin-top:16px">API key <span style="opacity:.6">(not needed for our own demo bots)</span></label>
       <input id="apiKey" class="mono" type="password" placeholder="llm_…" autocomplete="off">
       <!-- The endpoint must answer POST {"message":"..."} with JSON carrying one
            of reply/answer/message/response/text/output (backend/scanner.py:113).
@@ -791,6 +797,32 @@ function hostOf(url) {
   try { return new URL(url).host; } catch (e) { return url; }
 }
 
+/* Where a chat endpoint lives when the visitor gave us only a site address.
+   One guess, not a search: probing a stranger's paths is a different feature
+   with its own failure modes, and guessing wrong shows up as 21 identical
+   ERROR rows that read as "your bot is broken". */
+const DEFAULT_CHAT_PATH = '/api/chat';
+
+function chatEndpoint(raw) {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  // People paste "example.com" as often as "https://example.com".
+  const withScheme = /^https?:\/\//i.test(s) ? s : 'https://' + s;
+  let u;
+  try { u = new URL(withScheme); } catch (e) { return s; }
+  if (u.pathname === '' || u.pathname === '/') u.pathname = DEFAULT_CHAT_PATH;
+  return u.toString();
+}
+
+/* Show the completed address as it is typed. The field keeps what the visitor
+   wrote; this line says what will actually be called. */
+$('apiUrl').addEventListener('input', () => {
+  const raw = $('apiUrl').value.trim();
+  const resolved = chatEndpoint(raw);
+  $('apiResolved').textContent =
+    (!raw || resolved === raw) ? '' : 'We will send the attacks to ' + resolved;
+});
+
 /* ------------------------------------------------------------------ scan -- */
 $('run').addEventListener('click', async () => {
   const mode = $('mode').value;
@@ -802,14 +834,12 @@ $('run').addEventListener('click', async () => {
     $('error').textContent = 'Paste a system prompt first.'; return;
   }
   if (mode === 'api' && !apiUrl) {
-    $('error').textContent = 'Paste the endpoint URL first.'; return;
+    $('error').textContent = "Paste your bot's address first."; return;
   }
-  // The backend answers a keyless api-mode call with a 403 whose text is about
-  // org_id and ownership verification — accurate, and unreadable to anyone who
-  // has not read /api/scan. Say the actionable half here instead.
-  if (mode === 'api' && !apiKey) {
-    $('error').textContent = 'An API key is required to scan a live endpoint.'; return;
-  }
+  // No client-side key check any more. Whether a key is needed depends on
+  // whether the domain is waived server-side, which this page cannot know, and
+  // refusing here would block the demo domains that need no key at all. The
+  // backend's 403 already names what to do.
 
   $('error').textContent = '';
   $('run').disabled = true;
@@ -831,17 +861,20 @@ $('run').addEventListener('click', async () => {
   // carries that title.
   const siteUrl = $('siteUrl').value.trim();
   const demoBot = demoTargets.find(t => t.id === $('target').value);
-  const targetName = mode === 'api' ? hostOf(apiUrl)
+  const targetName = mode === 'api' ? hostOf(chatEndpoint(apiUrl))
                    : siteUrl        ? hostOf(siteUrl)
                    : demoBot        ? demoBot.name
                    : 'Custom prompt';
 
   const headers = { 'Content-Type': 'application/json' };
-  if (mode === 'api') headers['X-API-Key'] = apiKey;
+  // Sent only when there is one. backend/apikeys.py:124 treats an empty header
+  // the same as none, so this is tidiness rather than a fix — but it keeps an
+  // empty string out of the request where a reader would wonder what it meant.
+  if (mode === 'api' && apiKey) headers['X-API-Key'] = apiKey;
   const body = JSON.stringify({
     mode,
     system_prompt: mode === 'api' ? '' : systemPrompt,
-    api_url: mode === 'api' ? apiUrl : '',
+    api_url: mode === 'api' ? chatEndpoint(apiUrl) : '',
     canary: $('canary').value.trim() || null
   });
 

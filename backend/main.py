@@ -1045,15 +1045,42 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
     # it only replays text the caller submitted themselves, never a live
     # third-party system.
     if body.mode == "api":
-        if effective_org_id is None:
+        domain = (urlparse(body.api_url).netloc or body.api_url).lower()
+        waived = domain in config.SCAN_UNVERIFIED_DOMAINS
+
+        # A waived domain is one of ours, typed by hand into deploy/.env, and the
+        # ORGANISATION requirement is dropped together with the ownership check
+        # rather than kept beside it.
+        #
+        # Keeping it would have bought nothing. Registration is open and
+        # unconfirmed, so anyone who can reach this endpoint can hold a valid key
+        # within three requests — the security review walked exactly that
+        # sequence on 19.08. It was never a barrier against a stranger, only
+        # attribution. And a demo cannot ask a visitor for a credential that no
+        # page on this site can issue.
+        #
+        # The cost is real, and it is NOT the one first written here. An earlier
+        # version of this comment claimed such a scan "belongs to no organisation
+        # and appears in no history". It does not: _save_scan_to_db falls back to
+        # _get_or_create_org(), so an anonymous scan is persisted against the
+        # shared demo.local org (see :143-145). What is actually lost is that the
+        # scan cannot be told apart from any other anonymous one, and it lands in
+        # an org whose row anyone may already own — POST /api/organizations takes
+        # an arbitrary domain from any registered user, and "demo.local" is a
+        # claimable name. Nothing sensitive of ours goes in there: a waived scan
+        # stores our own demo bot's replies. The prompt-mode path storing customer
+        # system prompts in the same place is older than this waiver and is the
+        # one to fix before the basic_auth in front of this site ever comes off.
+        #
+        # A customer scan is unaffected — it has neither a waiver nor a reason
+        # to skip the DNS record that proves they asked to be attacked.
+        if effective_org_id is None and not waived:
             raise HTTPException(
                 403,
                 "An org_id (or a valid X-API-Key) is required for mode='api'. "
                 "Verify ownership of the target domain first via "
                 "/api/ownership/challenge and /api/ownership/verify."
             )
-
-        domain = urlparse(body.api_url).netloc or body.api_url
 
         # A loopback/private target can never pass DNS ownership verification
         # — there is no record to publish for 127.0.0.1 and nothing to own.
@@ -1071,8 +1098,9 @@ async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db
                     f"network. If this is a local lab target (see lab/runner.py), "
                     f"set ALLOW_PRIVATE_SCAN_TARGETS=true in .env and restart."
                 )
-        elif (domain.lower() not in config.SCAN_UNVERIFIED_DOMAINS
-                and not is_domain_verified(db, effective_org_id, domain)):
+        # Not waived means the org check above let us through, so effective_org_id
+        # is set by the time is_domain_verified needs it.
+        elif not waived and not is_domain_verified(db, effective_org_id, domain):
             raise HTTPException(
                 403,
                 f"Ownership of '{domain}' is not verified for this organization. "
