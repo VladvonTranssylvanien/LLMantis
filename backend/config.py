@@ -242,6 +242,16 @@ ALLOW_PRIVATE_SCAN_TARGETS = os.getenv("ALLOW_PRIVATE_SCAN_TARGETS", "").lower()
 # what stops this deployment being aimed at a stranger's bot (PLAYBOOK §5), and
 # waiving it for a domain we control is a different act from waiving it for
 # everyone. Empty by default: a domain gets in only by being typed here.
+#
+# THE WAIVER IS NOT SCOPED TO US. is_domain_verified() binds a domain to one
+# organisation; this list binds it to none, and main.py skips that call
+# entirely for a listed domain. Registration is open and unconfirmed, so any
+# stranger can mint an API key and aim a scan at anything listed, from our
+# server and on our judge budget. Listing a domain publishes it as a target.
+#
+# Matched against urlparse(url).netloc exactly — a scheme, a port or a trailing
+# dot in an entry means it can never match, and the caller gets a "not
+# verified" 403 that says nothing about the malformed entry.
 SCAN_UNVERIFIED_DOMAINS = {
     d.strip().lower()
     for d in os.getenv("SCAN_UNVERIFIED_DOMAINS", "").split(",")

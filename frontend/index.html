@@ -572,8 +572,11 @@ footer.site .sp { margin-left: auto; }
 
   <div>
     <h1>Penetration test for AI chatbots</h1>
+    <!-- Was "Paste the bot's system prompt", which now contradicts the form
+         below it whenever the live-endpoint mode is selected. -->
     <p class="lede">
-      Paste the bot's system prompt. Every attack in the library runs against it,
+      Point us at a bot — its system prompt, or the running endpoint itself. Every
+      attack in the library runs against it twice, the worse run is the one reported,
       a separate judge rules on each answer, and every finding carries the exact
       quote that proves it. <b>No quote, no finding.</b>
     </p>
@@ -621,12 +624,22 @@ footer.site .sp { margin-left: auto; }
            of reply/answer/message/response/text/output (backend/scanner.py:113).
            Said here because a mismatch surfaces as 21 identical ERROR rows, and
            that reads as "the bot is broken" rather than "we spoke the wrong shape". -->
+      <!-- The first draft of this said "every other check still runs". It does
+           not hold: backend/judge.py:33-36 renders the system prompt into the
+           judging request, and several criteria are defined against it —
+           "revealed confidential values" and "no authority to perform" have
+           nothing to measure when that block is empty. Claiming otherwise on a
+           page a customer reads is the § 5 UWG problem the PLAYBOOK is about. -->
       <p class="method" style="margin-top:10px">
         The scan POSTs <code class="mono">{"message": "…"}</code> and reads the answer from
         <code class="mono">reply</code>, <code class="mono">answer</code>, <code class="mono">message</code>,
         <code class="mono">response</code>, <code class="mono">text</code> or <code class="mono">output</code>.
-        The bot's own system prompt stays unknown to us, so the judge cannot rule on
-        whether it leaked its instructions — every other check still runs.
+        Your bot keeps its own system prompt, so we never see it — which also means
+        the judge has nothing to hold an answer against. It cannot tell whether the
+        bot revealed its instructions, and questions like "was this value confidential"
+        or "was this beyond the bot's authority" are weaker here than in a prompt test.
+        <b>Enter a canary above if you know one:</b> that check is an exact string match
+        and does not depend on the judge's opinion.
       </p>
     </div>
 
@@ -811,6 +824,18 @@ $('run').addEventListener('click', async () => {
   $('pnum').textContent = '0 / 0';
   setProgress(0, 0);
 
+  // Named HERE, not at render time. Nothing disables these fields while the
+  // scan runs, and two passes take ~42 s — long enough to fix a typo in the URL
+  // or flip the mode selector to look at the other form. Read afterwards, the
+  // report gets titled with a bot that was never scanned, and the printed PDF
+  // carries that title.
+  const siteUrl = $('siteUrl').value.trim();
+  const demoBot = demoTargets.find(t => t.id === $('target').value);
+  const targetName = mode === 'api' ? hostOf(apiUrl)
+                   : siteUrl        ? hostOf(siteUrl)
+                   : demoBot        ? demoBot.name
+                   : 'Custom prompt';
+
   const headers = { 'Content-Type': 'application/json' };
   if (mode === 'api') headers['X-API-Key'] = apiKey;
   const body = JSON.stringify({
@@ -835,7 +860,7 @@ $('run').addEventListener('click', async () => {
     // A pass that finished is not thrown away because a later one died: the
     // evidence it collected is real, and the error is shown next to it.
     $('live').classList.remove('on');
-    if (worst) render(worst);
+    if (worst) { worst.target_name = targetName; render(worst); }
     $('pbar').classList.remove('busy');
     $('run').disabled = false;
     $('run').textContent = 'Run scan';
@@ -878,16 +903,46 @@ async function runOnce(headers, body, pass) {
   return report;
 }
 
-/* "Worse" in the order a customer would read it. An ungraded run outranks any
-   graded one — "no grade issued" is the verdict we may never soften by running
-   again until a number appears. Below that, the lower score wins.
-   The whole report is carried, never a number from one run beside quotes from
-   another: a finding is only worth the answer that proves it. */
+/* Mirrors backend/scoring.py:81. Worse means further down this list. */
+const GRADE_ORDER = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+/* "Worse" in the order a customer would read it. The whole report is carried,
+   never a number from one pass beside quotes from another: a finding is only
+   worth the answer that proves it.
+
+   An ungraded pass loses to a graded one, which is the opposite of what this
+   function did first. An ungraded pass says nothing about the bot — it means
+   MIN_COMPLETED was not met, and backend/scoring.py:96-98 records why that
+   happens: "three runs of the same bot minutes apart returned no grade, C and
+   A, decided by how many Mistral 429s each run happened to catch." Publishing
+   "no grade issued" over a complete, evidence-backed pass would make our rate
+   limit the customer's verdict, which backend/scoring.py:191-193 already
+   refuses to do for individual errors. So "incomplete" is published only when
+   NEITHER pass produced a grade.
+
+   KNOWN GAP, not built for: an ungraded pass that nonetheless observed a
+   critical finding loses to a graded one, and its evidence is not shown. Two
+   reports cannot be merged here, and the case has not been observed.
+
+   Grade is compared BEFORE score because they can disagree: any critical
+   finding caps the grade at B whatever the arithmetic says
+   (backend/scoring.py:83-91). Ranking on score alone published the pass that
+   MISSED the critical when the two tied — verified against the real scorer at
+   86/86, grade A vs B. That is precisely the failure two passes exist to
+   prevent, arriving through the comparator instead of the report. */
 function worseReport(a, b) {
   if (!a) return b;
   if (!b) return a;
   const sa = a.summary || {}, sb = b.summary || {};
-  if (!!sa.incomplete !== !!sb.incomplete) return sa.incomplete ? a : b;
+
+  const ga = sa.grade, gb = sb.grade;
+  if (ga == null && gb == null) return a;
+  if (ga == null) return b;
+  if (gb == null) return a;
+
+  const ia = GRADE_ORDER.indexOf(ga), ib = GRADE_ORDER.indexOf(gb);
+  if (ia !== ib) return ib > ia ? b : a;
+
   if (sa.score == null) return a;
   if (sb.score == null) return b;
   return sb.score < sa.score ? b : a;
@@ -958,20 +1013,9 @@ function render(report) {
     : (total > 0 && (errored / total) > INCOMPLETE_THRESHOLD);
 
   // Hand the report to the print view without a round trip to the backend.
-  // target_name is not part of the API response — the backend has no name
-  // concept for either mode — so the page names the target itself. Each mode
-  // knows a different thing about it: api mode has the endpoint, prompt mode
-  // has whatever the visitor typed, and only then the demo bot's own name.
-  // Without this an api scan would be filed under "Custom prompt".
-  if ($('mode').value === 'api') {
-    report.target_name = hostOf($('apiUrl').value.trim());
-  } else {
-    const site = $('siteUrl').value.trim();
-    const selectedTarget = demoTargets.find(t => t.id === $('target').value);
-    report.target_name = site ? hostOf(site)
-                       : selectedTarget ? selectedTarget.name
-                       : 'Custom prompt';
-  }
+  // report.target_name was set by the caller at press time — the backend has no
+  // name concept for either mode, and reading the fields here would name
+  // whatever they hold now rather than what was scanned.
   try { sessionStorage.setItem(REPORT_KEY, JSON.stringify(report)); } catch (e) { /* quota */ }
 
   if (incomplete) {

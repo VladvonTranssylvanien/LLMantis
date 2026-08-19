@@ -385,12 +385,35 @@ served from our server and **sets no cookies**.
 |---|---|---|
 | **The word "zertifiziert" in any form** | § 5 UWG + AI Act Art. 43 | 🔴 see below — the most important row |
 | **Cold email** — even B2B | § 7 UWG | no B2B exception in Germany. **Paper letters only** |
-| **Active attack without ownership verification** | provider ToS, possibly § 202a StGB | passive page view is **not** a breach |
+| **Active attack without ownership verification** | provider ToS, possibly § 202a StGB | passive page view is **not** a breach. One narrow exception exists in code — see below |
 | **Alleinstellungsbehauptung** | § 5 UWG | "das prüft sonst niemand" — unprovable |
 | Exaggerating risk | § 5 UWG | "Sie bekommen ein Bußgeld!" is itself a violation |
 | Payment button without "Zahlungspflichtig bestellen" | § 312j BGB | contract void |
 | Storing bot answers containing personal data | GDPR | we become controller of someone else's data |
 | Publishing a customer's vulnerabilities | contract | NDA by default |
+
+### The one exception to ownership verification, and its real cost
+
+`SCAN_UNVERIFIED_DOMAINS` (`backend/config.py`, checked at `backend/main.py:1074`)
+names public domains an api-mode scan may attack without the DNS TXT record. It
+exists so a test bot we own can be scanned while it is still moving between
+hosts. It is **empty by default** and a domain enters it only by being typed
+into `deploy/.env`.
+
+Two things about it that the name does not say, and that decide whether a domain
+belongs in the list:
+
+- **The waiver is not scoped to us.** `is_domain_verified` binds a domain to one
+  organisation; the allowlist binds it to none, and it is skipped entirely. Anyone
+  who registers an account — open, no email confirmation — can mint an API key and
+  aim a scan at a listed domain, from our server and on our judge budget. Listing a
+  domain publishes it as a target, it does not reserve it for us.
+- **"Our own test bots" is a sentence in a comment, not a control.** The only thing
+  enforcing it is who can write `deploy/.env`, which is gitignored — so there is no
+  record of what was listed when, or by whom.
+
+A customer's domain never goes in here. For a customer the DNS record is the whole
+point: it is the evidence that they asked to be attacked.
 
 ### 🔴 Why "zertifiziert" is a red line
 
