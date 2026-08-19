@@ -672,6 +672,19 @@ function renderResult(rep) {
     '<dt>Your chat</dt><dd>' + (rep.opened_widget
       ? 'opened once and read — we typed nothing'
       : 'not opened') + '</dd>' +
+    /* The route we took, and which steps a model chose. Without this the report
+       cannot answer "did the AI do anything?" — the decisions streamed past in the
+       progress panel and were gone by the time the verdict appeared. A recorded
+       path is also the reproducible half of a step a model decided. */
+    ((rep.click_path || []).length
+      ? '<dt>How we got there</dt><dd>' + rep.click_path.map(function (step, i) {
+            var ai = step.indexOf('ai: ') === 0;
+            return (i ? ' \u2192 ' : '') + (ai
+              ? '<b title="chosen by the page-reading model">' +
+                escHtml(step.slice(4)) + '</b> <span class="none">(AI)</span>'
+              : escHtml(step));
+          }).join('') + '</dd>'
+      : '') +
     '<dt>Took</dt><dd>' + escHtml(rep.duration_s) + ' s</dd>' +
     '</dl>';
 
