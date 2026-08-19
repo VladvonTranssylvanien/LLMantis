@@ -98,7 +98,13 @@ NOT_CHAT = re.compile(
     r"usercentrics|cookiebot|onetrust|sourcepoint|borlabs|klaro|"      # consent CMPs
     r"consent|cookie|datenschutz|privatsphäre|einwillig|"
     r"newsletter|rabatt|gutschein|trustbadge|trustedshops|"           # marketing
-    r"back-?to-?top|scroll-?to-?top|share|social", re.I)
+    r"back-?to-?top|scroll-?to-?top|share|social|"
+    # Community forums are not chat assistants. o2online.de embeds "inSided
+    # in-page support" — its user forum — in a 400x720 iframe that carries a text
+    # input from the moment it loads, while the real Live-Chat frame has none
+    # until the conversation starts. Ranked by input alone, the forum won and the
+    # assistant was never read.
+    r"insided|community|forum|in-?page support|frag die community", re.I)
 
 CONSENT = re.compile(
     r"cookie|consent|einwillig|zustimm|akzeptier|datenschutz-?einstellung|"
@@ -192,7 +198,78 @@ WALK_FIXED = r"""
               excluded: NOT_CHAT.test(blob),
               box: {x: r.x + r.width / 2, y: r.y + r.height / 2}});
   }
-  return out.slice(0, 14);
+  // A LABEL NEEDS NO GEOMETRY.
+  //
+  // Everything above hunts for a pinned corner box, because that is what an
+  // UNLABELLED launcher looks like and shape is the only clue available. A button
+  // that says "OTTO KI-Assistent" is not a guess, and otto.de was missed three
+  // times over by treating it as one: it is position:relative in the footer, not
+  // fixed; it is a custom element (OC-BUTTON-V1), not one of the five tags the
+  // walk selects; and it sits outside the viewport when measured.
+  //
+  // So: a second pass by name alone. Any clickable-ish element whose own visible
+  // text names a chat or an AI counts, wherever it sits and whatever it is called.
+  // Appended after the pinned ones so a real launcher still ranks first.
+  const NAMED = /\bKI-?Assistent|künstliche intelligenz|\bAI[- ]?Assistent|chat-?bot|\bchat\b|assistent|assistant/i;
+  const clickable = el => el.tagName === 'BUTTON' || el.tagName === 'A' ||
+        el.getAttribute('role') === 'button' || el.hasAttribute('tabindex') ||
+        /button|link/i.test(el.tagName) || typeof el.onclick === 'function';
+  // A SIGNPOST IS NOT THE THING IT POINTS AT.
+  //
+  // The pass below matches on label text alone, which is right for a button and
+  // wrong for a link. saturn.de/de/service/kundenservice carries
+  //   <a href="https://hilfe.saturn.de/app/home">Zu allen Fragen & Antworten
+  //    und dem KI-Assistenten</a>
+  // in the middle of the page. Read as a launcher it produced "disclosed", with
+  // the reason "the chat launcher itself identifies the assistant as AI" — about
+  // an assistant we never opened, living on a different host. A false PASS, and
+  // those are the dangerous direction: the customer files it and believes they
+  // are covered.
+  //
+  // So a link that leaves the current page is returned as a signpost instead. It
+  // is evidence of nothing, and a place to go look. Empty href, "#", and
+  // javascript: stay launchers — that is how a real in-page launcher is written.
+  const navAway = el => {
+    if (el.tagName !== 'A') return '';
+    const h = el.getAttribute('href') || '';
+    if (!h || h.startsWith('#') || /^javascript:/i.test(h)) return '';
+    try {
+      const u = new URL(h, location.href);
+      if (!/^https?:$/.test(u.protocol)) return '';
+      const here = location.href.split('#')[0];
+      return u.href.split('#')[0] === here ? '' : u.href;
+    } catch (e) { return ''; }
+  };
+  const byName = root => {
+    for (const el of root.querySelectorAll('*')) {
+      if (el.shadowRoot) byName(el.shadowRoot);
+      if (seen.has(el) || el.children.length > 3) continue;
+      if (!clickable(el)) continue;
+      const visible = [el.getAttribute('aria-label'), el.getAttribute('title'),
+                       (el.innerText || '').slice(0, 200)]
+                      .filter(Boolean).join(' — ').trim().slice(0, 400);
+      if (!visible || visible.length > 90) continue;
+      if (!NAMED.test(visible) || NOT_CHAT.test(visible)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 20 || r.height < 12) continue;      // never rendered at all
+      const technical = [el.id, ((el.className || '') + '')].filter(Boolean)
+                        .join(' ').toString().slice(0, 200);
+      const away = navAway(el);
+      seen.add(el);
+      if (away) {
+        out.push({visible, technical, chatty: false, excluded: false,
+                  named: true, signpost: away, tag: out.length, box: null});
+        continue;
+      }
+      el.setAttribute('data-llmantis-launcher', String(out.length));
+      out.push({visible, technical, chatty: true, excluded: false,
+                named: true, signpost: '', tag: out.length,
+                box: {x: r.x + r.width / 2, y: r.y + r.height / 2}});
+    }
+  };
+  byName(document);
+
+  return out.slice(0, 18);
 }
 """
 
@@ -366,10 +443,25 @@ async def run_all(page, requests: list[str], websockets: list[str],
         p.fired = True
         for e in launchers[:4]:
             p.findings.append((e["visible"] or e["technical"])[:140])
+        # Say which way it was actually found. This probe's own sentence promises
+        # a button pinned to a corner, and the second pass in WALK_FIXED finds
+        # labelled buttons anywhere on the page — otto.de's sits in the footer at
+        # position:relative. Reporting that as "pinned to a corner" describes a
+        # page we did not look at.
+        if all(e.get("named") for e in launchers):
+            p.description = ("A button on the page names a chat or an assistant "
+                             "in its own label")
     elif elements:
         p.note = f"{len(elements)} pinned elements found, none chat-like"
     else:
         p.note = "no pinned elements found at all"
+    # Signposts are not findings. They are somewhere else to look, and the sweep
+    # reads them off this same list.
+    posts = [e for e in elements if e.get("signpost")]
+    if posts and not p.fired:
+        p.note = ((p.note + "; ") if p.note else "") + (
+            f"{len(posts)} link(s) point at a chat elsewhere, followed but not "
+            "counted as evidence")
 
     p = add("iframe", "A chat widget is embedded in an iframe", "medium")
     try:
