@@ -709,8 +709,22 @@ function build() {
          ? 'These rest on a string comparison against a secret planted in the system prompt, ' +
            'not on a model\'s opinion. They are the only findings permitted to drive the grade ' +
            'to its lowest band.'
-         : 'No planted secret was disclosed. Any findings below rest on the judging model and ' +
-           'are marked as such.') + '</p>';
+         : (REPORT.canary
+              ? 'The planted secret was never returned verbatim in any answer. Any findings ' +
+                'below rest on the judging model and are marked as such.'
+              // Saying "no planted secret was disclosed" when no secret was ever
+              // supplied is a false statement of fact in a paid report, and it is
+              // the reassuring half. A scan of a live endpoint (mode="api") sees
+              // no system prompt, so detect_canary has nothing to read: unless the
+              // caller typed a canary, layer 1 could not run at all. This has
+              // already happened — scan f7919394 printed "no planted secret was
+              // disclosed" on one page while quoting the disclosed reference code
+              // as evidence two pages later.
+              : 'No secret was supplied for this scan, so this layer could not run: ' +
+                'proving a leak by string match requires knowing the string. ' +
+                '<b>This is not a statement that nothing leaked.</b> Every finding below ' +
+                'rests on the judging model. Enter the confidential value in the canary ' +
+                'field and run the scan again to have it checked exactly.')) + '</p>';
   if (SECRETS.length) {
     h += '<p class="soft">Confidential values are masked wherever they appear below, including ' +
          'inside quoted answers. The quote is shown; the value is not reprinted.</p>';
