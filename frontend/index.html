@@ -327,7 +327,7 @@ header.topbar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--bg
      400 -- small text, so 4.5 is the bar, not 3. Re-measure that span before
      touching this alpha. */
   color:rgba(242,241,235,.82);
-  font-size:clamp(26px,3.2vw,38px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
+  font-size:clamp(28px,3.6vw,42px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
   padding:6px 0;transition:color var(--dur) var(--ease)}
 .overlay a:hover,.overlay a[aria-current="page"]{color:var(--bg)}   /* 5.86:1 */
 .overlay a span{font-family:var(--mono);font-size:13px;font-weight:400;
@@ -550,21 +550,25 @@ footer.site .sp { margin-left: auto; }
   </div>
 </header>
 
-<!-- Navigation lives in the overlay, as on the landing. Two destinations were
-     wrong before this and are fixed here: art50check pointed at /#produkt,
-     /#warum and /#ueber-uns, none of which exist (the landing's sections are
-     signal, verfahren, problem, grenzen, preise, team), and "Run scan" pointed
-     at "/" — the landing — on both pages, when index.html is served at /scan
-     (backend/main.py:1167). -->
+<!-- One menu, on every page. This list is the landing's own nav
+     (landing.html:439) verbatim - same labels, same order, same German - with
+     the two actions appended, and the landing carries those two as well. It
+     used to be a different list here: four items, renamed into English
+     (Product/Why/Pricing/About), with Signal and Grenzen missing altogether,
+     so tapping through from the landing changed the menu under the visitor.
+     The section anchors are absolute (/#...) because these pages are not the
+     landing; /scan is a real route (backend/main.py:1201), not a file path. -->
 <div class="overlay" id="ov" role="dialog" aria-modal="true" aria-label="Navigation">
   <button class="close" id="closeBtn" lang="de">Schlie&szlig;en &#10005;</button>
-  <nav>
-    <a href="/#verfahren"><span>01</span> Product</a>
-    <a href="/#problem"><span>02</span> Why</a>
-    <a href="/#preise"><span>03</span> Pricing</a>
-    <a href="/#team"><span>04</span> About</a>
-    <a href="/scan" aria-current="page"><span>05</span> Run scan</a>
-    <a href="/static/art50check.html"><span>06</span> Start free check</a>
+  <nav lang="de">
+    <a href="/#signal"><span>01</span> Signal</a>
+    <a href="/#verfahren"><span>02</span> Verfahren</a>
+    <a href="/#problem"><span>03</span> Warum</a>
+    <a href="/#grenzen"><span>04</span> Grenzen</a>
+    <a href="/#preise"><span>05</span> Preise</a>
+    <a href="/#team"><span>06</span> Team</a>
+    <a href="/scan" aria-current="page"><span>07</span> Pr&uuml;fung starten</a>
+    <a href="/static/art50check.html"><span>08</span> Art.-50-Check</a>
   </nav>
 </div>
 
