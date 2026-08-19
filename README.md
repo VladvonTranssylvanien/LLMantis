@@ -62,7 +62,6 @@ itself has to be measured rather than asserted.
 | | Art. 50 Check | Red team Prüfung |
 |---|---|---|
 | Method | Passive: reads one public page | Active: sends real attacks to the bot |
-| Permission | None — it reads what any visitor reads | DNS TXT proof of ownership, hard-gated |
 | Price | Free | Paid |
 | Role | Lead funnel | The product |
 
@@ -115,8 +114,7 @@ website: paste its address and `api` mode attacks the live chatbot over HTTP,
 exactly as a customer would reach it. A bare host is completed to the chat
 endpoint and printed back before anything is sent — silently scanning an address
 other than the one on screen is how a report ends up describing something the
-reader never asked about. Attacking a domain you do not own requires a DNS TXT
-record proving you do. `model` mode instead takes a system prompt and posts it
+reader never asked about. `model` mode instead takes a system prompt and posts it
 with each attack to a deployment we hold, which is useful before a bot is live
 and is how the demo bots run.
 
@@ -277,6 +275,9 @@ lab/          the three target bots and the measurement harness
 
 The architecture was built so the two obvious directions are additions rather
 than rewrites.
+
+**Ownership verification.** Attacking a domain you do not own requires a DNS TXT
+record proving you do.
 
 **A much larger attack library.** Attacks are data, so the library grows without
 touching the engine, and because the score deducts per finding rather than
