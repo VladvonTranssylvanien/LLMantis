@@ -248,8 +248,14 @@ body{font-family:var(--sans)}
 </style>
 <style>
 /* ===========================================================================
-   LLMantis — free Art.-50-Check. Passive only: one GET on the caller's own
-   page, no message ever sent to their bot. See backend/art50check.py.
+   LLMantis — free Art.-50-Check. A real browser on the caller's own page:
+   twelve detection methods, desktop and mobile, and the chat opened once so
+   the greeting can be read. NO message is ever sent to their bot — see
+   backend/art50engine.py, where _read_greeting is the only place a click
+   happens and holds no code path that can enter text.
+   This said "Passive only: one GET … see backend/art50check.py" until 20.08.
+   It described the checker replaced on 18.08, and named a file since deleted
+   as dead code — the same staleness the landing page carried until c0ea296.
    The tokens and @font-face rules are INLINE above, the same block the other
    five pages carry. This page used to <link> assets/base.css, which is the
    DARK stylesheet — it was the last dark page in a light product, and the

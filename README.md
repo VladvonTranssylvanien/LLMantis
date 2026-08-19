@@ -261,7 +261,8 @@ conventions and the full endpoint table in `README_old.md`.
 ## Where the code is
 
 ```
-backend/    scanner.py · judge.py · scoring.py · art50check.py · ownership.py
+backend/    scanner.py · judge.py · scoring.py · ownership.py · netguard.py
+            art50engine.py · art50probes.py · art50opener.py (the free check)
             llm.py (the only file that talks to a provider) · main.py · models.py
 attacks/    attacks_short.yaml (21, the default) · attacks.yaml (78)
 frontend/   one file per page, no build step: landing · index (scanner)
