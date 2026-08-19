@@ -98,7 +98,13 @@ NOT_CHAT = re.compile(
     r"usercentrics|cookiebot|onetrust|sourcepoint|borlabs|klaro|"      # consent CMPs
     r"consent|cookie|datenschutz|privatsphäre|einwillig|"
     r"newsletter|rabatt|gutschein|trustbadge|trustedshops|"           # marketing
-    r"back-?to-?top|scroll-?to-?top|share|social", re.I)
+    r"back-?to-?top|scroll-?to-?top|share|social|"
+    # Community forums are not chat assistants. o2online.de embeds "inSided
+    # in-page support" — its user forum — in a 400x720 iframe that carries a text
+    # input from the moment it loads, while the real Live-Chat frame has none
+    # until the conversation starts. Ranked by input alone, the forum won and the
+    # assistant was never read.
+    r"insided|community|forum|in-?page support|frag die community", re.I)
 
 CONSENT = re.compile(
     r"cookie|consent|einwillig|zustimm|akzeptier|datenschutz-?einstellung|"
