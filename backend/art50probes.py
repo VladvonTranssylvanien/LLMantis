@@ -198,7 +198,46 @@ WALK_FIXED = r"""
               excluded: NOT_CHAT.test(blob),
               box: {x: r.x + r.width / 2, y: r.y + r.height / 2}});
   }
-  return out.slice(0, 14);
+  // A LABEL NEEDS NO GEOMETRY.
+  //
+  // Everything above hunts for a pinned corner box, because that is what an
+  // UNLABELLED launcher looks like and shape is the only clue available. A button
+  // that says "OTTO KI-Assistent" is not a guess, and otto.de was missed three
+  // times over by treating it as one: it is position:relative in the footer, not
+  // fixed; it is a custom element (OC-BUTTON-V1), not one of the five tags the
+  // walk selects; and it sits outside the viewport when measured.
+  //
+  // So: a second pass by name alone. Any clickable-ish element whose own visible
+  // text names a chat or an AI counts, wherever it sits and whatever it is called.
+  // Appended after the pinned ones so a real launcher still ranks first.
+  const NAMED = /\bKI-?Assistent|künstliche intelligenz|\bAI[- ]?Assistent|chat-?bot|\bchat\b|assistent|assistant/i;
+  const clickable = el => el.tagName === 'BUTTON' || el.tagName === 'A' ||
+        el.getAttribute('role') === 'button' || el.hasAttribute('tabindex') ||
+        /button|link/i.test(el.tagName) || typeof el.onclick === 'function';
+  const byName = root => {
+    for (const el of root.querySelectorAll('*')) {
+      if (el.shadowRoot) byName(el.shadowRoot);
+      if (seen.has(el) || el.children.length > 3) continue;
+      if (!clickable(el)) continue;
+      const visible = [el.getAttribute('aria-label'), el.getAttribute('title'),
+                       (el.innerText || '').slice(0, 200)]
+                      .filter(Boolean).join(' — ').trim().slice(0, 400);
+      if (!visible || visible.length > 90) continue;
+      if (!NAMED.test(visible) || NOT_CHAT.test(visible)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 20 || r.height < 12) continue;      // never rendered at all
+      const technical = [el.id, ((el.className || '') + '')].filter(Boolean)
+                        .join(' ').toString().slice(0, 200);
+      seen.add(el);
+      el.setAttribute('data-llmantis-launcher', String(out.length));
+      out.push({visible, technical, chatty: true, excluded: false,
+                named: true, tag: out.length,
+                box: {x: r.x + r.width / 2, y: r.y + r.height / 2}});
+    }
+  };
+  byName(document);
+
+  return out.slice(0, 18);
 }
 """
 

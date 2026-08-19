@@ -1066,6 +1066,14 @@ async def check(url: str, *, authorized: bool = False, exhaustive: bool = True,
                 # A greeting belongs to the page it was spoken on. Read it while
                 # we are standing there.
                 if open_widget and els and not greeting["read"]:
+                    # The frontend shows this while the click happens, which is the
+                    # one moment a caller most wants narrated. It was emitted from
+                    # the old end-of-sweep block and got lost when the read moved
+                    # here; the page listens for it, so its absence was a silent
+                    # gap between "page 3" and a verdict.
+                    await emit("opening",
+                               label=(els[0].get("visible")
+                                      or els[0].get("technical") or "")[:80])
                     (greeting["opened"], greeting["text"], greeting["source"],
                      greeting["path"]) = await _read_greeting(
                         page, els[0], use_ai=use_ai,
