@@ -383,7 +383,26 @@ input:focus-visible {
 /* The twelve methods are shown as they run, not summarised afterwards. Watching
    the list fill in is what a 90-second wait needs to not feel broken — and it is
    also the evidence: the caller sees every method being tried. */
-.p-line { font-size: 13.5px; color: var(--muted); margin-bottom: 14px; }
+.p-bar {
+  height: 6px; border-radius: 999px; background: var(--surface-2);
+  overflow: hidden; margin-bottom: 12px;
+}
+.p-bar > i {
+  display: block; height: 100%; width: 0;
+  background: var(--accent); border-radius: 999px;
+  transition: width .5s var(--ease);
+}
+.p-line { font-size: 13.5px; color: var(--muted); margin-bottom: 4px; }
+.p-quip {
+  font-size: 13px; color: var(--muted); opacity: .8; min-height: 1.5em;
+  margin-bottom: 14px; font-style: italic;
+}
+.probes-fold { border-top: 1px solid var(--border); padding-top: 10px; }
+.probes-fold summary {
+  cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 500;
+}
+.probes-fold summary:hover { color: var(--text); }
+.probes-fold .p-grid { margin-top: 10px; }
 .p-line b { color: var(--text); font-weight: 500; }
 .p-grid { display: grid; gap: 6px; }
 .p-probe {
@@ -553,8 +572,16 @@ footer.site .sp { margin-left: auto; }
 
   <div class="panel" id="progress" role="status" aria-live="polite">
     <div class="r-url" id="pUrl"></div>
+    <div class="p-bar" role="progressbar" aria-labelledby="pPage"><i id="pFill"></i></div>
     <div class="p-line" id="pPage">Starting…</div>
-    <div id="pProbes" class="p-grid"></div>
+    <div class="p-quip" id="pQuip"></div>
+    <!-- The twelve methods stay, folded. They are the deliverable: a result that
+         says "no widget" is worth exactly the list behind it, and this is the only
+         place a reader can see which steps a model chose. Folded, not removed. -->
+    <details class="probes-fold" id="pFold">
+      <summary><span id="pCount">0</span> of 12 methods run — show what we tried</summary>
+      <div id="pProbes" class="p-grid"></div>
+    </details>
   </div>
 
   <div class="panel" id="result" role="status" aria-live="polite">
@@ -605,6 +632,48 @@ const progress = $('progress'), result = $('result');
 /* One row per probe, keyed by name so a probe that fires on page 7 updates the
    row it already has instead of appending a duplicate. Twelve rows, always. */
 const rows = new Map();
+
+/* Shown one at a time while the check runs. Each line describes something that is
+   actually happening — a waiting message that invents work would be a small lie in
+   a product sold on honest measurement, and this audience reads carefully. Dry
+   rather than jokey: the buyer is a compliance manager, not a games console. */
+const QUIPS = [
+  'Loading your pages the way a visitor’s browser does, JavaScript and all.',
+  'Twelve methods per page. None of them skipped once one finds something.',
+  'Watching which requests your page makes — a vendor domain is proof, a word is not.',
+  'Looking for a button pinned to a corner, and for one that simply says what it is.',
+  'Reading iframes your own page is not allowed to read.',
+  'Asking a model which of your pages is most likely to host the assistant.',
+  'Your cookie banner will not be accepted on your behalf. That choice is yours.',
+  'If we find the chat we open it once, read it, and leave. We never type.',
+  'Checking desktop, then mobile — some launchers only exist on one.',
+  'A result that says “no widget” is worth exactly the list of things we tried.',
+];
+let quipTimer = null, quipAt = 0;
+
+function startQuips() {
+  quipAt = 0;
+  $('pQuip').textContent = QUIPS[0];
+  clearInterval(quipTimer);
+  quipTimer = setInterval(() => {
+    quipAt = (quipAt + 1) % QUIPS.length;
+    $('pQuip').textContent = QUIPS[quipAt];
+  }, 7000);
+}
+function stopQuips(msg) {
+  clearInterval(quipTimer);
+  quipTimer = null;
+  $('pQuip').textContent = msg || '';
+}
+
+/* The bar cannot be a true percentage: how many pages a check visits depends on
+   what it finds, and it stops the moment the assistant speaks. So it moves on real
+   events and eases toward a ceiling it never reaches on its own — honest about
+   being an indication rather than a measurement. */
+function setBar(pages) {
+  const pct = Math.min(92, 6 + pages * 5);
+  $('pFill').style.width = pct + '%';
+}
 
 /* Per-probe state, because the sweep visits up to 18 pages and each probe
    reports on every one of them.
@@ -735,6 +804,10 @@ form.addEventListener('submit', async (e) => {
   $('pProbes').innerHTML = '';
   $('pUrl').textContent = url;
   $('pPage').textContent = 'Starting…';
+  $('pCount').textContent = '0';
+  $('pFill').style.width = '0';
+  $('pFold').open = false;
+  startQuips();
   progress.classList.add('on');
 
   try {
@@ -773,15 +846,24 @@ form.addEventListener('submit', async (e) => {
             '</b> detection methods, every page, both form factors…';
         } else if (ev.type === 'page') {
           pages++;
+          setBar(pages);
           $('pPage').innerHTML = 'Page <b>' + pages + '</b> [' +
             escHtml(ev.viewport) + '] — ' + escHtml(ev.url);
         } else if (ev.type === 'probe') {
           probeRow(ev);
+          $('pCount').textContent = String(rows.size);
+        } else if (ev.type === 'ai') {
+          stopQuips('The page-reading model: ' + ev.note);
+        } else if (ev.type === 'opening') {
+          stopQuips('Opening your chat, once, and reading what it says first.');
         } else if (ev.type === 'error') {
           errEl.textContent = ev.message;
+          stopQuips('');
           done = true;
         } else if (ev.type === 'done') {
           renderResult(ev.report);
+          $('pFill').style.width = '100%';
+          stopQuips('');
           $('pPage').innerHTML = 'Finished — <b>' + pages +
             '</b> page(s) checked with every method.';
           done = true;
@@ -791,6 +873,7 @@ form.addEventListener('submit', async (e) => {
   } catch (err) {
     errEl.textContent = 'Check failed: ' + String(err);
   } finally {
+    stopQuips('');
     runBtn.disabled = false;
     runBtn.textContent = label;
   }
