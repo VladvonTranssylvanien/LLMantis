@@ -27,6 +27,10 @@ class Organization(Base):
     targets = relationship("Target", back_populates="organization", cascade="all, delete-orphan")
     ownership_verifications = relationship("OwnershipVerification", back_populates="organization", cascade="all, delete-orphan")
     scans = relationship("Scan", back_populates="organization", cascade="all, delete-orphan")
+    memberships = relationship("Membership", back_populates="organization", cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="organization", cascade="all, delete-orphan")
+    branding = relationship("Branding", back_populates="organization", uselist=False,
+                             cascade="all, delete-orphan")
 
 
 class Target(Base):
@@ -38,10 +42,56 @@ class Target(Base):
     name = Column(String(255), nullable=False)
     system_prompt = Column(Text, nullable=False)
     canary = Column(String(255), nullable=True)
+    # PLAYBOOK decision #5: customer prompts are trade secrets.
+    # "delete_after_scan" is the safe default — must be an explicit
+    # opt-in to keep a target's prompt around longer than that.
+    retention = Column(String(50), nullable=False, default="delete_after_scan")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="targets")
     scans = relationship("Scan", back_populates="target", cascade="all, delete-orphan")
+
+
+class User(Base):
+    """A person who can log in. Separate from Organization on purpose —
+    one person can belong to more than one org, via Membership."""
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    email = Column(String(255), nullable=False, unique=True)
+    password_hash = Column(String(255), nullable=False)
+    # Embedded in every JWT as "tv". Bumping this invalidates every token
+    # issued before the bump, all at once — logout, without a separate
+    # table of revoked token ids to store and clean up.
+    token_version = Column(Integer, nullable=False, default=0)
+    # Per-account brute-force lockout. Rate limiting on /api/auth/login is
+    # per-IP — it does nothing against a distributed attack, or one paced
+    # just under the limit, targeting one account. Reset to 0 on success.
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    memberships = relationship("Membership", back_populates="user", cascade="all, delete-orphan")
+
+
+class Membership(Base):
+    """
+    Links a user to an organization with a role.
+
+    This table is the schema groundwork the implementation plan called for
+    on day one, so the agency/multi-user tier is a new row later, not a
+    backend rewrite. Built 16.08 with no `users` table yet; wired to real
+    authentication the same day `User` was added.
+    """
+    __tablename__ = "memberships"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
+    role = Column(String(50), nullable=False)  # "owner" | "admin" | "member"
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="memberships")
+    organization = relationship("Organization", back_populates="memberships")
 
 
 class OwnershipVerification(Base):
@@ -52,8 +102,10 @@ class OwnershipVerification(Base):
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
     domain = Column(String(255), nullable=False)
     method = Column(String(50), nullable=False)
+    token = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default="pending")
     verified_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     organization = relationship("Organization", back_populates="ownership_verifications")
@@ -66,7 +118,13 @@ class Scan(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     target_id = Column(UUID(as_uuid=True), ForeignKey("targets.id"), nullable=False)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    library_version = Column(String(50), nullable=False, default="1.0")
     duration_s = Column(Float, nullable=False)
+    # 'done' | 'incomplete' — PLAYBOOK §9: >10% errored attacks means no
+    # grade at all. This must survive the trip to the database, not just
+    # exist in the streamed response, or a later reader of this row has
+    # no way to know the grade was deliberately withheld.
+    status = Column(String(50), nullable=False, default="done")
     grade = Column(String(1), nullable=True)
     score = Column(Integer, nullable=True)
     error_rate = Column(Integer, nullable=False, default=0)
@@ -87,8 +145,53 @@ class Result(Base):
     verdict = Column(String(50), nullable=False)
     confidence = Column(String(50), nullable=False, default="likely")
     evidence = Column(Text, nullable=True)
+    judge_reason = Column(Text, nullable=True)
     method = Column(String(50), nullable=False)
     duration_ms = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     scan = relationship("Scan", back_populates="results")
+
+
+class ApiKey(Base):
+    """
+    A credential that lets an organization call the API programmatically
+    (CI/CD pipelines, integrations) instead of through the browser.
+
+    Only the SHA-256 hash is stored — the plaintext key is shown to the
+    caller exactly once, at creation, and never again.
+    """
+    __tablename__ = "api_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    key_hash = Column(String(64), nullable=False, unique=True)
+    key_prefix = Column(String(16), nullable=False)  # shown in listings to tell keys apart
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    organization = relationship("Organization", back_populates="api_keys")
+
+
+class Branding(Base):
+    """
+    White-label settings for an agency reselling reports to its own clients.
+
+    One row per organization (or none — absence means "use LLMantis
+    branding as-is"). Everything here is cosmetic substitution for the
+    Pruefbericht and the report UI; it changes nothing about how a scan
+    runs or is scored.
+    """
+    __tablename__ = "branding"
+
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), primary_key=True)
+    display_name = Column(String(255), nullable=True)   # shown instead of "LLMantis"
+    logo_url = Column(Text, nullable=True)               # shown instead of the mantis mark
+    accent_color = Column(String(7), nullable=True)       # hex, e.g. "#7BE33F" — validated on write
+    support_email = Column(String(255), nullable=True)   # shown instead of kontakt@llmantis.de
+    custom_domain = Column(String(255), nullable=True)   # e.g. checks.agency.de — stored, not yet routed
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="branding")

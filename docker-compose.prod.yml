@@ -1,0 +1,135 @@
+# Production stack. Not for a laptop - docker-compose.yml is the development
+# one and starts Postgres only.
+#
+#   docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d
+#
+# Two things differ from development on purpose:
+#   - Postgres and the app publish NO ports. They exist only on this network,
+#     reachable through Caddy. A published 5432 on a public IP is a database
+#     open to the internet.
+#   - Every secret comes from deploy/.env, which is gitignored. Nothing here
+#     carries a value.
+
+services:
+
+  # No container_name anywhere on purpose. A fixed name defeats Compose's own
+  # project scoping: with one, `-p something` still tries to create
+  # "llmantis-db" and collides with the development stack that already owns
+  # that name. Every command in deploy/README.md addresses services by service
+  # name, which does not need it.
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    # The rate limiter keys on request.client.host (slowapi/util.py:27). Without
+    # --proxy-headers uvicorn reports the TCP peer, and behind Caddy that is
+    # Caddy's container address for EVERY visitor — so "5/minute per IP" was one
+    # global bucket, and a press costs two of it because the scan runs twice.
+    # Measured on this box: a request carrying X-Forwarded-For: 203.0.113.99 was
+    # logged as 172.18.0.5, the calling container. Not the header.
+    #
+    # Trusting the header is safe HERE specifically: the service publishes no
+    # ports (verified, PortBindings is empty), so the only thing that can open a
+    # connection is a container on this network. workshop-reg already runs this
+    # way. Overridden here rather than in the Dockerfile because that file is
+    # Vlad's and a change there was reverted once already.
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+      # PROVIDER was pinned to the literal `mistral` here, so deploy/.env could
+      # not change it and the six settings the 18.08 engine rework introduced
+      # never reached the container at all. Deploying that rework against this
+      # file gave "Invalid model: gpt-4.1" from Mistral - the judge model from
+      # .env, sent to the provider this file forced. Anything config.py reads
+      # has to be listed here; `--env-file` only feeds interpolation below.
+      PROVIDER: ${PROVIDER:-azure}
+
+      # The judge.
+      AZURE_URL: ${AZURE_URL:-}
+      AZURE_KEY: ${AZURE_KEY:-}
+      AZURE_AUTH: ${AZURE_AUTH:-api-key}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gpt-4.1}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+
+      # The target under attack. mode="model" refuses to run without these two
+      # (backend/scanner.py:72), and the frontend dropdown is mode="model".
+      TARGET_URL: ${TARGET_URL:-}
+      TARGET_KEY: ${TARGET_KEY:-}
+      TARGET_MODEL: ${TARGET_MODEL:-gpt-4.1-mini}
+      TARGET_AUTH: ${TARGET_AUTH:-api-key}
+      LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-60}
+      # The model that reads a page and finds the chat button, for the Art.-50
+      # check only (backend/art50opener.py). Deliberately its own variables and
+      # not AZURE_* : the scan and the Art.-50 check are two features owned by two
+      # people, and one shared key is one shared outage.
+      #
+      # Empty disables the fallback and the keyword opener still runs — but on
+      # o2online.de the keyword opener alone never reaches the assistant, because
+      # the chat lives at /service/aura/ and "aura" is a brand name no path list
+      # can guess. Left out of this file entirely, the feature would look present
+      # and quietly do less, which is what "the settings never reached the
+      # container" meant the first time.
+      ART50_AI_URL: ${ART50_AI_URL:-}
+      ART50_AI_KEY: ${ART50_AI_KEY:-}
+      ART50_AI_AUTH: ${ART50_AI_AUTH:-api-key}
+      ART50_AI_MODEL: ${ART50_AI_MODEL:-gpt-4.1-mini}
+      ART50_AI_TIMEOUT_S: ${ART50_AI_TIMEOUT_S:-20}
+      # 3 is the measured ceiling for the free Mistral tier. At 5, three
+      # back-to-back scans produced enough 429s to void a grade.
+      CONCURRENCY: ${CONCURRENCY:-3}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
+      # Off, and it must stay off here. On a server this would let a
+      # logged-in caller point a scan at 127.0.0.1 or the private network -
+      # our own database included. It exists for lab/runner.py on a laptop.
+      ALLOW_PRIVATE_SCAN_TARGETS: "false"
+      # Public domains allowed to be scanned without DNS ownership proof, comma
+      # separated. Our own test bots only. Empty here means the deployed default
+      # is "nobody" - a domain gets in by being named in deploy/.env, and comes
+      # back out by being removed from it. Listed in this block because
+      # `--env-file` alone would never reach the container (see PROVIDER above).
+      SCAN_UNVERIFIED_DOMAINS: ${SCAN_UNVERIFIED_DOMAINS:-}
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      LLMANTIS_DOMAIN: ${LLMANTIS_DOMAIN}
+      LLMANTIS_USER: ${LLMANTIS_USER}
+      LLMANTIS_PASSWORD_HASH: ${LLMANTIS_PASSWORD_HASH}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means asking Let's Encrypt
+      # for new ones, and there is a rate limit on that.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

@@ -32,7 +32,7 @@
 |------|------|------|--------|
 | **Project Lead** | Bogdan | Coordination, design, pitch deck, brand | ✅ |
 | **Backend Owner** | Vlad (YOU) | Scanner, judge, scoring, API, database | ✅ ~90% |
-| **Attack Engineer** | Gregor | Attack library, target bots, judge calibration | ⬜ ~20% |
+| **Attack Engineer** | Gregor | Attack library, target bots, judge calibration | ✅ ~80% |
 | **GRC/Legal** | Kwabena | Compliance, legal text, Art. 50 rules | ✅ ~85% |
 
 **Rule**: One owner per file. If two people need to edit same file, design is broken.
@@ -66,11 +66,11 @@
 │                                                 │
 │  1. scanner.py: Concurrent attack runner        │
 │     - Runs 75 attacks in parallel (5 at a time) │
-│     - Two target modes: prompt (mock) or api    │
+│     - Two target modes: prompt or api           │
 │                                                 │
 │  2. judge.py: Two-layer verdict                 │
 │     - Layer 1: Deterministic (canary leak)      │
-│     - Layer 2: AI judge (Claude/Mistral)        │
+│     - Layer 2: AI judge (whatever PROVIDER is)  │
 │     - Returns: verdict + confidence + evidence  │
 │                                                 │
 │  3. scoring.py: Risk calculation                │
@@ -83,9 +83,9 @@
 │     - Validates: IDs unique, categories valid   │
 │                                                 │
 │  5. llm.py: Provider abstraction                │
-│     - Mock mode (for testing, no cost)          │
-│     - Anthropic (Claude API)                    │
-│     - Mistral (EU provider) [future]            │
+│     - Mistral - the only one registered today   │
+│     - No mock mode: it was removed with the     │
+│       Anthropic code during the migration       │
 └─────────────────────────────────────────────────┘
               ↓
 ┌─────────────────────────────────────────────────┐
@@ -120,7 +120,7 @@
 - `scanner.py` (242 lines) — Concurrent attack runner, 21 attacks functional
 - `judge.py` (145+ lines) — Two-layer verdict, confidence levels, evidence extraction
 - `scoring.py` (129 lines) — Risk calculation with severity weights & confidence multiplier
-- `llm.py` (147 lines) — Mock & Anthropic providers
+- `llm.py` — Mistral only. `_PROVIDERS` holds one entry
 - `attacks.py` (123 lines) — YAML loader with validation
 - `config.py` (62 lines) — Centralized settings
 - `models.py` (95 lines) — SQLAlchemy ORM (5 tables defined)
@@ -164,7 +164,9 @@
 
 Each attack has: severity, message, fail_if rules, judge_hint, fix recommendation
 
-**Status**: All 21 working in mock mode. Target: 75 attacks (54 remaining)
+**Status**: 78 attacks in `attacks/attacks.yaml` (Gregor, 17.08). The 21-attack
+set is kept as `attacks/attacks_short.yaml`. Nothing reads that file — swapping
+sets means renaming them, see the Mistral quota note in PROJECT-STATE.md #12
 
 ### ✅ DOCUMENTATION (85% Complete)
 
@@ -208,7 +210,7 @@ Each attack has: severity, message, fail_if rules, judge_hint, fix recommendatio
 | **Migrations** | Alembic 1.13.1 | ✅ |
 | **DB Driver** | psycopg 3.3.4 | ✅ |
 | **Config** | python-dotenv 1.2.2 | ✅ |
-| **LLM Providers** | Anthropic 0.42.0 | ✅ (mock + real) |
+| **LLM Provider** | mistralai 2.9.3 | ✅ the only provider registered today |
 | **HTTP Client** | httpx 0.28.1 | ✅ |
 | **Data Format** | YAML 6.0.2 | ✅ |
 | **HTML Parsing** | BeautifulSoup4 4.15.0 | ✅ (for art50check) |
@@ -222,11 +224,12 @@ Each attack has: severity, message, fail_if rules, judge_hint, fix recommendatio
 
 ### 🔴 CRITICAL (Before First Customer)
 
-1. **Judge uses Anthropic (US provider)**
-   - Problem: Violates "EU-only stack" invariant; judge processes customer trade secrets
-   - Solution: Migrate to Mistral (France) or Aleph Alpha (Germany)
-   - Timeline: Week 2-3 (not blocking MVP)
-   - Impact: HIGH — Legal/compliance issue
+1. ✅ **DONE 16.08 — the judge runs on Mistral.** ⚠️ **Rationale withdrawn 18.08.**
+   - `anthropic` is gone from `requirements.txt` and `_PROVIDERS` holds only
+     `mistral`. That is still an accurate description of the code.
+   - What changed is why: this was tech debt #1 because a US vendor was
+     forbidden. That rule is gone (`PLAYBOOK.md` §1), so this is no longer a
+     compliance item — it is just a note about which provider is wired up.
 
 2. **Database not integrated into endpoints**
    - Problem: Models exist, tables created, but `/api/scan` doesn't save results
@@ -287,8 +290,10 @@ Each attack has: severity, message, fail_if rules, judge_hint, fix recommendatio
 | Documentation | 85% | ✅ YES | Comprehensive briefs ready |
 | **Overall** | **~85%** | **⚠️ PARTIAL** | Can scan & score; no persistence yet |
 
-**Can Ship For Demo?** YES (mock mode)
-**Can Ship For Paying Customer?** NO (missing database integration + Mistral migration)
+**Can Ship For Demo?** YES — against real bots. Measured 16-17.08: demo bot
+D/52 then A/100 after hardening; Gregor's live lab bots D/60 and A/99.
+**Can Ship For Paying Customer?** NO — no automated tests, no judge agreement
+number, legal pages unfilled.
 
 ---
 
@@ -319,11 +324,10 @@ Each attack has: severity, message, fail_if rules, judge_hint, fix recommendatio
 
 ### .env (Current)
 ```
-PROVIDER=mock
-ANTHROPIC_API_KEY=
-TARGET_MODEL=claude-sonnet-4-5
-JUDGE_MODEL=claude-sonnet-4-5
-CONCURRENCY=5
+PROVIDER=mistral
+MISTRAL_API_KEY=
+JUDGE_MODEL=mistral-small
+CONCURRENCY=3
 DATABASE_URL=postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis
 ```
 
@@ -383,7 +387,10 @@ uvicorn backend.main:app --reload --port 8000
 - **API Health**: http://localhost:8000/api/health
 - **Attacks**: http://localhost:8000/api/attacks
 
-### Test in Mock Mode
+### Run a scan
+There is no mock mode. A real MISTRAL_API_KEY is required, or every attack
+comes back ERROR under an HTTP 200.
+
 1. Open http://localhost:8000
 2. Select "TeleShop Support (unprotected)"
 3. Click "Run scan"
@@ -397,15 +404,15 @@ uvicorn backend.main:app --reload --port 8000
 ### Vlad (Backend Owner) — This Week
 1. ✅ Database setup (DONE)
 2. Integrate database into `/api/scan` endpoint
-3. Get Mistral API key (or Anthropic for testing)
+3. ✅ Mistral API key in use
 4. Test end-to-end with real model
 5. Measure: cost, duration, judge accuracy
 6. Support Gregor with target bots if needed
 
 ### Gregor (Attack Engineer) — This Week
-1. Build 3 target bots (TeleShop vulnerable/hardened, MediClinic)
-2. Create 30 hand-labeled calibration examples
-3. Measure judge accuracy on real responses
+1. ✅ Build 3 target bots (TeleShop vulnerable/hardened, MediClinic)
+2. ✅ Create 30 hand-labeled calibration examples
+3. ✅ Measure judge accuracy on real responses
 4. Write 54 more attacks (21 → 75 target)
 
 ### Bogdan (Project Lead) — This Week
@@ -438,9 +445,11 @@ uvicorn backend.main:app --reload --port 8000
 
 ## KEY PRINCIPLES (From PLAYBOOK)
 
-1. **EU-Only Stack** (INVARIANT)
-   - All tools must be EU-based or self-hosted
-   - No US cloud (CLOUD Act risk for trade secrets)
+1. ~~**EU-Only Stack**~~ — **withdrawn 18.08** (`PLAYBOOK.md` §1)
+   - No vendor prohibition applies to this project any more, and data
+     residency is not a selling point
+   - Customer system prompts are still trade secrets: that governs retention,
+     logging and access, not which vendor processes them
 
 2. **Black-Box Only**
    - Never read source code
@@ -464,7 +473,7 @@ uvicorn backend.main:app --reload --port 8000
 ## SUCCESS CRITERIA (For Course Submission)
 
 ✅ MVP runs locally (backend + frontend)
-✅ Can scan chatbots in mock mode
+✅ Can scan chatbots against a real model
 ✅ Shows realistic grade (A/B/C/D/F)
 ✅ Backend architecture documented
 ✅ Team roles clear, responsibilities split

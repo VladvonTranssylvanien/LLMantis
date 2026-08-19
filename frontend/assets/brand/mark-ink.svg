@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="LLMantis mark">
+  <title>LLMantis mark</title>
+  <!-- Same geometry as mark.svg. Only the DEFAULT ink differs: #116B2E is
+       6.63:1 on white and 5.86:1 on the #F2F1EB ground, where mark.svg's
+       #7BE33F is 1.63:1. An <img>-loaded SVG cannot inherit colour from the
+       page, so a light surface needs its own file. That also means the token
+       named "accent" does not reach this green: it is edited here, by hand.
+       (No double hyphen anywhere in this comment: XML forbids it, and one
+       here made the whole file unparseable, so every page showed a broken
+       image icon instead of the mark.) -->
+  <g fill="currentColor" color="#116B2E">
+    <!-- head silhouette with knocked-out compound eyes -->
+    <path fill-rule="evenodd" d="
+      M 50 29
+      C 44 27, 30 26, 18 27
+      C 12 27.5, 9 31, 10 37
+      C 12 51, 22 68, 34 78
+      C 38 82, 44 86, 50 87
+      C 56 86, 62 82, 66 78
+      C 78 68, 88 51, 90 37
+      C 91 31, 88 27.5, 82 27
+      C 70 26, 56 27, 50 29
+      Z
+      M 18.5 31.28 a 14 8.5  50 1 0 18  21.44 a 14 8.5  50 1 0 -18 -21.44 Z
+      M 63.5 52.72 a 14 8.5 -50 1 0 18 -21.44 a 14 8.5 -50 1 0 -18  21.44 Z
+    "/>
+    <!-- antennae -->
+    <path d="M 44 31 C 36 22, 24 12, 6 2 C 21 13, 34 24, 46.5 34.5 Z"/>
+    <path d="M 56 31 C 64 22, 76 12, 94 2 C 79 13, 66 24, 53.5 34.5 Z"/>
+  </g>
+</svg>

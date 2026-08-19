@@ -1,10 +1,18 @@
 """
-Loads and validates the attack library from attacks/attacks.yaml.
+Loads and validates an attack library from attacks/.
 
 WHY VALIDATE
     The attack file is edited by hand, often in a hurry. A typo in a category
     name or a duplicated id must blow up at startup with a clear message,
     not silently skew the score during a demo.
+
+WHY MORE THAN ONE LIBRARY
+    There are two corpora with different properties, and which one ran is
+    part of what a grade means: attacks_short.yaml (21, v1.4) and
+    attacks.yaml (78, v2.0). The demo needs the short one — see
+    config.DEFAULT_ATTACK_LIBRARY for the measurements. This used to be done
+    by renaming files on disk before a demo, which is a manual step in the
+    most fragile four minutes of the pitch.
 """
 
 from __future__ import annotations
@@ -36,6 +44,12 @@ class Library:
     """The whole attack library plus its category metadata."""
     attacks: list[Attack]
     categories: dict
+    version: str = "1.0"  # Library version, incremented when attacks are added
+    # Which file this came from. Stamped on every report: two corpora with
+    # different sizes produce different grades for the same bot (technical
+    # debt #15), so a report that names only the version is ambiguous the
+    # moment a version number is ever reused.
+    name: str = ""
 
     def by_category(self, name: str) -> list[Attack]:
         return [a for a in self.attacks if a.category == name]
@@ -51,19 +65,19 @@ class Library:
         return out
 
 
-def _validate(raw: dict) -> None:
-    """Raise a clear error on the first problem found."""
+def _validate(raw: dict, filename: str = "attacks.yaml") -> None:
+    """Raise a clear error on the first problem found, naming the file."""
     if not isinstance(raw, dict) or "attacks" not in raw:
-        raise ValueError("attacks.yaml is missing the top-level 'attacks:' key")
+        raise ValueError(f"{filename} is missing the top-level 'attacks:' key")
 
     declared_categories = set(raw.get("categories") or {})
     if not declared_categories:
-        raise ValueError("attacks.yaml is missing the top-level 'categories:' key")
+        raise ValueError(f"{filename} is missing the top-level 'categories:' key")
 
     seen_ids = set()
 
     for index, a in enumerate(raw["attacks"], start=1):
-        where = f"attack #{index} (id={a.get('id', 'MISSING')})"
+        where = f"{filename} attack #{index} (id={a.get('id', 'MISSING')})"
 
         for required in ("id", "category", "severity", "message", "fix"):
             if not a.get(required):
@@ -86,19 +100,45 @@ def _validate(raw: dict) -> None:
             )
 
 
-@lru_cache(maxsize=1)
-def load_library() -> Library:
-    """
-    Read the YAML file and return a validated Library.
+class UnknownLibraryError(ValueError):
+    """Raised when a caller asks for a library that is not in attacks/."""
 
-    Cached, so we parse the file once, not on every scan.
+
+def resolve_library_name(name: str | None) -> str:
     """
-    path = config.ATTACKS_DIR / "attacks.yaml"
+    Turn an optional, possibly caller-supplied name into a safe filename.
+
+    None means "whatever the deployment is configured for". Anything else
+    must appear verbatim in config.available_libraries(), which lists bare
+    filenames found in attacks/ — so a path, a traversal or a typo is
+    rejected here rather than reaching the filesystem.
+    """
+    if not name:
+        return config.DEFAULT_ATTACK_LIBRARY
+
+    allowed = config.available_libraries()
+    if name not in allowed:
+        raise UnknownLibraryError(
+            f"Unknown attack library '{name}'. Available: {', '.join(allowed) or 'none'}"
+        )
+    return name
+
+
+@lru_cache(maxsize=8)
+def _load(name: str) -> Library:
+    """
+    Read one YAML file and return a validated Library.
+
+    Cached per filename, so each corpus is parsed once rather than on every
+    scan. Only ever called with a name that resolve_library_name() has
+    already whitelisted.
+    """
+    path = config.ATTACKS_DIR / name
     if not path.exists():
         raise FileNotFoundError(f"Attack library not found at {path}")
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    _validate(raw)
+    _validate(raw, name)
 
     attacks = [
         Attack(
@@ -113,10 +153,31 @@ def load_library() -> Library:
         for a in raw["attacks"]
     ]
 
-    return Library(attacks=attacks, categories=raw["categories"])
+    return Library(
+        attacks=attacks,
+        categories=raw["categories"],
+        version=raw.get("version", "1.0"),
+        name=name,
+    )
 
 
-def reload_library() -> Library:
-    """Clear the cache and re-read the file, after editing attacks.yaml."""
-    load_library.cache_clear()
-    return load_library()
+def load_library(name: str | None = None) -> Library:
+    """
+    The validated library for this scan.
+
+    name  a filename in attacks/, or None for config.DEFAULT_ATTACK_LIBRARY.
+    Raises UnknownLibraryError if the name is not one we ship.
+    """
+    return _load(resolve_library_name(name))
+
+
+def reload_library(name: str | None = None) -> Library:
+    """
+    Clear the cache and re-read from disk, after editing a library by hand.
+
+    Clears every cached corpus, not just the one asked for — the point of
+    this call is that the files on disk changed, and there is no way to know
+    which ones.
+    """
+    _load.cache_clear()
+    return load_library(name)

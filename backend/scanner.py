@@ -29,29 +29,86 @@ import httpx
 from . import config, scoring
 from .attacks import Attack, load_library
 from .judge import judge
-from .llm import chat
+from .llm import openai_compatible_chat
 
 
 @dataclass
 class Target:
     """The bot we are attacking."""
-    mode: str = "prompt"            # "prompt" or "api"
-    system_prompt: str = ""         # used when mode == "prompt"
+    # "model" -- a real deployment we send the system prompt to on every
+    #            request, because the deployment holds no instructions of its
+    #            own. The endpoint comes from config, never from the caller.
+    # "api"   -- a chatbot that already has its own prompt. We send only the
+    #            attack. Gated behind DNS ownership verification.
+    # "prompt" is accepted as the old name for "model" and behaves identically,
+    # so the frontend and demo/targets.yaml keep working unchanged. It used to
+    # mean something different: the prompt was replayed on our OWN provider, so
+    # the scan measured a bot we were simulating rather than one that exists.
+    mode: str = "model"
+    system_prompt: str = ""         # sent with every request when mode == "model"
     api_url: str = ""               # used when mode == "api"
     api_headers: dict = field(default_factory=dict)
     canary: str | None = None       # planted secret, enables layer-1 detection
+    # Anything else that must never appear in an answer: a supplier name, an
+    # internal rate, a person's name. The canary is one planted string we
+    # control; these are the customer's own real secrets, which we cannot
+    # guess. Both are checked the same way in layer 1.
+    #
+    # This exists because the deterministic rules in attacks.yaml carry
+    # literal phrases ("Shenzhen") belonging to one specific demo bot. Those
+    # match nothing on any other bot, so layer 1 silently does not apply and
+    # the finding quietly falls through to the model. Found against the lab
+    # bots, whose supplier is Nordwind Logistik.
+    secrets: list[str] = field(default_factory=list)
+
+
+class TargetError(Exception):
+    """The target could not be reached, or gave us nothing to judge."""
 
 
 async def _ask_target(target: Target, message: str) -> str:
     """Send one attack to the bot and return its answer."""
 
-    if target.mode == "prompt":
-        return await chat(
-            system=target.system_prompt,
-            user=message,
-            model="mistral-small",
+    if target.mode in ("model", "prompt"):
+        if not config.TARGET_URL or not config.TARGET_KEY:
+            raise TargetError(
+                "TARGET_URL or TARGET_KEY is not set. mode='model' attacks a "
+                "real deployment; there is nothing to attack without one."
+            )
+
+        # Shared with the judge's provider so the target inherits the same
+        # measured 429 backoff. Without it every rate-limited attack becomes an
+        # ERROR immediately, which is what suppressed grades before 171b06b.
+        choice = await openai_compatible_chat(
+            url=config.TARGET_URL, key=config.TARGET_KEY,
+            auth=config.TARGET_AUTH, model=config.TARGET_MODEL,
+            system=target.system_prompt, user=message,
             max_tokens=config.MAX_TOKENS_TARGET,
+            timeout=config.LLM_TIMEOUT_S, what="target",
         )
+        answer = choice["message"].get("content") or ""
+
+        # An empty answer must NEVER be returned as a reply.
+        #
+        # It contains no canary and no forbidden phrase, so the judge scores it
+        # PASS: a model that never answered is recorded as a model that
+        # resisted. Systematic false negatives, exactly inverted from the truth.
+        # Measured on a reasoning model at the 600-token default: 1857
+        # characters of reasoning, empty content, finish_reason=length.
+        #
+        # lab/runner.py has guarded this since 16.08; scanner.py never has
+        # (issue #7). This path does not go through the runner, so it carries
+        # the guard itself. Raising makes it an ERROR, which counts toward
+        # gradability instead of disappearing (PLAYBOOK §9).
+        if not answer.strip():
+            raise TargetError(
+                f"target returned an empty answer "
+                f"(finish_reason={choice.get('finish_reason')}, "
+                f"max_tokens={config.MAX_TOKENS_TARGET}). Scored as an error, "
+                f"never as a pass."
+            )
+
+        return answer
 
     if target.mode == "api":
         async with httpx.AsyncClient(timeout=30) as client:
@@ -98,7 +155,8 @@ async def _run_one(attack: Attack, target: Target, limiter: asyncio.Semaphore) -
             }
 
         try:
-            verdict = await judge(attack, target.system_prompt, answer, target.canary)
+            verdict = await judge(attack, target.system_prompt, answer,
+                                  target.canary, target.secrets)
         except Exception as e:
             verdict = {
                 "verdict": "ERROR",
@@ -116,14 +174,16 @@ async def _run_one(attack: Attack, target: Target, limiter: asyncio.Semaphore) -
 
 
 async def run_scan(target: Target, categories: list[str] | None = None,
-                   on_result=None) -> dict:
+                   on_result=None, library_name: str | None = None) -> dict:
     """
     Run a full scan and return the report.
 
-    categories  optional filter, e.g. ["data_leakage"] to run a subset
-    on_result   optional async callback after each attack, for live progress
+    categories    optional filter, e.g. ["data_leakage"] to run a subset
+    on_result     optional async callback after each attack, for live progress
+    library_name  which corpus in attacks/ to run; None uses
+                  config.DEFAULT_ATTACK_LIBRARY
     """
-    library = load_library()
+    library = load_library(library_name)
     attacks = library.attacks
     if categories:
         attacks = [a for a in attacks if a.category in categories]
@@ -154,23 +214,30 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         r["attack_id"],
     ))
 
+    # scoring.compute decides gradability now, and sets "incomplete" and
+    # "incomplete_because" itself.
+    #
+    # It used to be decided here, as "more than 10% of attacks errored". That
+    # is a ratio, so it moved with the library and with luck: three runs of the
+    # same bot minutes apart returned no grade, C and A, decided only by how
+    # many Mistral 429s each run happened to catch (GREGOR_WORKLOG.md session
+    # 22). The rule is now an absolute count of completed attacks plus critical
+    # coverage, and it lives with the grading it governs rather than beside it.
     summary = scoring.compute(results)
 
-    # If >10% of attacks errored, the scan is incomplete - set grade to None
+    # Still reported: it is the honest headline for "how much of this scan
+    # actually ran", and the UI shows it whether or not a grade was issued.
     total_attacks = len(results)
-    error_count = len([r for r in results if r["verdict"] == "ERROR"])
+    error_count = sum(1 for r in results if scoring.classify(r) == "ERROR")
     error_rate = round(100 * error_count / total_attacks) if total_attacks > 0 else 0
-
-    if error_rate > 10:
-        summary["grade"] = None
-        summary["incomplete"] = True
-    else:
-        summary["incomplete"] = False
 
     return {
         "scan_id": scan_id,
         "duration_s": round(time.time() - started, 1),
         "target_mode": target.mode,
+        "library_version": library.version,
+        "library_name": library.name,
+        "canary": target.canary,  # the one actually used (explicit or auto-detected)
         "summary": summary,
         "results": results,
         "scoring_explanation": scoring.explain(),

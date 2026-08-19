@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Art. 50 disclosure check — LLMantis</title>
+<link rel="icon" href="/static/assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/static/assets/brand/favicon-32.png" sizes="32x32">
+<style>
+/* ---- primitives lifted from assets/base.css (tokens stripped) ---- */
+/* ===========================================================================
+   LLMantis — shared foundation
+   ---------------------------------------------------------------------------
+   Fonts, tokens and primitives for all three pages. Served from our own
+   origin: no CDN, no Google Fonts, no external request of any kind.
+   PLAYBOOK.md §3 is the source of truth for every value here.
+   =========================================================================== */
+
+/* --------------------------------------------------------------- typefaces */
+/* Self-hosted. `font-display: swap` so text paints immediately in the
+   fallback and reflows once the file lands, rather than blocking on it. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;          /* one variable file covers the whole ramp */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------- dark tokens */
+
+
+/* ------------------------------------------------- light tokens: the paper */
+/* The Prüfbericht is the one printed surface. Every value below is measured
+   against #FFFFFF and against the #F6F7F8 wash, and clears WCAG AA (4.5:1)
+   for small text — the report is read, not glanced at. */
+
+
+/* ------------------------------------------------------------- primitives */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
+.mono { font-family: var(--mono); }
+
+/* One visible focus style everywhere. Never remove it without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+[data-surface='paper'] :focus-visible { outline-color: var(--accent-on-light); }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  /* NOT `var(--glass-shine), var(--glass-lift)`. box-shadow's grammar is
+     `none | <shadow>#` — `none` is legal only as the SOLE value, so the pair
+     failed to parse and the WHOLE declaration was dropped: .glass computed
+     box-shadow:none on every page, and nobody noticed because the hairline
+     border stayed. Measured in Chrome: shine+lift -> "none", lift alone ->
+     "rgba(18,18,16,.18) 0 8px 24px -14px". If a token can hold `none`, it
+     cannot sit in a comma list. */
+  box-shadow: var(--glass-lift);
+}
+/* Without this a browser with no backdrop-filter paints a see-through panel
+   and the text behind shows through the text on top. Opaque is safe failure. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--glass-fallback); }
+}
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-decoration: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 18px;
+  display: inline-block;
+  transition: filter .2s var(--ease), transform .2s var(--ease);
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+
+/* Screen-reader-only, for labels that must exist but not be seen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* PLAYBOOK §3 makes this mandatory on every page. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root{
+  /* This block is copied verbatim into all SIX pages: index, scanner, report,
+     impressum, datenschutz, art50check. That duplication is why the app and
+     the landing drifted into two palettes in the first place: a colour changed
+     in one file only. Change it in all six, and keep them byte-identical:
+       for f in index scanner report impressum datenschutz art50check; do
+         awk '/^:root\{/,/^\}/' frontend/$f.html | md5; done   # one hash
+     art50check.html was the last page to join, and it joined by dropping its
+     <link> to assets/base.css — which nothing loads any more. */
+  --bg:#F2F1EB;            /* the landing's ground. The app's own was #F7F8F5,
+                              1.06 away — the swap is a hue move, not a weight
+                              move, so no AA threshold turns over on it.      */
+  --bg-2:#FFFFFF;
+  --surface:#FFFFFF;       /* 1.13 off the ground; on #F7F8F5 it was 1.07       */
+  /* Recessed track/hover, and it has two grounds: the .ring track and
+     .fhead:hover sit on --surface (#FFFFFF), while .pbar, .mini and the nav
+     hover sit on the page ground. Those two weights can no longer both be
+     held. #EEF6E9 was 1.037 off the OLD ground and 1.106 off white; the new
+     ground is itself 1.132 off white, i.e. darker than that old track — so
+     nothing that still reads as recessed against the ground can also be
+     1.106 off white. The role wins: 1.034 off the ground, and 1.171 off
+     white, where it reads slightly heavier than it used to.               */
+  --surface-2:#ECEEE6;
+  --border:#DFDED9;        /* 1.19 off the ground. #E3E6DF was 1.18 on the old
+                              ground and only 1.12 on this one — the hairline
+                              lost a fifth of its separation to the swap.       */
+  --text:#121210;          /* 16.57:1                                          */
+  --muted:#5A6660;         /*  5.30:1  AA. The landing's #706E63 measures 4.53
+                              here — 0.03 above the threshold, for no gain.    */
+
+  /* One value has to serve two roles: green text on the page, and a button
+     fill carrying a white label. #116B2E is 5.86:1 as text on --bg and 6.63:1
+     the other way round, so both clear AA and there is no second green. */
+  --accent:#116B2E;
+  --on-accent:#FFFFFF;
+  --accent-on-light:#116B2E;   /* the same green. See the paper block below.    */
+
+  --critical:#A3200F;      /*  6.70:1 */
+  --high:#B45309;          /*  4.44:1 on the ground — but it is never small
+                              text there: as a grade it is 34px, as a severity
+                              it sits on --surface (5.02:1), and its one use on
+                              the ground is a 1px border, where 3:1 applies. */
+  --medium:#7A5200;        /*  6.12:1 */
+  --low:#27548F;           /*  6.75:1 */
+  --info:#5A6660;
+
+  /* #7BE33F is 1.5:1 on white. It survives only as a large decorative shape,
+     never as text, an icon, or a border on its own — and since the warm bloom
+     went orange nothing references it. Kept as the dark theme's brand green. */
+  --brand-lite:#7BE33F;
+
+  --grid-line:rgba(18,18,16,.045);
+  /* The warm bloom was #7BE33F at .16, which blends to #DFEFCF — a cold lime
+     patch on a warm ground. It is now the landing's one warm note, #FF720D,
+     at the alpha that reproduces the old bloom's weight (1.06 off the ground). */
+  --bloom-warm:rgba(255,114,13,.067);
+  --bloom-cool:rgba(17,107,46,.05);
+
+  /* Chrome that overlays scrolling content keeps the material; on a light
+     ground the inset shine reads as a smudge, so it is dropped. */
+  --glass-bg:rgba(242,241,235,.86);
+  --glass-border:#DFDED9;
+  --glass-lift:0 8px 24px -14px rgba(18,18,16,.18);
+  --glass-fallback:#FFFFFF;
+
+  --ring:rgba(17,107,46,.30);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --r:12px;
+  /* The landing's two chrome values, so the header ported from it is the same
+     object here and not a lookalike: --pad is the page gutter the header and
+     the overlay both sit on, --dur the transition the overlay slides with.
+     --ease above is already the landing's --ease-expo, same curve. */
+  --pad:clamp(20px,4.4vw,64px);
+  --dur:.35s;
+  /* Header height, so body padding and scroll-padding agree with the bar.
+     It lives HERE and not in a :root of its own next to the header rules: a
+     second `:root{` at column 0 opened a second range in the awk check this
+     block documents below, and the check went from one hash to four. The
+     detector broke, not the palette. */
+  --hdr:110px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:var(--sans)}
+
+/* The printed sheet is its own surface. base.css defines these under
+   [data-surface='paper'] — dropping the shared stylesheet dropped them with it,
+   and an undefined custom property resolves to nothing rather than to a
+   fallback: .printbar lost its background and kept its white text. */
+[data-surface='paper']{
+  --paper:#FFFFFF;
+  --wash:#F6F7F8;
+  --ink:#121210;          /* 16.57:1 on --bg, 18.75:1 on white */
+  --ink-soft:#5A6660;     /*  5.99:1 on white */
+  --rule:#E3E6DF;
+  --accent-on-light:#116B2E;  /* 6.63:1 on white, 6.18:1 on the wash. Was
+                                 #1F5C0E at 8.09 — a second green, one hue
+                                 step off the screen one and visible when the
+                                 report opens out of the app. */
+  --critical:#A3200F;
+  --high:#B45309;
+  --medium:#7A5200;
+  --low:#27548F;
+  --on-accent:#FFFFFF;
+  --ring:rgba(17,107,46,.30);
+}
+
+/* STEP 9 — neither page carried this. The prompt named only report.html;
+   index.html was missing it too. */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+<style>
+/* ===========================================================================
+   LLMantis — free Art.-50-Check. Passive only: one GET on the caller's own
+   page, no message ever sent to their bot. See backend/art50check.py.
+   The tokens and @font-face rules are INLINE above, the same block the other
+   five pages carry. This page used to <link> assets/base.css, which is the
+   DARK stylesheet — it was the last dark page in a light product, and the
+   "Start free check" button on index.html led straight to it. Swapping the
+   token source repainted almost all of it — almost, because five rgba()
+   washes below are literals that no token reaches. This file holds no HEX
+   literal, which is exactly what made the first version of this comment
+   claim it held no literal at all: rgba() is a literal too, and grepping
+   for '#' does not find it. Of the five, only the two greens needed to
+   change; see the note above .v-badge for why the rest stayed.
+   =========================================================================== */
+
+body {
+  /* Flat, like the landing. This was a 64px grid, two radial blooms and a
+     white-to-ground gradient — a texture the landing does not have, which is
+     what made the two halves read as two products even once the palette was
+     shared. --grid-line, --bloom-warm, --bloom-cool and --bg-2 are now unused
+     by any page; they stay in :root only because that block is byte-identical
+     across six files and deleting a token is a six-file edit for no behaviour. */
+  background: var(--bg);
+  /* The header is fixed now, so content must clear it. */
+  padding-top: var(--hdr);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------------ header */
+/* ── header, ported from landing.html ────────────────────────────────────────
+   The app used to carry its own bar: a 26px mark, six inline links and a
+   collapse-at-760px menu. The landing carries an 84px seal with the wordmark
+   lying ON it, a Chatbot-Pruefung label hanging under, and one Menue button
+   opening a green strip. This is that header, on the app's token names, so the
+   two halves of the product are one object rather than two that agree about
+   colour. FIXED, not sticky, because the overlay is fixed and a sticky bar
+   scrolls out from under it. Anything below must clear --hdr. */
+html{scroll-padding-top:var(--hdr)}   /* or a focused field lands behind the bar */
+header.topbar{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--bg)}
+.hbar{display:flex;align-items:center;justify-content:space-between;
+  padding:13px var(--pad) 12px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;text-decoration:none;color:var(--text)}
+.brand img{width:84px;height:84px;display:block}
+/* The wordmark comes after the seal in the DOM so it paints over the ring, and
+   the negative margin pulls it back across the seal's right edge. */
+.brand .name{position:relative;margin-left:-12px;
+  font-size:33px;font-weight:700;letter-spacing:-.035em;line-height:1}
+.brand .name .ll{color:var(--accent)}
+/* Out of flow, so the flex centres the seal against the WORDMARK alone. */
+.brand .sub{position:absolute;top:100%;left:0;
+  display:block;font-family:var(--mono);font-size:10px;font-weight:400;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+.menu-btn{display:flex;align-items:center;gap:11px;background:none;border:0;padding:8px 0;
+  font:inherit;font-size:15px;color:var(--text);cursor:pointer}
+.dots{display:grid;grid-template-columns:repeat(2,5px);gap:3px}
+.dots i{width:5px;height:5px;background:var(--accent);display:block}
+
+/* ── overlay navigation ──────────────────────────────────────────────────── */
+/* A green strip out of the right edge, only as wide as its labels need. */
+.overlay{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:50;background:var(--accent);
+  width:max-content;max-width:min(90vw,460px);
+  display:flex;flex-direction:column;padding:var(--pad);
+  transform:translateX(100%);visibility:hidden;overflow-y:auto;
+  /* visibility is NOT animated. With `visibility var(--dur)` it stayed hidden
+     for the whole opening frame, so the focus() that follows the attribute
+     change was a no-op on a hidden element and the keyboard caller was left
+     on the button behind the strip. 0s here, delayed by --dur in the closed
+     state, gives the same look: shown at once, hidden only after the slide. */
+  transition:transform var(--dur) var(--ease),visibility 0s var(--dur)}
+.overlay[data-open="true"]{transform:none;visibility:visible;
+  transition:transform var(--dur) var(--ease),visibility 0s}
+.overlay .close{align-self:flex-end;background:none;border:0;font:inherit;font-size:15px;
+  color:var(--bg);cursor:pointer;padding:8px 0}
+.overlay nav{margin:auto 0;display:grid;gap:6px}
+.overlay a{display:flex;align-items:baseline;gap:22px;text-decoration:none;
+  /* On the accent this measures 4.510:1 quantised to 8 bits, which is what a
+     screen actually shows (#CAD9C9), and 4.501:1 if the blend is left in
+     floats. The original comment said 4.51, which was right by luck: it was
+     rounded up from the float. Either figure clears 4.5, and the margin is
+     thinner than it looks, because .overlay a span below is 13px at weight
+     400 -- small text, so 4.5 is the bar, not 3. Re-measure that span before
+     touching this alpha. */
+  color:rgba(242,241,235,.82);
+  font-size:clamp(26px,3.2vw,38px);font-weight:700;letter-spacing:-.045em;line-height:1.06;
+  padding:6px 0;transition:color var(--dur) var(--ease)}
+.overlay a:hover,.overlay a[aria-current="page"]{color:var(--bg)}   /* 5.86:1 */
+.overlay a span{font-family:var(--mono);font-size:13px;font-weight:400;
+  letter-spacing:.1em;color:rgba(242,241,235,.82)}
+@media (prefers-reduced-motion:reduce){ .overlay,.overlay[data-open="true"]{transition:none} }
+/* The landing shrinks its header below 900px (landing.html:385). The port did
+   not carry that, so tapping through from the landing on a phone made the seal
+   jump 60px->84px and the bar 86->110, on the one journey this work exists to
+   make continuous. */
+@media (max-width:900px){
+  :root{--hdr:90px}
+  .brand img{width:60px;height:60px}
+  .brand .name{margin-left:-9px;font-size:25px}
+}
+
+/* ------------------------------------------------------------------ layout */
+.wrap {
+  max-width: 720px; margin: 0 auto;
+  padding: clamp(26px, 5vw, 48px) clamp(16px, 4vw, 40px) 110px;
+  display: flex; flex-direction: column; gap: 24px;
+}
+.lede { color: var(--muted); max-width: 60ch; margin: 10px 0 0; }
+.lede b { color: var(--text); font-weight: 500; }
+h1 { font-size: clamp(24px, 4vw, 32px); }
+
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: clamp(18px, 3vw, 26px);
+}
+label.field { display: block; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
+input {
+  width: 100%; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+  padding: 10px 12px;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+input:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring);
+}
+.actions { display: flex; align-items: center; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+.err { color: var(--critical); font-size: 13px; }
+
+/* ------------------------------------------------------------------ result */
+#result, #progress { display: none; }
+#result.on, #progress.on { display: block; }
+
+/* ------------------------------------------------------------- live progress */
+/* The twelve methods are shown as they run, not summarised afterwards. Watching
+   the list fill in is what a 90-second wait needs to not feel broken — and it is
+   also the evidence: the caller sees every method being tried. */
+.p-bar {
+  height: 6px; border-radius: 999px; background: var(--surface-2);
+  overflow: hidden; margin-bottom: 12px;
+}
+.p-bar > i {
+  display: block; height: 100%; width: 0;
+  background: var(--accent); border-radius: 999px;
+  transition: width .5s var(--ease);
+}
+.p-line { font-size: 13.5px; color: var(--muted); margin-bottom: 4px; }
+.p-quip {
+  font-size: 13px; color: var(--muted); opacity: .8; min-height: 1.5em;
+  margin-bottom: 14px; font-style: italic;
+}
+.probes-fold { border-top: 1px solid var(--border); padding-top: 10px; }
+.probes-fold summary {
+  cursor: pointer; font-size: 13px; color: var(--muted); font-weight: 500;
+}
+.probes-fold summary:hover { color: var(--text); }
+.probes-fold .p-grid { margin-top: 10px; }
+.p-line b { color: var(--text); font-weight: 500; }
+.p-grid { display: grid; gap: 6px; }
+.p-probe {
+  display: grid; grid-template-columns: 18px 1fr auto; gap: 10px;
+  align-items: baseline; font-size: 13px; padding: 5px 0;
+  border-top: 1px solid var(--border);
+}
+.p-probe .mark { font-family: var(--mono); }
+.p-probe.hit .mark { color: var(--accent); }
+.p-probe.miss { color: var(--muted); }
+.p-probe.ctx .mark { color: var(--medium); font-style: italic; }
+.p-probe .detail {
+  font-family: var(--mono); font-size: 11.5px; color: var(--muted);
+  max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.p-probe .conf { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* --------------------------------------------------------------- the verdict */
+.v-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 4px 11px; border-radius: 999px;
+  margin-bottom: 14px;
+}
+/* These sit on .panel = --surface = #FFFFFF. Only .ok changed, and only
+   because #7BE33F is an off-palette GREEN sitting under #116B2E text — the
+   one thing the single-green decision actually reaches. It is now the accent
+   at the alpha that reproduces the lime tint's weight, not the accent at .1:
+   the lime sits at 1.0547 off white and this lands at 1.051. An earlier
+   version of this comment said 1.060 — that is the figure for .038, and .037
+   shipped. Exact arithmetic puts .037 at 1.0534, but Chrome quantises alpha
+   to 8 bits (.037 * 255 = 9.4 -> 9/255 = .0353), so 1.051 is what renders and
+   1.051 is what this says.
+   .bad and .warn keep their source hex. .bad's #FF6B6B is base.css's dark
+   --critical; .warn's #FFC107 is in NO palette at all — the dark --medium is
+   #FFC53D, so that wash never matched its own theme either. What matters is
+   that at 10% over white both are a pale red and a pale amber, which is the
+   wash convention the rest of the light system uses (#FDF6E3 1.079,
+   #FFF8E5 1.060, #FDF1E7 1.110). Re-mixing them from --critical/--medium was
+   tried and reverted: it produced 1.185 and 1.157 — heavier than any other
+   wash in the product — and dropped the text from 6.85/6.57 to 6.40/5.98. */
+.v-badge.ok   { color: var(--accent);   background: rgba(17, 107, 46, .037); }
+.v-badge.bad  { color: var(--critical); background: rgba(255, 107, 107, .1); }
+.v-badge.warn { color: var(--medium);   background: rgba(255, 193, 7, .1); }
+.v-badge.none { color: var(--muted);    background: var(--surface-2); }
+.v-reason { font-size: 14.5px; margin: 0 0 16px; }
+.q-label { display: block; color: var(--muted); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.v-quote {
+  font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap;
+  background: var(--bg); border-left: 3px solid var(--border);
+  border-radius: 0 6px 6px 0; padding: 10px 14px; margin: 0 0 16px;
+}
+.v-meta { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px;
+  font-size: 13px; margin-bottom: 8px; }
+.v-meta dt { color: var(--muted); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .04em; }
+.v-meta dd { margin: 0; overflow-wrap: anywhere; }
+#rShot, .w-shot { display: block; width: 100%; border: 1px solid var(--border);
+  border-radius: 8px; margin: 8px 0 18px; }
+.w-shot { border-color: var(--accent); }
+.r-url {
+  font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  word-break: break-all; margin-bottom: 16px;
+}
+.r-empty { color: var(--muted); font-size: 14px; }
+.r-check {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 14px; padding: 12px 0; border-top: 1px solid var(--border);
+}
+.r-check:first-child { border-top: 0; }
+.r-check .label { font-size: 14px; font-weight: 500; }
+.r-check .evidence { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.r-status {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  white-space: nowrap; padding: 3px 9px; border-radius: 999px;
+}
+/* Same pair, same reasoning as .v-badge above: the green moves because it is
+   off-palette, the red stays because a 10% pale red is the convention.
+   Note that these two rules are DEAD: no line of this page's JavaScript ever
+   emits .r-status or .r-check — renderResult only ever writes .v-badge,
+   .v-quote, .v-meta, .r-empty, .w-shot and .q-label. Kept in step with
+   .v-badge so the pair does not diverge if something starts emitting them. */
+.r-status.pass { color: var(--accent); background: rgba(17, 107, 46, .037); }
+.r-status.fail { color: var(--critical); background: rgba(255, 107, 107, .1); }
+
+.cta-row {
+  display: flex; align-items: center; gap: 14px; margin-top: 22px; flex-wrap: wrap;
+  padding-top: 18px; border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------ footer */
+footer.site {
+  border-width: 1px 0 0 0; padding: 20px clamp(16px, 4vw, 40px);
+}
+footer.site .in {
+  max-width: 940px; margin: 0 auto; display: flex; gap: 18px; flex-wrap: wrap;
+  align-items: center; color: var(--muted); font-size: 12.5px;
+}
+footer.site a { color: var(--muted); }
+footer.site .sp { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="hbar">
+    <a class="brand" href="/" aria-label="LLMantis — Startseite">
+      <img src="/static/assets/brand/seal.svg" alt="">
+      <span class="name"><span class="ll">LL</span>Mantis
+        <span class="sub" lang="de">Chatbot-Pr&uuml;fung</span>
+      </span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="ov">
+      <span lang="de">Men&uuml;</span> <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    </button>
+  </div>
+</header>
+
+<!-- Navigation lives in the overlay, as on the landing. Two destinations were
+     wrong before this and are fixed here: art50check pointed at /#produkt,
+     /#warum and /#ueber-uns, none of which exist (the landing's sections are
+     signal, verfahren, problem, grenzen, preise, team), and "Run scan" pointed
+     at "/" — the landing — on both pages, when index.html is served at /scan
+     (backend/main.py:1167). -->
+<div class="overlay" id="ov" role="dialog" aria-modal="true" aria-label="Navigation">
+  <button class="close" id="closeBtn" lang="de">Schlie&szlig;en &#10005;</button>
+  <nav>
+    <a href="/#verfahren"><span>01</span> Product</a>
+    <a href="/#problem"><span>02</span> Why</a>
+    <a href="/#preise"><span>03</span> Pricing</a>
+    <a href="/#team"><span>04</span> About</a>
+    <a href="/scan"><span>05</span> Run scan</a>
+    <a href="/static/art50check.html" aria-current="page"><span>06</span> Start free check</a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+  <div>
+    <h1>Art. 50 disclosure check</h1>
+    <p class="lede">
+      We open your site in a real browser and run <b>twelve detection methods</b>
+      on every page we visit — your entry page, your own
+      <span lang="de">Hilfe</span> and Kontakt pages, on desktop and on mobile.
+      Nothing is skipped once something is found, because a result that says
+      <i>no widget</i> is only worth the list of things that were tried.
+    </p>
+    <p class="lede">
+      When we find your chat button we <b>open it once and read what your
+      assistant says first</b> — that greeting is exactly what Art. 50(1) is
+      about, and it is not on the button. One click, the same as any visitor.
+      <b>We never type anything and never send your bot a message.</b>
+      Takes 30–150 seconds; you can watch each method run.
+    </p>
+  </div>
+
+  <div class="panel">
+    <form id="checkForm">
+      <label class="field" for="url">Website URL</label>
+      <input id="url" placeholder="your-company.de" autocomplete="off" required>
+      <div class="actions">
+        <button class="btn" id="run" type="submit">Check now</button>
+        <span class="err" id="error" role="alert"></span>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel" id="progress" role="status" aria-live="polite">
+    <div class="r-url" id="pUrl"></div>
+    <div class="p-bar" role="progressbar" aria-labelledby="pPage"><i id="pFill"></i></div>
+    <div class="p-line" id="pPage">Starting…</div>
+    <div class="p-quip" id="pQuip"></div>
+    <!-- The twelve methods stay, folded. They are the deliverable: a result that
+         says "no widget" is worth exactly the list behind it, and this is the only
+         place a reader can see which steps a model chose. Folded, not removed. -->
+    <details class="probes-fold" id="pFold">
+      <summary><span id="pCount">0</span> of 12 methods run — show what we tried</summary>
+      <div id="pProbes" class="p-grid"></div>
+    </details>
+  </div>
+
+  <div class="panel" id="result" role="status" aria-live="polite">
+    <div class="r-url" id="rUrl"></div>
+    <div id="rBody"></div>
+    <img id="rShot" alt="" hidden>
+    <div class="cta-row">
+      <a class="btn" href="/">Run the full test on your own prompt</a>
+      <span style="color:var(--muted);font-size:13px">
+        This check opens your chat once and reads it. Driving 21 documented
+        attacks at your assistant is a different thing and requires
+        <span lang="de">Eigentumsnachweis</span>.
+      </span>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site">
+  <div class="in">
+    <span>© 2026 LLMantis</span>
+    <a href="/static/impressum.html" lang="de">Impressum</a>
+    <a href="/static/datenschutz.html" lang="de">Datenschutzerklärung</a>
+    <span class="sp">This is an automated technical check, not legal advice.</span>
+  </div>
+</footer>
+
+<script>
+'use strict';
+
+const VERDICT = {
+  disclosed:        ['ok',   'Discloses AI'],
+  not_disclosed:    ['bad',  'No disclosure'],
+  not_determinable: ['warn', 'Not determinable'],
+  no_widget_found:  ['none', 'No widget found'],
+};
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+const $ = id => document.getElementById(id);
+
+const form = $('checkForm'), runBtn = $('run'), errEl = $('error');
+const progress = $('progress'), result = $('result');
+
+/* One row per probe, keyed by name so a probe that fires on page 7 updates the
+   row it already has instead of appending a duplicate. Twelve rows, always. */
+const rows = new Map();
+
+/* Shown one at a time while the check runs. Each line describes something that is
+   actually happening — a waiting message that invents work would be a small lie in
+   a product sold on honest measurement, and this audience reads carefully. Dry
+   rather than jokey: the buyer is a compliance manager, not a games console. */
+const QUIPS = [
+  'Loading your pages the way a visitor’s browser does, JavaScript and all.',
+  'Twelve methods per page. None of them skipped once one finds something.',
+  'Watching which requests your page makes — a vendor domain is proof, a word is not.',
+  'Looking for a button pinned to a corner, and for one that simply says what it is.',
+  'Reading iframes your own page is not allowed to read.',
+  'Asking a model which of your pages is most likely to host the assistant.',
+  'Your cookie banner will not be accepted on your behalf. That choice is yours.',
+  'If we find the chat we open it once, read it, and leave. We never type.',
+  'Checking desktop, then mobile — some launchers only exist on one.',
+  'A result that says “no widget” is worth exactly the list of things we tried.',
+];
+let quipTimer = null, quipAt = 0;
+
+function startQuips() {
+  quipAt = 0;
+  $('pQuip').textContent = QUIPS[0];
+  clearInterval(quipTimer);
+  quipTimer = setInterval(() => {
+    quipAt = (quipAt + 1) % QUIPS.length;
+    $('pQuip').textContent = QUIPS[quipAt];
+  }, 7000);
+}
+function stopQuips(msg) {
+  clearInterval(quipTimer);
+  quipTimer = null;
+  $('pQuip').textContent = msg || '';
+}
+
+/* The bar cannot be a true percentage: how many pages a check visits depends on
+   what it finds, and it stops the moment the assistant speaks. So it moves on real
+   events and eases toward a ceiling it never reaches on its own — honest about
+   being an indication rather than a measurement. */
+function setBar(pages) {
+  const pct = Math.min(92, 6 + pages * 5);
+  $('pFill').style.width = pct + '%';
+}
+
+/* Per-probe state, because the sweep visits up to 18 pages and each probe
+   reports on every one of them.
+
+   Two rules, and the second was a bug worth remembering. A probe that fired
+   anywhere stays fired — a later page finding nothing does not undo an earlier
+   hit. But the DETAIL has to stay pinned to the event that justified the tick:
+   rendering the latest event's text produced rows reading "✓ fixed_launcher —
+   no pinned elements found at all", a tick contradicted by its own evidence, in
+   the one product whose entire pitch is honest measurement. */
+function probeRow(ev) {
+  let st = rows.get(ev.name);
+  if (!st) {
+    const row = document.createElement('div');
+    $('pProbes').appendChild(row);
+    st = { row, hit: false, detail: '' };
+    rows.set(ev.name, st);
+  }
+  if (ev.fired) {
+    st.hit = true;
+    if (ev.detail) st.detail = ev.detail;        // keep the finding, not the miss
+  } else if (!st.hit) {
+    st.detail = ev.detail || '';                 // a miss may explain why
+  }
+  /* consent_gate is context, never a finding. A cookie banner is not good news
+     and a green tick beside it reads as one — it is the reason a widget may not
+     have loaded at all, which belongs in the report as a caveat. */
+  const isContext = ev.name === 'consent_gate';
+  st.row.className = 'p-probe ' + (isContext ? 'ctx' : (st.hit ? 'hit' : 'miss'));
+  st.row.innerHTML =
+    '<span class="mark">' + (isContext ? (st.hit ? 'i' : '·') : (st.hit ? '✓' : '·')) + '</span>' +
+    '<span><b>' + escHtml(ev.name) + '</b> — ' + escHtml(ev.description || '') + '</span>' +
+    '<span class="detail" title="' + escHtml(st.detail) + '">' +
+    escHtml(st.detail) + '</span>';
+}
+
+function renderResult(rep) {
+  const [cls, label] = VERDICT[rep.verdict] || ['none', rep.verdict];
+  const fired = (rep.probes_fired || []).filter(n => n !== 'consent_gate');
+  let h = '<span class="v-badge ' + cls + '">' + escHtml(label) + '</span>';
+  h += '<p class="v-reason">' + escHtml(rep.reason) + '</p>';
+
+  if (rep.evidence) {
+    h += '<dt class="q-label">The words we judged on</dt>' +
+         '<div class="v-quote">' + escHtml(rep.evidence) + '</div>';
+  } else if (rep.launcher_label) {
+    h += '<dt class="q-label">What your chat button says</dt>' +
+         '<div class="v-quote">' + escHtml(rep.launcher_label) + '</div>';
+  } else if (rep.launcher_technical) {
+    h += '<dt class="q-label">Your chat button</dt>' +
+         '<p class="r-empty">carries no text a person can read — we found it by ' +
+         'its markup (<code>' + escHtml(rep.launcher_technical) + '</code>), which ' +
+         'is enough to locate it and not enough to judge it.</p>';
+  }
+
+  h += '<dl class="v-meta">' +
+    '<dt>Methods run</dt><dd>' + (rep.probes_attempted ?? 0) +
+      ' — ' + fired.length + ' found something' +
+      (fired.length ? ': <code>' + fired.map(escHtml).join('</code>, <code>') + '</code>' : '') +
+    '</dd>' +
+    '<dt>Pages checked</dt><dd>' + (rep.pages_tried || []).length +
+      ' (' + [...new Set((rep.pages_tried || []).map(p => p.viewport))].join(', ') + ')</dd>' +
+    '<dt>robots.txt</dt><dd>' + escHtml(rep.robots) +
+      ' — recorded, not enforced</dd>' +
+    '<dt>Your chat</dt><dd>' + (rep.opened_widget
+      ? 'opened once and read — we typed nothing'
+      : 'not opened') + '</dd>' +
+    /* The route we took, and which steps a model chose. Without this the report
+       cannot answer "did the AI do anything?" — the decisions streamed past in the
+       progress panel and were gone by the time the verdict appeared. A recorded
+       path is also the reproducible half of a step a model decided. */
+    ((rep.click_path || []).length
+      ? '<dt>How we got there</dt><dd>' + rep.click_path.map(function (step, i) {
+            var ai = step.indexOf('ai: ') === 0;
+            return (i ? ' \u2192 ' : '') + (ai
+              ? '<b title="chosen by the page-reading model">' +
+                escHtml(step.slice(4)) + '</b> <span class="none">(AI)</span>'
+              : escHtml(step));
+          }).join('') + '</dd>'
+      : '') +
+    '<dt>Took</dt><dd>' + escHtml(rep.duration_s) + ' s</dd>' +
+    '</dl>';
+
+  if (rep.first_message) {
+    h += '<dt class="q-label">What your assistant said first' +
+         (rep.greeting_source ? ' — read from the ' + escHtml(rep.greeting_source) +
+          ' the click opened' : '') + '</dt>' +
+         '<div class="v-quote">' + escHtml(rep.first_message.slice(0, 900)) + '</div>';
+    if (rep.widget_shot_b64) {
+      h += '<dt class="q-label">Your chat, open, at the moment we read it</dt>' +
+           '<img class="w-shot" alt="Your chat widget open on ' + escHtml(rep.url) +
+           '" src="data:image/png;base64,' + rep.widget_shot_b64 + '">';
+    }
+  } else if (rep.widget_shot_b64) {
+    /* The evidence came from the button, not from a greeting. Show the button —
+       scrolled to and cropped in place. Previously this branch showed nothing and
+       the only picture was the end-of-run viewport shot, taken from the top of the
+       page: on otto.de, whose button is in the footer, the proof of a disclosure
+       was a photograph of a shop front. */
+    h += '<dt class="q-label">Where we read it, on your page</dt>' +
+         '<img class="w-shot" alt="The chat button on ' + escHtml(rep.url) +
+         '" src="data:image/png;base64,' + rep.widget_shot_b64 + '">';
+  }
+  if (rep.impersonation) {
+    h += '<p class="r-empty"><b>It introduces itself as a person</b> — ' +
+         escHtml(rep.impersonation) + '. That is the opposite of disclosure, and ' +
+         'harder to defend than saying nothing at all.</p>';
+  }
+  if (rep.verdict === 'not_determinable' && fired.length && !rep.opened_widget) {
+    h += '<p class="r-empty">We found your assistant but could not open it, so ' +
+         'nothing is claimed about what it says. A widget behind a cookie wall or ' +
+         'a login will do this.</p>';
+  }
+  $('rBody').innerHTML = h;
+
+  const shot = $('rShot');
+  if (rep.screenshot_b64) {
+    shot.src = 'data:image/png;base64,' + rep.screenshot_b64;
+    shot.alt = 'Screenshot of ' + rep.url;
+    shot.hidden = false;
+  } else { shot.hidden = true; }
+
+  result.classList.add('on');
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = $('url').value.trim();
+  if (!url) return;
+
+  errEl.textContent = '';
+  runBtn.disabled = true;
+  const label = runBtn.textContent;
+  runBtn.textContent = 'Checking…';
+  result.classList.remove('on');
+  rows.clear();
+  $('pProbes').innerHTML = '';
+  $('pUrl').textContent = url;
+  $('pPage').textContent = 'Starting…';
+  $('pCount').textContent = '0';
+  $('pFill').style.width = '0';
+  $('pFold').open = false;
+  startQuips();
+  progress.classList.add('on');
+
+  try {
+    const res = await fetch('/api/art50check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_url: url }),
+    });
+
+    if (!res.ok) {
+      let detail = 'Check failed.';
+      try { detail = (await res.json()).detail || detail; } catch (_) {}
+      errEl.textContent = detail;
+      progress.classList.remove('on');
+      return;
+    }
+
+    /* NDJSON: one JSON object per line, so the page moves while the browser
+       works. A 90-second blocking request reads as a broken page. */
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '', pages = 0, done = false;
+
+    while (!done) {
+      const { value, done: finished } = await reader.read();
+      if (finished) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let ev; try { ev = JSON.parse(line); } catch (_) { continue; }
+
+        if (ev.type === 'start') {
+          $('pPage').innerHTML = '<b>' + ev.probes +
+            '</b> detection methods, every page, both form factors…';
+        } else if (ev.type === 'page') {
+          pages++;
+          setBar(pages);
+          $('pPage').innerHTML = 'Page <b>' + pages + '</b> [' +
+            escHtml(ev.viewport) + '] — ' + escHtml(ev.url);
+        } else if (ev.type === 'probe') {
+          probeRow(ev);
+          $('pCount').textContent = String(rows.size);
+        } else if (ev.type === 'ai') {
+          stopQuips('The page-reading model: ' + ev.note);
+        } else if (ev.type === 'opening') {
+          stopQuips('Opening your chat, once, and reading what it says first.');
+        } else if (ev.type === 'error') {
+          errEl.textContent = ev.message;
+          stopQuips('');
+          done = true;
+        } else if (ev.type === 'done') {
+          renderResult(ev.report);
+          $('pFill').style.width = '100%';
+          stopQuips('');
+          $('pPage').innerHTML = 'Finished — <b>' + pages +
+            '</b> page(s) checked with every method.';
+          done = true;
+        }
+      }
+    }
+  } catch (err) {
+    errEl.textContent = 'Check failed: ' + String(err);
+  } finally {
+    stopQuips('');
+    runBtn.disabled = false;
+    runBtn.textContent = label;
+  }
+});
+</script>
+
+<script>
+/* Overlay navigation, ported from landing.html. */
+(function () {
+  var ov = document.getElementById('ov'), mb = document.getElementById('menuBtn');
+  if (!ov || !mb) return;
+  function setOv(open) {
+    ov.dataset.open = String(open);
+    mb.setAttribute('aria-expanded', String(open));
+    /* Locking the body removes the scrollbar, and where scrollbars take real
+       width that widens the content box and every centred column shifts.
+       Handing back exactly the scrollbar's width keeps the layout the same
+       size. Measured before the lock, or it is already gone. */
+    var gutter = innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = open ? 'hidden' : '';
+    document.body.style.paddingRight = open ? gutter + 'px' : '';
+    /* Not in this tick. The overlay is visibility:hidden until the attribute
+       change is applied, and a visibility:hidden element cannot take focus --
+       measured: activeElement stayed BODY, so opening the menu by keyboard
+       left the caller nowhere. One frame later it is visible and focusable. */
+    if (open) requestAnimationFrame(function () { ov.querySelector('a').focus(); });
+    else mb.focus();
+  }
+  mb.addEventListener('click', function () { setOv(ov.dataset.open !== 'true'); });
+  document.getElementById('closeBtn').addEventListener('click', function () { setOv(false); });
+  ov.querySelectorAll('a').forEach(function (a) {
+    a.addEventListener('click', function () { setOv(false); });
+  });
+  addEventListener('keydown', function (e) {
+    if (ov.dataset.open !== 'true') return;
+    if (e.key === 'Escape') { setOv(false); return; }
+    /* aria-modal="true" claims the rest of the page is unavailable, and without
+       this it is not: Tab walked off the last link into the controls behind the
+       strip, which are scroll-locked and covered. Measured -- the eighth Tab
+       reached the demo-bot select. preventDefault fires for Tab only, and only
+       while the strip is open, so nothing a form field expects is touched. */
+    if (e.key !== 'Tab') return;
+    var f = ov.querySelectorAll('button, a[href]');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+})();
+</script>
+</body>
+</html>

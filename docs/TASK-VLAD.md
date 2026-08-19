@@ -45,14 +45,10 @@ A judge's opinion is never enough on its own.
 
 ## Hard rules
 
-- **The judge model runs in the EU.** Mistral (France) or Aleph Alpha (Germany).
-  It reads customer system prompts, which are trade secrets.
-  `backend/config.py:33` currently defaults `JUDGE_MODEL` to `claude-sonnet-4-5`,
-  a US provider. **This repository is public, so that default is publicly
-  readable.** It is tech debt #1.
-- **No US vendors anywhere in the stack.** AWS, Azure, GCP, Google Fonts,
-  Stripe, Clerk, Auth0, Sentry US, any US CDN. We sell EU compliance; a US
-  vendor in the stack is a contradiction a customer will notice.
+- **The judge reads customer system prompts, which are trade secrets.** That
+  governs retention, logging and who may read them. It no longer restricts
+  which provider runs it — the EU-only rule was withdrawn on 18.08
+  (`PLAYBOOK.md` §1), and there is no vendor prohibition in this project.
 - **Never the word "certified"** — or `zertifiziert`, `Zertifikat`,
   `AI-Act-konform`, `DSGVO-konform`. Not in UI text, not in comments, not in
   variable names, not in commit messages. § 5 UWG, cease-and-desist risk.

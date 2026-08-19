@@ -1,11 +1,28 @@
+# Agents specific
+CLAUDE.md
+AGENTS.md
+
 # Never commit secrets
+#
+# `.env` and `.env.*` carry no slash, so they already match at any depth -
+# lab/.env, deploy/.env and calibration/.env are covered by those two lines.
+# What they do NOT cover is a secret file whose name merely ends in .env, and
+# lab/.env.example names two of those as things people are likely to create.
+# So: any *.env, plus the one named file it warns about.
 .env
 .env.*
 !.env.example
+*.env
+lab/bots/keys.yaml
 *.key
 *.pem
 credentials.json
 secrets.yaml
+
+# Local Compose overrides. Machine-specific by definition (a port remap, a
+# different volume), and untracked is not the same as ignored: `git add -A`
+# sweeps up whatever is lying around, and this repository is public.
+docker-compose.override.yml
 
 # Scan output: customer system prompts and full transcripts.
 # These are customer trade secrets. They never reach version control.
@@ -39,10 +56,14 @@ venv/
 #
 # The app loads brand assets only from frontend/assets/brand/. Nothing in a
 # build may reference Brand/ at all.
-Brand/Screenshot*.png
-Brand/mantis-transparent-background/
-Brand/LLMantis/
-Brand/*.zip
+#
+# This is an allowlist, not a list of patterns, because the list of patterns
+# already failed. New_Logo.png was added on 2026-08-18, matched none of
+# Screenshot* / mantis-* / LLMantis/ / *.zip, and reached the public remote
+# carrying the owner's real name in a Canva XMP block. A new filename cannot
+# outrun an allowlist; it walks straight past a list of names.
+Brand/*
+!Brand/llmantis-*.svg
 
 # tool output
 art50-results.csv

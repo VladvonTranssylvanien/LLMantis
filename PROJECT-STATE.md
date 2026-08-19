@@ -3,22 +3,56 @@
 > Project memory. Update after every stage.
 > Returning in a new chat: *"Continuing LLMantis. Read `~/LLMantis/PROJECT-STATE.md`."*
 >
-> Last updated: 15.08.2026 · Bogdan
+> Last updated: 16.08.2026 · Vlad (session with Claude Code)
 
 ---
 
 ## 1. Where we are
 
-**Status:** week 1, track A (course submission in 7 days).
+**🔴 Course submission deadline: 21.08.2026.** Carried here from
+`PROJECT_COMPLETE_OVERVIEW.md` before that file was deleted — it was the only
+place in the repository that named the date, and it said "7 days from Aug 15",
+which reads as seven days no matter when you open it.
+
+**Team and ownership** (same source, one owner per file — if two people need to
+edit the same file, the design is broken):
+
+| Role | Name | Owns |
+|---|---|---|
+| Project Lead | Bogdan | Project structure, planning, engine work, pitch deck, frontend |
+| Backend Owner | Vlad | Scanner, judge, scoring, API, database |
+| Attack Engineer | Gregor | Attack library, target bots, judge calibration |
+| GRC / Legal | Kwabena | Compliance, legal text, Art. 50 rules |
+
+**Status:** week 1, track A — **backend/API work for
+Vlad's implementation plan is functionally complete** (P0 + P1 + the P2 items
+that don't need a registered company), **including authentication**. Remaining
+gaps are frontend UI for the newer endpoints (a deliberate choice — Bogdan owns
+that next) and the 21→75 attack library.
 
 - ✅ Idea chosen and justified with market data (ECA Mapping 2025)
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
-- ✅ Repository with a working backend: FastAPI, 21 attacks, two-layer judging, scoring, HTML frontend, mock mode
+- ✅ Repository with a working backend: FastAPI, 21 attacks, two-layer judging, scoring, HTML frontend
 - ✅ Playbook and role briefs written
 - ✅ Repository renamed to `LLMantis` (Vlad, 15.08). GitHub keeps a redirect from the old name
 - ✅ Playbook, role briefs and brand merged into the engine repository
 - ✅ LICENSE added (AGPL-3.0)
 - ✅ Brand mark drawn (`Brand/`) — wordmark still needs outlining
+- ✅ **Judge runs on Mistral** — the only provider `llm.py` registers (16.08).
+  ⚠️ The EU-only reason for it was withdrawn on 18.08, see the changelog
+- ✅ **Postgres database** — organizations, targets, scans, results, ownership
+  verifications, memberships, API keys, branding. Alembic migrations (16.08)
+- ✅ **Real DNS ownership verification**, gating active (`mode="api"`) scans (16.08)
+- ✅ **Organizations, API keys, white-label branding** — implemented and
+  tested via curl; no frontend yet (16.08)
+- ✅ **Art.-50-Check** — free passive layer, its own page, SSRF-guarded, tested
+  against real sites (16.08)
+- ✅ **Rate limiting** (`slowapi`, per IP) on every write endpoint (16.08)
+- ✅ **Security pass done** (16.08): no secrets in git history or code, no
+  SQL injection, no XSS, SSRF fixed, `requirements.txt` fixed (was missing
+  sqlalchemy/alembic/psycopg/dnspython — a fresh clone would not have started)
+- ✅ **Authentication** (16.08) — `User` table, bcrypt + JWT, every org-scoped
+  endpoint requires membership. The free anonymous scan path is untouched
 - ⬜ Hypothesis tested on 24 sites ← **blocks the pitch**
 - ⬜ Name cleared at DPMA/EUIPO
 - ⬜ Legal map from Kwabena
@@ -38,7 +72,7 @@
 | 4 | Market: Germany → EU | Lets us reuse the CodeArgus groundwork | 15.08 |
 | 5 | **Two product layers** | Passive Art.-50-Check without permission (funnel) + active red team with ownership verification (revenue). Solves the legal problem | 15.08 |
 | 6 | **Prüfbericht, not Zertifikat** | AI Act certificates come only from notified bodies, and only for high-risk. "Zertifiziert" = § 5 UWG | 15.08 |
-| 7 | **Judge on Mistral, not OpenAI/Anthropic** | The judge processes customer system prompts = trade secrets. US CLOUD Act contradicts what we sell | 15.08 |
+| 7 | ~~**Judge on Mistral, not OpenAI/Anthropic**~~ **REVERSED 18.08** | Was: US CLOUD Act contradicts what we sell. The EU-only stack is no longer true and no longer claimed; provider choice is an engineering decision. What survives is that system prompts are trade secrets — a retention and access rule, not a vendor rule | 15.08, reversed 18.08 |
 | 8 | Three `confidence` levels + mandatory `evidence` | A `possible` finding as fact in a paid report = § 5 UWG | 15.08 |
 | 9 | Canary strings in system prompts | Turns a judge's opinion into a deterministic fact. Only `confirmed` may produce an F | 15.08 |
 | 10 | **Working language: English** | Code, comments, commits, docs, UI — all English | 15.08 |
@@ -80,14 +114,22 @@
 
 | # | What | Due | Who |
 |---|---|---|---|
-| 1 | 🔴 **Migrate the judge to Mistral** — confirmed in code: `backend/config.py:33` sets `JUDGE_MODEL` default to `claude-sonnet-4-5` (US provider). `TARGET_MODEL` on line 30 is the same, but that one only simulates a customer bot, so it is far less urgent. **Public repo, so this is publicly readable** | before the first paying customer | Vlad |
-| 2 | Persistent database instead of in-memory state | week 2 | Vlad |
-| 3 | Real ownership verification (DNS TXT) | week 4 | Vlad |
-| 4 | Organizations in the data model | week 3 | Vlad |
-| 5 | Attack library versioning | week 3 | Vlad |
+| 1 | ✅ **DONE 16.08, then MOOT 18.08** ~~Migrate the judge to Mistral~~ — `backend/llm.py` talks only to Mistral and `anthropic` is gone from `requirements.txt`, both still true. It stopped being technical debt because the rule requiring it was withdrawn, not because it was finished | ~~before the first paying customer~~ | Vlad |
+| 2 | ✅ **DONE 16.08** ~~Persistent database instead of in-memory state~~ — Postgres + Alembic, every scan/org/result survives a restart | ~~week 2~~ | Vlad |
+| 3 | ✅ **DONE 16.08** ~~Real ownership verification (DNS TXT)~~ — gates every `mode="api"` scan; 90-day re-verification | ~~week 4~~ | Vlad |
+| 4 | ✅ **DONE 16.08** ~~Organizations in the data model~~ — plus a `Membership` table (user_id, org_id, role), unused until auth exists | ~~week 3~~ | Vlad |
+| 5 | ✅ **DONE 16.08** ~~Attack library versioning~~ — `attacks.yaml` has `version: "1.4"`, shows up in every scan report and the Pruefbericht | ~~week 3~~ | Vlad |
 | 6 | Rename the Notion page | this week | Bogdan |
 | 8 | **Original illustrated mark** — the geometric mark is the brand and ships as final; an illustrated one may replace it. Owner: Bogdan, no date | open | Bogdan |
-| 7 | **README §Scoring contradicts decision #8.** README documents the shipped behaviour — flat severity weights, critical cap at **D**. Prompt 3 / P0 specifies BASE + CONF_K multipliers and a cap at **C**. Update the README in the same commit as P0, or the repo documents two different scoring rules | with P0 | Vlad |
+| 7 | ✅ **RESOLVED** (verified 16.08) ~~README §Scoring contradicts decision #8~~ — `backend/scoring.py` caps at **C** and applies `CONFIDENCE_WEIGHT` multipliers (confirmed/likely/possible), matching README and decision #8. No contradiction found; this must have been fixed during the P0 confidence-levels work | ~~with P0~~ | Vlad |
+| 9 | ✅ **DONE 16.08** ~~No authentication layer~~ — `POST/GET /api/auth/{register,login,me}` (bcrypt + JWT bearer tokens), every org-scoped endpoint now calls `require_membership()`. `mode="prompt"` scans with no `org_id` and no `X-API-Key` stay fully anonymous on purpose — that's the free demo path and it never touches a live third-party system. Anything that acts *as* an organization (creating one, minting a key, reading scan history, verifying ownership, `mode="api"` or `mode="prompt"` with an `org_id`) now requires a valid token and membership | ~~before any non-localhost deployment~~ | Vlad |
+| 10 | Frontend for organizations, API keys, branding and ownership verification — all four work today via curl only. `index.html` and `art50check.html` are the only pages with a UI | after auth (building a UI for endpoints anyone can call as anyone else is wasted work) | Frontend |
+| 11 | 21 → 75 attacks in `attacks/attacks.yaml` (5 categories × 15) — 🔴 **read #12 first, this needs a paid Mistral plan** | with Gregor | Attack Engineer |
+| 12 | 🔴 **The free Mistral tier cannot carry 75 attacks.** Measured 16.08 from Mistral's own rate-limit headers: the account allows **50 requests/minute** and **50,000 tokens/minute**. One 21-attack scan costs ~34 requests and ~11,900 tokens — already 68% of the request budget, which is why two scans back to back used to come back with no grade at all. That works out at ~1.6 requests per attack, so: **above roughly 31 attacks every single scan exceeds the per-minute request limit on its own.** At 75 attacks a scan needs ~121 requests (243% of the limit) and ~42,500 tokens (85%), meaning a minimum of ~2.4 minutes per scan spent purely waiting on backoff, and no possibility of two scans in the same minute. Retry with backoff (added 16.08) keeps this correct rather than silently ungraded, but it cannot create quota. **Decide before the library grows past ~30 attacks**, not after: upgrade the Mistral plan (simplest), or cut judge calls per attack, or accept multi-minute scans | before the library passes ~30 attacks | team decision — Vlad has the numbers |
+| 13 | **Basic-Auth on the server is unauthenticated CPU amplification.** `caddy hash-password` defaults to bcrypt cost 14, so every *wrong* password costs the box a full bcrypt — and Caddy runs it even for a username that does not exist, so an attacker has to guess nothing. Measured in the security pass: 10 sequential wrong-password requests took 20.2s against 0.20s for 10 requests with no `Authorization` header at all; 30 in parallel pinned Caddy at 1086% CPU. Caddy's hash cache only helps the *correct* password, so a random one each time defeats it, and nothing rate-limits it — `slowapi` lives inside the app, which a 401 never reaches. **Accepted, not fixed:** the worst case is an unlaunched, unadvertised site being unavailable while someone attacks it, with no data at risk and full recovery the moment it stops. Revisit if the box is ever advertised while still password-gated, or lower the cost factor when generating the hash | if the gated site is advertised | Bogdan |
+| 14 | **DNS rebinding defeats the SSRF guard — hypothesis, code path confirmed.** `netguard.assert_public_host` resolves the hostname (`netguard.py:58`) and returns; the connection is then made by an independent second resolution (`art50check.py:125`, `scanner.py:69`). A name the attacker controls with TTL 0 — public on the first lookup, `127.0.0.1` on the second — would pass the guard. The two-resolution path was read; **no rebinding nameserver was stood up, so the race itself is unproven.** Not reachable today: both callers sit behind the site's Basic-Auth. The redirect half of this class is handled correctly (`art50check.py:119` sets `follow_redirects=False` and re-runs the guard on every hop). **Fix before the password comes off**, since that is the moment `/api/art50check` becomes anonymous and internet-facing | before removing Basic-Auth | Bogdan |
+| 15 | 🔴 **A bigger library made the vulnerable bot look safer.** First run of the 78-attack set, 17.08, same demo bot and same system prompt as the 21-attack runs: **D/52 became C/80**. The bot is not safer — it still leaks the canary and `critical_failures` is 3; the grade is C only because the critical cap holds it there, the raw score of 80 is B territory. Score is passed-weight over total-weight, so 57 attacks it mostly passes dilute the result by 28 points. This is a scoring question, not a library question: a bot with three confirmed critical leaks should not score 80 in a paid Prüfbericht. **Decide before either set is used with a customer** | before the first paid report | team decision — Bogdan has the measurements |
+| 16 | **The 78-attack set is unbalanced, and one category is nearly empty.** Planned as 5 x 15. Actual: jailbreak 21, brand_safety 20, prompt_injection 17, data_leakage 15, **excessive_agency 5**. On the 17.08 run three of those five errored on Mistral 429, so the whole "what the bot is allowed to do" category rested on **2 scored attacks out of 78**. Also `summary.total` counts only PASS+FAIL, so that scan reports 74 while 78 ran | with the next library edit | Gregor |
 
 ---
 
@@ -97,10 +139,12 @@
 |---|---|
 | Business registration (Gewerbe) | before the first invoice |
 | Gründungszuschuss | 🔴 **check NOW** if anyone is registered with the Agentur für Arbeit — the application goes in BEFORE Gewerbeanmeldung |
-| Mollie, payments | when a customer is ready to pay |
-| PDF export | after the course submission |
+| **Paid Mistral plan** | 🔴 **before the attack library passes ~30 attacks.** The free tier's 50 requests/minute is exceeded by a single scan beyond that point — see technical debt #12 for the measured numbers. This is a hard blocker on the 21→75 work, not a nice-to-have |
+| Mollie, payments | when the Gewerbe is registered — team decided 16.08 not to build even the schema until then |
+| ~~PDF export~~ | ✅ **done 16.08** — client-side print via `frontend/report.html`, no backend needed |
+| Email verification, password reset | when Brevo (or any EU email sender) is set up — same reasoning as Mollie: both need a real send-email credential that doesn't exist yet. Team decided 16.08 not to fake it with a console-logged token in the meantime |
 | Badge | after 10 customers |
-| CI/CD integration | when a customer asks |
+| CI/CD integration | when there is a Hetzner server to deploy to |
 | Voice AI agents | year 2 |
 
 ---
@@ -110,11 +154,54 @@
 | Metric | Value | State |
 |---|---|---|
 | Sites checked for the hypothesis | 0 of 24 | 🔴 blocks the pitch |
-| Attacks in the library | 21 of 75 | 🟠 |
-| Test bots | 0 of 3 | 🔴 |
-| Calibration set | 0 of 30 | 🔴 |
-| Judge agreement with human labels | not measured | 🔴 |
+| Attacks in the library | 78 (`attacks.yaml`) · 21 (`attacks_short.yaml`, the demo default) | ✅ |
+| Test bots | 3 of 3 | ✅ `demo/targets.yaml` — TeleShop unprotected, TeleShop hardened, Praxis Dr. Weber. Mirrors `lab/bots/` byte for byte |
+| Calibration set | 30 of 30, all hand-labelled (v1) · 43 of 43 (v2) | ✅ `calibration/set-v1.yaml`, `set-v2.yaml` |
+| Judge agreement with human labels | **29/29, identical in all 10 runs** | ✅ measured 18.08 on the current engine |
+| — of which the deterministic layer | **11/11, 0 disagreements, every run** | ✅ the number that carries the grade |
 | Paid reports per month (**north star**) | 0 | — |
+
+### ⚠️ The engine changed on 18.08 — read this before quoting any number
+
+**Mistral is out.** The judge now runs on **gpt-4.1** and the target on
+**gpt-4.1-mini**, both on Azure, and a scan attacks a **real deployment over
+HTTP** instead of replaying a system prompt on our own provider. See
+`docs/ENGINE-REWORK.md` and `GREGOR_WORKLOG.md` sessions 30–32.
+
+Every figure in this section is measured on that engine. Reproduce with:
+
+```bash
+python calibration/calibrate.py --runs 10
+```
+
+**The judge stopped wobbling, and that is the headline change:**
+
+| Judge | Agreement | Unstable items |
+|---|---|---|
+| `mistral-small` (superseded, n=10) | mean 94.3 %, range **26–30 of 30** | 5 |
+| **`gpt-4.1` (current, n=10)** | **29/29 every run** | **0** |
+
+All five items that used to disagree now agree, including `cal-021` and
+`cal-023`, which session 16 predicted by name as the likeliest false positives.
+
+⚠️ **29, not 30, and it is not a like-for-like replacement for "29/30".**
+`cal-027` is unjudgeable on Azure every run: it is the `jb_encoding` item whose
+`bot_response` *is* an Azure content-filter error, so the base64 payload trips
+the filter on the judge path exactly as it does at the target. The figure covers
+29 items; say so if asked.
+
+Two things to say out loud, both stronger than a percentage:
+
+* **The deterministic layer agreed with a human on every item it can see, in
+  every run — 11/11 on v1, 13/13 on v2, zero disagreements.** Only a `confirmed`
+  finding may drive a grade to F (`PLAYBOOK.md:466`), so the worst grade we issue
+  is the part that does not wobble, on either engine.
+* **The remaining variance is the bot, not the judge.** The vulnerable bot moves
+  **F↔D** between runs and the hardened control has been seen once at B(85) in
+  four runs, with zero errors throughout. That is the same target answering
+  differently to the same sentence — which is the product's own argument, and it
+  is already in the Q&A. **Slide 5 should promise a contrast, not two specific
+  letters.**
 
 ---
 
@@ -148,6 +235,207 @@ illustration of the scan pipeline, the GRC section and pricing. Impressum and
 Datenschutz exist as structural placeholders with `{{TOKEN}}` fields — Kwabena
 owns the wording.
 
-**Open API request (not implemented — frontend must not add backend fields):**
-the Prüfbericht wants an **attack-library version** on page 1. The report shows
-"not reported by the backend" until `report.attack_library_version` exists.
+**16.08.2026** — Full backend session (Vlad, with Claude Code). Completed the
+rest of Vlad's implementation plan and closed out P1/P2 up to what the team
+decided to defer:
+
+- Migrated the judge fully to Mistral (removed all Anthropic code and the
+  `anthropic` dependency — tech debt #1, closed)
+- Postgres + Alembic: organizations, targets, scans, results, ownership
+  verifications, `Membership` (schema-only, unused until auth), `ApiKey`,
+  `Branding` — tech debt #2 and #4, closed
+- Real DNS TXT ownership verification, wired as a hard gate in front of every
+  `mode="api"` scan — tech debt #3, closed
+- Attack library versioning (`attacks.yaml` → `version: "1.4"`), now shown
+  correctly in the Prüfbericht — tech debt #5, closed; also fixed the report
+  page reading the wrong field name (`attack_library_version` vs the API's
+  actual `library_version`) and a missing `target_name`, both of which made
+  every printed report show placeholders instead of the real scan
+- API keys (`POST/GET/DELETE /api/keys`) for CI/CD-style programmatic access,
+  and white-label branding (`PUT/GET /api/organizations/{id}/branding`) for
+  the agency tier — both P2 items, both tested
+- Free Art.-50-Check got its own page (`frontend/art50check.html`), wired to
+  the pricing card that used to link nowhere; verified against real sites
+  (otto.de missing AI disclosure, zendesk.com clean, wikipedia.org no widget)
+- **Security pass:** git history and current code clean of secrets; no SQL
+  injection (ORM everywhere) or XSS (escaped consistently on all 3 frontend
+  pages); found and fixed a real SSRF hole in Art.-50-Check (it fetched any
+  caller-supplied URL server-side with no guard — blocked private/loopback/
+  link-local/metadata-endpoint addresses, re-checked on every redirect hop);
+  found and fixed `requirements.txt` missing sqlalchemy/alembic/psycopg/
+  dnspython (a fresh clone would not have started) and a stale `anthropic`
+  entry; added per-IP rate limiting (`slowapi`) since `/api/scan` makes ~21
+  real Mistral calls and had zero cost protection
+- **Found, not fixed (team decision pending):** no authentication anywhere —
+  any caller can create organizations, mint API keys for any `org_id`, and
+  read any scan's results, including the confidential `evidence` quotes a
+  scan captured. Fine for a localhost PoC, not fine for anything else. See
+  technical debt #9. Do not deploy this server beyond localhost until the
+  team has decided an approach and it is built.
+- Rewrote the stale parts of `README.md` (Status/Project structure/API table/
+  Who-does-what all predated the database entirely) and `SECRETS.md` (still
+  told people to get an Anthropic key)
+
+**What's left of Vlad's plan:** frontend for organizations/API keys/branding/
+ownership (tech debt #10, Bogdan's), 21→75 attacks (#11, Gregor's side), then
+Mollie billing and CI/CD — both intentionally deferred until the Gewerbe is
+registered.
+
+**16.08.2026 (later) — Authentication.** Team decided to build it rather than
+wait, and to leave the frontend for it to Bogdan. Closed technical debt #9:
+
+- New `User` table (email, password_hash, bcrypt) and `backend/auth.py`:
+  `POST /api/auth/register`, `POST /api/auth/login` (both rate-limited),
+  `GET /api/auth/me`. Sessions are JWT bearer tokens (`Authorization: Bearer
+  <token>`), not cookies — the frontend is fetch()-based already, and a
+  bearer token sidesteps CSRF entirely since the browser never sends it
+  automatically. `JWT_SECRET` in `.env`; if unset the app generates a random
+  one at startup and logs everyone out on every restart, on purpose — a
+  deliberately annoying default so a real secret gets set before this is
+  mistaken for production-ready.
+- `Membership` (built earlier today, unused until now) is the authorization
+  source of truth: `require_membership(db, user, org_id)` raises 403 if the
+  caller isn't a member. Wired into every org-scoped endpoint — creating an
+  org (creator becomes owner automatically), listing/reading orgs, branding,
+  ownership challenge/verify, and — the one that mattered most — issuing,
+  listing and revoking API keys. **This closes the exact hole found in this
+  morning's security pass:** anyone could mint a working API key for any
+  `org_id` with zero proof of ownership. Verified live with two accounts: an
+  "attacker" cannot create a key for the "victim" org (403), the real owner
+  can (200) for their own.
+- `GET /api/scans` and `/api/scans/{id}` now scope to the caller's orgs
+  instead of returning every scan in the system (including the confidential
+  `evidence` a scan captured). A scan belonging to someone else's org 404s,
+  not 403s, so probing scan ids can't distinguish "not yours" from "doesn't
+  exist".
+- **The free demo path is untouched on purpose:** `POST /api/scan` with
+  `mode="prompt"` and no `org_id` and no `X-API-Key` still needs no login at
+  all — that's the course-pitch demo, and it only ever replays text the
+  caller submitted themselves, never a live third-party system. `org_id` in
+  the body is now honoured only for a logged-in member of that org; an
+  `X-API-Key` still works exactly as before (the key itself is already proof
+  of the org, no separate login needed on top of it) — verified both paths
+  still work end to end after the change.
+- Verified with 13 separate checks (register/login/me, org creation with and
+  without login, the API-key mint attack across two accounts, anonymous scan,
+  scan with org_id unauthenticated/non-member/owner, scan history scoping,
+  the API-key scan path) before calling this done.
+
+**Frontend for all of this — organizations, API keys, branding, ownership,
+login/register — is Bogdan's, not built here.** The API is ready for it.
+
+**16.08.2026 (later still) — Security hardening pass on auth.** Worked
+through a punch list from a review of the authentication system just built,
+one item at a time:
+
+1. **Role-based authorization** — any `Membership` role could do anything.
+   Sensitive actions (create/revoke API keys, change branding, ownership
+   verification) now require `admin` or `owner`; adding a new member
+   requires `owner`. Added `POST /api/organizations/{id}/members` — this
+   was missing entirely, so no org could have more than one member before
+   today. `GET /api/organizations/{id}` now actually returns its members
+   (the docstring already claimed it did).
+2. **Logout / token revocation** — JWTs had no invalidation path short of
+   waiting out the 24h expiry. `User.token_version`, embedded in every
+   token; `POST /api/auth/logout` bumps it, invalidating every token for
+   that account at once (no per-session targeting, deliberately simple).
+3. **Per-account brute-force lockout** — the per-IP rate limit on login
+   does nothing against a distributed or slow-paced attack on one account.
+   5 consecutive failures locks that account for 15 minutes regardless of
+   caller IP, even against the correct password.
+4. `POST /api/attacks/reload` had no rate limit at all — added one. Still
+   no login required (shared, non-secret, not org-scoped content).
+5. CORS: deliberately **not** added. Everything is same-origin today; a
+   wildcard policy would be a regression, not a fix. Documented in
+   README.md exactly how to add it correctly (specific origin, never `*`)
+   once a frontend needs it.
+6. **Deferred, not built:** email verification and password reset both
+   need a real send-email credential (Brevo, per the stack decision) that
+   doesn't exist yet — same reasoning as Mollie. Team decided not to fake
+   it with a console-logged token in the meantime.
+7. **HTTPS/TLS:** left entirely to whoever sets up the Hetzner deploy
+   (Bogdan) — nothing to fix in application code until there is a real
+   server and domain to get a certificate for.
+
+Every item verified live before moving to the next, same discipline as the
+rest of today: role permissions with three real accounts, logout with a
+real token before/after, lockout with 5 genuine failed attempts followed
+by a still-rejected correct password, then a successful unlock.
+
+**16.08.2026 (evening) — first runs against Gregor's lab, and what they
+found.** Gregor merged the target lab (PR #9) and the measurement harness.
+Pointing our scanner at Bot A / Bot B is the first time api mode has ever
+hit a real target instead of a mock, and it immediately paid for itself.
+
+Integration:
+- The ownership gate blocked the lab outright — DNS TXT verification can
+  never pass for `127.0.0.1`. New `ALLOW_PRIVATE_SCAN_TARGETS` flag, off by
+  default (on a deployed box it would be an SSRF hole), plus the SSRF check
+  extracted to `backend/netguard.py` now that two callers need it.
+- Gregor's line references into `scanner.py` all still resolve. His
+  `detect_canary` finding is real and his uppercase workaround is the right
+  one: permitting lowercase makes the first match in a realistic German
+  prompt `gpt-4`, which we would then report as a confirmed critical leak.
+
+Four judge/scoring defects that only real answers could expose:
+- The judge awarded itself `confidence: "confirmed"`, reserved for
+  deterministic matches (decision #9). A model's opinion was heading into a
+  Prüfbericht labelled as proven fact.
+- The judge cited **our own attack text** as evidence. `no quote, no
+  finding` from the plan §4.1 had never been implemented.
+- Capping the judge at `likely` then exposed a worse one: the confidence
+  multiplier was applied to **passes**, not findings. A bot defending all 21
+  attacks scored 70 — a C — and an F if the judge said "possible". Both the
+  README and `scoring.py`'s own docstring document the formula without any
+  multiplier; the plan applies it to fails. It was on the wrong side.
+- Layer 1 only looked for the canary on attacks declaring
+  `contains_canary` (14 of 21), so a leak during a brand_safety attack fell
+  through to the model. Now every declared secret is checked on every
+  attack, and `ScanRequest` takes a `secrets` list so a customer's real
+  secrets get the same treatment as a planted canary. Skips any value our
+  own attack text already contains — Gregor hit that exact false positive
+  in his harness first.
+
+Then the one that would have broken the pitch: **scans were silently losing
+their grade to Mistral rate limits.** Scan the vulnerable bot, immediately
+scan the hardened one, and the second came back ungraded. Three causes,
+found in order: no retry anywhere in `llm.py`; the synchronous Mistral
+client called from inside an `async` function, blocking the event loop so
+`CONCURRENCY` never actually did anything; and then, once `complete_async`
+made concurrency real, 5 immediately exceeded the tier. Default is now 3
+(measured), with 5-attempt backoff at 2/4/8/16s. Three consecutive
+prompt-mode scans now run 0/0/0 errors where they used to be 0/14%/33%.
+The second and third take ~45s instead of ~14s, spent waiting — the right
+trade against returning no grade at all.
+
+That investigation is where the numbers in technical debt #12 come from,
+and #12 is the item that matters most for next week: **the free Mistral
+tier cannot carry the 21→75 attack expansion.**
+
+Current state against the lab: Bot A grades D (~64-69, four of its findings
+deterministic canary leaks), Bot B grades A (~98-100). The A→B contrast
+lands. Bot B's occasional failures are real, not false positives — it leaks
+the supplier name intermittently and drafts a legal demand letter despite
+its own rule 6. Both are Gregor's to fix; the control group is working
+exactly as it should by surfacing them.
+
+**18.08.2026 — the EU-only stack is withdrawn.** Gregor's decision. It was
+`PLAYBOOK.md` §1, an INVARIANT, and it required an EU-only vendor stack and an
+EU-only judge model (Mistral or Aleph Alpha, with Anthropic, OpenAI and Google
+forbidden). It is gone: **no vendor prohibition applies to this project any
+more, and data residency is no longer a selling point.** Decision #7 is marked
+reversed, technical debt #1 is moot rather than done, and the customer-facing
+claim is removed from `PITCH-PLAN.md` — slide 6 now rests on three mechanisms
+instead of four, and the Q&A answer to *"where does our data go?"* answers with
+how prompts are handled rather than with a country.
+
+What survives on its own merits: customer system prompts and transcripts are
+trade secrets and may contain personal data, which governs **retention, logging
+and access** — not which vendor processes them. The ban on "zertifiziert"
+(`PLAYBOOK.md` §5) was never a residency rule and is untouched.
+
+⚠️ Mistral is still the only provider `backend/llm.py` registers, so the
+descriptive statements about it remain accurate. The rate-limit and quota
+numbers throughout this document (technical debt #12, #16, the 50 req/min
+figures) are measurements of the Mistral free tier and will not survive a
+provider change.

@@ -69,43 +69,39 @@ The `LLM` prefix saves us — but only if we always write the name **as one word
 
 # PART II — INVARIANTS
 
-## 1. EU-only stack **INVARIANT**
+## 1. ~~EU-only stack~~ — **WITHDRAWN 18.08.2026**
 
-| Layer | Choice | ❌ Never |
-|---|---|---|
-| Hosting | **Hetzner** (Nuremberg / Falkenstein) 🇩🇪 | AWS, Azure, GCP |
-| Mail | **mailbox.org** 🇩🇪 | Google Workspace, M365 |
-| Email sending | **Brevo** 🇫🇷 | SendGrid, Postmark, Resend |
-| Payments | **Mollie** 🇳🇱 | Stripe, Paddle at launch |
-| Auth | **self-hosted** | Clerk, Auth0, Supabase Auth |
-| Analytics | **Plausible self-hosted** | Google Analytics |
-| Fonts | **self-hosted** | Google Fonts CDN |
-| Errors | **GlitchTip** | Sentry US |
-| **LLM judge** | **Mistral** 🇫🇷 or **Aleph Alpha** 🇩🇪 | 🔴 **Anthropic, OpenAI, Google** |
+This section required an EU-only vendor stack and, in its last row, an EU-only
+LLM for the judge — Mistral or Aleph Alpha, with Anthropic, OpenAI and Google
+forbidden. **It is no longer an invariant, and data residency is no longer a
+selling point.** Provider choice is now an engineering decision like any other.
 
-**One reason for all of it:** US companies fall under the **US CLOUD Act** —
-US authorities can demand data regardless of which data centre it sits in.
+The section number is kept so that references to `§1` elsewhere still resolve.
+Nothing replaces the prohibition: there is no forbidden vendor in this playbook
+any more, for any layer.
 
-### 🔴 The last row is the most important one in this table
+**What the project actually uses** — a record, not a rule. Other documents refer
+to "the stack decision" and mean this list. Any of it may change on ordinary
+engineering grounds:
 
-We have the sharpest possible version of this problem. Consider what we send
-to the judge model:
+| Layer | Currently |
+|---|---|
+| Hosting | Hetzner (Nuremberg / Falkenstein) |
+| Mail | mailbox.org |
+| Email sending | Brevo — not wired up yet |
+| Payments | Mollie — not wired up yet |
+| Auth | self-hosted (email/password + JWT) |
+| Analytics | Plausible, self-hosted |
+| Fonts | self-hosted |
+| Errors | GlitchTip |
+| LLM judge | Mistral — the only provider `backend/llm.py` registers |
 
-> the customer's system prompt — their trade secret — and full conversation
-> transcripts where the bot may have leaked personal data.
+What survives, on its own merits and not as a residency argument:
 
-If that goes to OpenAI or Anthropic, we:
-1. become an **Auftragsverarbeiter** with a US sub-processor — SCCs, TIA,
-   an entry in the Verzeichnis;
-2. **sell AI compliance while breaking AI compliance.** The first lawyer-customer
-   asks this in the first meeting;
-3. lose the only advantage we have over American competitors.
-
-**Decision:** judge and attacker run on **Mistral** (Paris, data in the EU).
-For the course demo anything goes — but this is recorded as **tech debt #1**
-and closed **before the first paying customer**, not later.
-
-> 💬 In a meeting: *"Wo liegen die Prompts meines Bots?" — "Frankreich. Mistral. Kein US-Anbieter im gesamten Stack."*
+- customer system prompts and transcripts are **trade secrets and may contain
+  personal data**. That governs retention, logging and who may read them
+  (§2, and the retention rule in PART VII) — it no longer dictates a vendor.
+- the word "zertifiziert" is still banned (§5). That was never a residency rule.
 
 ## 2. 🔒 The core product rule **INVARIANT**
 
@@ -123,6 +119,74 @@ Consequences, not up for discussion:
 Landing page button: **"Prüfen Sie unseren eigenen Bot"**.
 
 ## 3. Design system
+
+> ### 🔴 DECIDED 18.08.2026 — the product goes LIGHT. Do not revert.
+>
+> The dark theme is dropped. Bogdan's decision: the buyer is a restaurant owner as
+> much as a compliance manager, the Prüfbericht was always a light document, and
+> one theme across landing + app + report is less to carry.
+>
+> **State right now:** shipped, and there is no dark page left. `frontend/preview/`
+> and its `REVIEW.md` are gone — the preview pages were swapped into the live
+> ones, so there is nothing left to review separately. `assets/base.css` still
+> holds the dark set but **no page links it any more**: `art50check.html` was the
+> last one, and it joined the light system by inlining the same foundation the
+> other five carry. It held no HEX literal of its own — which is not the same as
+> holding no literal, and the first attempt at this said it was: five `rgba()`
+> washes are literals no token reaches, and two of them were the off-palette
+> lime, so two of its own rules DID have to be rewritten. The same sweep missed
+> the `<img>` asset: the page went on loading `mark.svg`, whose single colour is
+> that same lime, at 1.44:1 on the light topbar. **A colour sweep that reads only
+> CSS is not a colour sweep** — the greens in this product live in CSS, in `rgba()`,
+> and inside SVG files that no token can reach.
+>
+> base.css is now dead weight and can be deleted the day somebody wants to.
+>
+> The app first shipped light on its own palette (`#F7F8F5 / #111827 / #256B10`)
+> while the landing shipped on another. Both differences turned out to be hue and
+> not weight — the two greens measure 1.007:1 apart and the two grounds 1.062:1 —
+> so the landing's won, and the app followed it.
+>
+> **Light tokens — every ratio computed, not estimated.** Against `--bg #F2F1EB`:
+>
+> ```css
+> --bg:#F2F1EB;        --surface:#FFFFFF;     --line:#DFDED9;
+> --ink:#121210;       /* 16.57:1 */          --ink-muted:#5A6660;  /* 5.30:1 */
+> --accent:#116B2E;    /*  5.86:1 as text, 6.63:1 under a white label — one
+>                          value serves both roles, so there is no second green.
+>                          It is also the green on the printed sheet, and the
+>                          literal inside seal.svg and mark-ink.svg, which an
+>                          <img>-loaded SVG cannot read from a token.          */
+> --brand-lite:#7BE33F;/*  1.44:1 here, 1.63:1 on white — LARGE DECORATIVE
+>                          SHAPES ONLY. Never text, never an icon, never a
+>                          border on its own. Nothing references it today.    */
+> --critical:#A3200F;  /* 6.70 */  --high:#B45309; /* 4.44 */  --medium:#7A5200; /* 6.12 */
+> ```
+>
+> `--high` at 4.44 is below AA on this ground and is deliberately kept: it is
+> never small text there. As a grade it is 34px, as a severity label it sits on
+> `--surface` at 5.02:1, and its one use on the ground is a 1px border, where the
+> threshold is 3:1.
+>
+> **Two grounds, not one.** `--surface` is `#FFFFFF` and did not move in the swap.
+> Before deciding a colour lost contrast, read the ancestor chain: `.capped`,
+> the `.ring` track and `.fhead:hover` all sit on white, not on `--bg`.
+>
+> `#3E8F14` is **removed** — 3.61:1 on `--bg`, 4.08:1 on white, fails AA both ways.
+> It survives only in `lockup-light.svg`, which no page references.
+>
+> `#1F5C0E` is **retired** — it was the second, darker green on the printed sheet.
+> It survives only in `lockup.svg`, likewise unreferenced.
+>
+> Accent budget is unchanged: the green is roughly **5 % of the pixels**. A light
+> page flooded with green looks like an eco brand, not a security tool.
+>
+> The seal (`assets/brand/seal.svg`) has exactly three jobs — a dated stamp on the
+> report, a quiet watermark on the landing, a compact lockup in the navbar. It
+> states **that a test happened**, never a verdict, and it is **not** given to
+> customers for their own site. That is the Badge, deferred in §6 until 10 customers.
+
+### Dark tokens — current live state, superseded by the block above
 
 ```css
 --bg:        #0A0A0B;   --surface:   #141518;   --border:  #24262B;
@@ -321,12 +385,35 @@ served from our server and **sets no cookies**.
 |---|---|---|
 | **The word "zertifiziert" in any form** | § 5 UWG + AI Act Art. 43 | 🔴 see below — the most important row |
 | **Cold email** — even B2B | § 7 UWG | no B2B exception in Germany. **Paper letters only** |
-| **Active attack without ownership verification** | provider ToS, possibly § 202a StGB | passive page view is **not** a breach |
+| **Active attack without ownership verification** | provider ToS, possibly § 202a StGB | passive page view is **not** a breach. One narrow exception exists in code — see below |
 | **Alleinstellungsbehauptung** | § 5 UWG | "das prüft sonst niemand" — unprovable |
 | Exaggerating risk | § 5 UWG | "Sie bekommen ein Bußgeld!" is itself a violation |
 | Payment button without "Zahlungspflichtig bestellen" | § 312j BGB | contract void |
 | Storing bot answers containing personal data | GDPR | we become controller of someone else's data |
 | Publishing a customer's vulnerabilities | contract | NDA by default |
+
+### The one exception to ownership verification, and its real cost
+
+`SCAN_UNVERIFIED_DOMAINS` (`backend/config.py`, checked at `backend/main.py:1074`)
+names public domains an api-mode scan may attack without the DNS TXT record. It
+exists so a test bot we own can be scanned while it is still moving between
+hosts. It is **empty by default** and a domain enters it only by being typed
+into `deploy/.env`.
+
+Two things about it that the name does not say, and that decide whether a domain
+belongs in the list:
+
+- **The waiver is not scoped to us.** `is_domain_verified` binds a domain to one
+  organisation; the allowlist binds it to none, and it is skipped entirely. Anyone
+  who registers an account — open, no email confirmation — can mint an API key and
+  aim a scan at a listed domain, from our server and on our judge budget. Listing a
+  domain publishes it as a target, it does not reserve it for us.
+- **"Our own test bots" is a sentence in a comment, not a control.** The only thing
+  enforcing it is who can write `deploy/.env`, which is gitignored — so there is no
+  record of what was listed when, or by whom.
+
+A customer's domain never goes in here. For a customer the DNS record is the whole
+point: it is the evidence that they asked to be attacked.
 
 ### 🔴 Why "zertifiziert" is a red line
 
@@ -566,7 +653,7 @@ different jobs, and confusing them is the fastest way to fail both.
 | **7** | pitch, 3 rehearsals | local fallback ready | — | legal Q&A answers |
 
 **Track A scope — what we do NOT do:** billing, business registration, Hetzner,
-Mistral migration, i18n, subscriptions, badge, PDF export (HTML is enough), real
+i18n, subscriptions, badge, PDF export (HTML is enough), real
 DNS ownership verification (a stub is enough).
 
 ## 13. TRACK B — startup (after submission)
@@ -575,7 +662,6 @@ DNS ownership verification (a stub is enough).
 |---|---|---|
 | **1** (course) | demo + **the 24-site number** + legal map | no number = building blind |
 | **2** | name cleared at DPMA/EUIPO, domains bought, Hetzner, mailbox.org | name not cleared = don't order a logo |
-| **3** | 🔴 **migration to Mistral** — tech debt #1 closed | US vendor in the stack = we sell what we violate |
 | **4** | real ownership verification, public free Art.-50-Check | active attacks without verification = a legal bomb |
 | **6** | ⚡ **first payment** | none = stop and figure out why, don't write more code |
 | **8** | 10 customers, first paper letters sent | |
@@ -613,7 +699,6 @@ not GitHub stars.
 |---|---|
 | The word "zertifiziert" slips into copy | Kwabena proofreads **every** text before publication |
 | Name taken by a live competitor | Google the name, not just registers and domains. `Mantis` is taken in security |
-| US LLM inside an EU-compliance product | Mistral before the first paying customer |
 | Attacking a bot without the owner's permission | Layer 1 passive, layer 2 verified only |
 | Judge produces false positives | Gregor's calibration set + three confidence levels |
 | Grade issued from an incomplete scan | >10% failed checks → no grade |
@@ -675,5 +760,6 @@ Date · Task · Branch · Author
 
 1. **Test the hypothesis in 20 minutes, not two months.** 150 lines and 24 real sites.
 2. **Proof of work is effect, not change.** And verify the tool before trusting its output.
-3. **Do not violate what you protect against.** For us that means two specific things:
-   **no US vendor in the stack** and **never the word "zertifiziert"**.
+3. **Do not violate what you protect against.** For us that means our own bot
+   passes our own test and discloses that it is an AI — and **never the word
+   "zertifiziert"**.
