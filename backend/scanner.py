@@ -238,6 +238,12 @@ async def run_scan(target: Target, categories: list[str] | None = None,
         "library_version": library.version,
         "library_name": library.name,
         "canary": target.canary,  # the one actually used (explicit or auto-detected)
+        # The report masks every declared secret wherever it appears, including
+        # inside quoted answers (frontend/report.html:517). It was already reading
+        # this key — and never receiving it, so a declared value other than the
+        # canary would have been reprinted in the PDF in plain text, which is the
+        # opposite of what a Prüfbericht about a leak should do.
+        "secrets": target.secrets,
         "summary": summary,
         "results": results,
         "scoring_explanation": scoring.explain(),
