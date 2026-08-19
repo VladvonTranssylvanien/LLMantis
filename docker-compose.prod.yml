@@ -36,6 +36,20 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # The rate limiter keys on request.client.host (slowapi/util.py:27). Without
+    # --proxy-headers uvicorn reports the TCP peer, and behind Caddy that is
+    # Caddy's container address for EVERY visitor — so "5/minute per IP" was one
+    # global bucket, and a press costs two of it because the scan runs twice.
+    # Measured on this box: a request carrying X-Forwarded-For: 203.0.113.99 was
+    # logged as 172.18.0.5, the calling container. Not the header.
+    #
+    # Trusting the header is safe HERE specifically: the service publishes no
+    # ports (verified, PortBindings is empty), so the only thing that can open a
+    # connection is a container on this network. workshop-reg already runs this
+    # way. Overridden here rather than in the Dockerfile because that file is
+    # Vlad's and a change there was reverted once already.
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
     depends_on:
       postgres:
         condition: service_healthy

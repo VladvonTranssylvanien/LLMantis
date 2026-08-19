@@ -980,7 +980,12 @@ async def get_scan(scan_id: str, db: Session = Depends(get_db),
 
 
 @app.post("/api/scan")
-@limiter.limit("5/minute")
+# 10, not 5, because one button press is now TWO scans (the worse run is the
+# one reported), so 5 allowed exactly two presses per minute and broke the
+# third mid-way — leaving pass 1's report on screen next to a 429. Five presses
+# a minute is the headroom a live demonstration needs. It is not a licence to
+# hammer: each press is ~42 judge calls and we pay for every one.
+@limiter.limit("10/minute")
 async def scan(request: Request, body: ScanRequest, db: Session = Depends(get_db),
                 api_key_org: UUID | None = Depends(resolve_org_from_api_key),
                 current_user: User | None = Depends(get_current_user_optional)):
