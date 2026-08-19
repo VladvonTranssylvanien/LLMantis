@@ -253,13 +253,29 @@ h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
   color:var(--muted)}
 .plan .p{font-size:clamp(40px,4.6vw,64px);font-weight:700;letter-spacing:-.05em;margin:16px 0 4px}
 .plan .p small{font-size:15px;font-weight:400;letter-spacing:0;color:var(--muted)}
-.plan ul{list-style:none;margin:24px 0 26px;padding:0;display:grid;gap:11px;flex:1}
+.plan ul{list-style:none;margin:24px 0 26px;padding:0;display:grid;gap:11px;flex:1;
+  /* flex:1 grows this list to whatever the TALLEST card in the row needs, and a
+     grid's rows stretch to fill that -- so the slack lands inside each <li>
+     rather than after the list. Measured at 1449px: a 22px line of text sat in
+     a 50px box, and once Business grew its "why monthly" paragraph the same
+     line sat in 98px, with gap:11px honoured throughout. align-content:start
+     keeps every row at its content height and puts the slack at the bottom,
+     where the flex column already parks it above .cta. */
+  align-content:start}
 .plan li{font-size:15.5px;color:var(--body);padding-left:20px;position:relative;line-height:1.45}
 .plan li::before{content:'';position:absolute;left:0;top:.62em;width:8px;height:1px;background:var(--accent)}
 .plan li.cannot{color:var(--muted)}
 .plan li.cannot::before{background:var(--faint)}
 .plan .req{font-family:var(--mono);font-size:11.5px;line-height:1.6;letter-spacing:.04em;
   color:var(--accent);background:var(--accent-soft);padding:11px 13px;margin-bottom:20px}
+/* Business is the only card priced per MONTH while the product only ever
+   produces events, so it is the only one that has to answer "what am I paying
+   for in month two". The feature list cannot: every line in it is a thing that
+   happens during a scan. Hence a paragraph, ruled off from the list above it,
+   sitting between the list and the call to action. */
+.plan .why{font-size:13.5px;line-height:1.55;color:var(--muted);margin:0 0 24px;
+  padding-top:18px;border-top:1px solid var(--hairline)}
+.plan .why b{color:var(--body);font-weight:600}
 .cta{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;text-decoration:none;
   font-weight:600;font-size:15.5px;color:var(--ink);border-bottom:1px solid var(--accent);
   padding-bottom:3px;transition:color var(--dur) var(--ease)}
@@ -639,10 +655,20 @@ footer a:hover{color:var(--accent)}
           Ohne diesen Nachweis führen wir keinen aktiven Test durch.</p>
         <ul>
           <li>Alles aus Starter</li>
-          <li>Prüfung des laufenden Bots</li>
-          <li>Nachprüfung nach der Behebung</li>
-          <li>Verlauf und mehrere Bots</li>
+          <li>Prüfung des laufenden Bots — gegen das ausgelieferte System,
+              nicht gegen seinen Systemprompt</li>
+          <li><b>Unbegrenzt viele Prüfungen</b></li>
+          <li>Nachprüfung nach jeder Behebung</li>
         </ul>
+        <!-- "Verlauf und mehrere Bots" stood here and was dropped. Neither is a
+             Business feature: /api/scans returns history to any account
+             (backend/main.py:901) and nothing caps how many targets anyone may
+             hold. Worse, no page in this frontend calls /api/scans at all, so
+             "Verlauf" named a screen that does not exist. -->
+        <p class="why"><b>Warum monatlich:</b> Ihr Bot ändert sich. Ein bearbeiteter
+          Prompt, ein Modell-Update, neue Inhalte in der Wissensbasis — jedes davon
+          kann eine behobene Lücke zurückbringen. Ein Bericht vom letzten Monat sagt
+          nichts über den Bot von heute. Sie prüfen, so oft Sie ändern.</p>
         <!-- Business is the live-bot test, so the page must open on the mode that
              asks for the endpoint. Without ?mode=api it opens on the Starter form
              and the endpoint field is not even on screen. -->
