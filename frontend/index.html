@@ -811,43 +811,87 @@ $('run').addEventListener('click', async () => {
   $('pnum').textContent = '0 / 0';
   setProgress(0, 0);
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (mode === 'api') headers['X-API-Key'] = apiKey;
+  const body = JSON.stringify({
+    mode,
+    system_prompt: mode === 'api' ? '' : systemPrompt,
+    api_url: mode === 'api' ? apiUrl : '',
+    canary: $('canary').value.trim() || null
+  });
+
+  let worst = null;
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (mode === 'api') headers['X-API-Key'] = apiKey;
-
-    const res = await fetch('/api/scan', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        mode,
-        system_prompt: mode === 'api' ? '' : systemPrompt,
-        api_url: mode === 'api' ? apiUrl : '',
-        canary: $('canary').value.trim() || null
-      })
-    });
-    if (!res.ok) throw new Error(await res.text());
-
-    // The backend streams NDJSON: one object per line, sent the moment each
-    // attack finishes. Reading it live is what moves the feed.
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      buffer += decoder.decode(chunk.value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) if (line.trim()) onEvent(JSON.parse(line));
+    for (let pass = 1; pass <= PASSES; pass++) {
+      // Each pass starts its own feed. Two passes appended to one list would
+      // read as a 42-attack scan against a 21-attack library.
+      $('feed').innerHTML = '';
+      $('pfill').style.width = '0%';
+      worst = worseReport(worst, await runOnce(headers, body, pass));
     }
   } catch (e) {
     $('error').textContent = 'Scan failed: ' + e.message;
   } finally {
+    // A pass that finished is not thrown away because a later one died: the
+    // evidence it collected is real, and the error is shown next to it.
+    $('live').classList.remove('on');
+    if (worst) render(worst);
     $('pbar').classList.remove('busy');
     $('run').disabled = false;
     $('run').textContent = 'Run scan';
   }
 });
+
+/* The same bot, scanned twice, and the WORSE run is the one reported.
+   Measured against the workshop bot on three identical runs: A/100, A/90,
+   B/79 — the grade itself moved, not only the number. There are two sources
+   of variance and neither is a bug we can remove here: the judge is an LLM,
+   and so is the bot, which surrendered its planted secret on some runs and
+   refused on others. One run is a sample, not a measurement, and the only
+   sample we may publish is the one that found more.
+   Costs exactly what it says: two scans per press, twice the time and twice
+   the API calls. */
+const PASSES = 2;
+
+async function runOnce(headers, body, pass) {
+  const res = await fetch('/api/scan', { method: 'POST', headers, body });
+  if (!res.ok) throw new Error(await res.text());
+
+  // The backend streams NDJSON: one object per line, sent the moment each
+  // attack finishes. Reading it live is what moves the feed.
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', report = null;
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const ev = JSON.parse(line);
+      if (ev.type === 'complete') report = ev.report;
+      onEvent(ev, pass);
+    }
+  }
+  return report;
+}
+
+/* "Worse" in the order a customer would read it. An ungraded run outranks any
+   graded one — "no grade issued" is the verdict we may never soften by running
+   again until a number appears. Below that, the lower score wins.
+   The whole report is carried, never a number from one run beside quotes from
+   another: a finding is only worth the answer that proves it. */
+function worseReport(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const sa = a.summary || {}, sb = b.summary || {};
+  if (!!sa.incomplete !== !!sb.incomplete) return sa.incomplete ? a : b;
+  if (sa.score == null) return a;
+  if (sb.score == null) return b;
+  return sb.score < sa.score ? b : a;
+}
 
 function setProgress(done, total) {
   const bar = $('pbar');
@@ -856,18 +900,23 @@ function setProgress(done, total) {
   bar.setAttribute('aria-valuetext', done + ' of ' + total + ' checks complete');
 }
 
-function onEvent(ev) {
-  if (ev.type === 'start') { $('pnum').textContent = '0 / ' + ev.total; setProgress(0, ev.total); }
+function onEvent(ev, pass) {
+  // Without the pass number the counter restarts at 0/21 halfway through and
+  // looks like the scan crashed and began again.
+  const tag = ' · pass ' + pass + ' of ' + PASSES;
+
+  if (ev.type === 'start') { $('pnum').textContent = '0 / ' + ev.total + tag; setProgress(0, ev.total); }
 
   if (ev.type === 'result') {
     $('pfill').style.width = Math.round(100 * ev.done / ev.total) + '%';
-    $('pnum').textContent = ev.done + ' / ' + ev.total;
+    $('pnum').textContent = ev.done + ' / ' + ev.total + tag;
     setProgress(ev.done, ev.total);
     appendLine(ev.result);
   }
 
-  if (ev.type === 'complete') { $('live').classList.remove('on'); render(ev.report); }
-  if (ev.type === 'error')    { $('error').textContent = ev.message; }
+  // "complete" carries the report, and runOnce keeps it — rendering happens
+  // once, after every pass has been compared.
+  if (ev.type === 'error') { $('error').textContent = ev.message; }
 }
 
 /* One row per finished attack. ERROR is its own state — an attack that never
