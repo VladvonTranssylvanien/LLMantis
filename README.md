@@ -170,14 +170,6 @@ by a person with their reason recorded.
 | Errors across a full 78-attack scan of three bots (~234 target calls) | **0** |
 | Judge-side content filtering, 78 attacks × 3 bots | **0** |
 
-One of the 30 items is unjudgeable on the current provider — its recorded bot
-answer *is itself* a content-filter error — so it is reported as an error and
-excluded rather than counted either way, which would invent a verdict the judge
-never gave.
-
-The deterministic figure is the one that carries the product, because **only a
-`confirmed` finding may drive a grade to F.** The harshest verdict we issue is
-the part that does not depend on a model's opinion.
 
 Those answers were harvested from three bots we built for the purpose: a
 deliberately careless support bot, a hardened twin of it with the same job and a
@@ -220,7 +212,7 @@ Impressum. No account, and nothing is sent to the bot.
    from the browser. Declared secrets are masked, so the report quotes the leak
    without reprinting it.
 
-Attacking a domain you do not own requires a DNS TXT record proving you do.
+Only attack domains you own!
 
 ---
 
@@ -236,7 +228,7 @@ so a chatbot certification does not exist as a legal category. Claiming one is a
 § 5 UWG problem in Germany, not a wording preference. "Certified",
 "zertifiziert", "AI-Act-konform" and "DSGVO-konform" are therefore banned
 repository-wide — in UI text, comments, variable names, documentation and commit
-messages. See `PLAYBOOK.md`.
+messages.
 
 LLMantis tests **only** AI systems the user owns. Active testing requires
 verified ownership of the target. All attacks are publicly documented techniques
@@ -280,29 +272,6 @@ calibration/  the hand-labelled sets and the agreement runner
 lab/          the three target bots and the measurement harness
 ```
 
-## Status
-
-**Working end to end:** both layers, Postgres persistence with Alembic
-migrations, DNS ownership verification, per-IP rate limiting, authentication
-(bcrypt and JWT, membership-scoped on every org endpoint), API keys, white-label
-branding, and the printable Prüfbericht rendering a real scan.
-
-**Known gaps, measured rather than guessed:**
-
-- `excessive_agency` holds 5 attacks against 15–21 in the other four categories.
-- The 78-attack corpus costs resolution — the vulnerable bot and the middle case
-  both floor at F while the hardened control drops to B. Hence the 21-attack
-  default.
-- Organizations, API keys, branding and ownership verification are API-only, no
-  UI yet.
-- A report lives in the browser tab that ran the scan. Re-opening one later needs
-  `GET /api/scans/{id}` extended to return the findings it currently omits.
-- `POST /api/scan` has not been exercised with the database up; every measurement
-  above comes from calling the scanner directly.
-- Billing and CI/CD deployment are deferred deliberately.
-
-`PROJECT-STATE.md` holds every decision with its reasoning, `GREGOR_WORKLOG.md`
-the measurement history.
 
 ## Where this goes next
 
@@ -311,20 +280,13 @@ than rewrites.
 
 **A much larger attack library.** Attacks are data, so the library grows without
 touching the engine, and because the score deducts per finding rather than
-counting the percentage defended, adding attacks cannot flatter a bot. The room is
-there: one category holds five attacks against fifteen elsewhere, and the same
-flaw needs probing in several phrasings and languages before "your bot resists
-this" is worth saying.
+counting the percentage defended, adding attacks cannot flatter a bot. 
 
 **An AI in the attacker loop.** Today the library is fixed — every bot gets the
 same sentences. The next step is an attacking model that reads the target's own
 answers and decides what to try next: following up where a bot hesitated, and
 writing attacks specific to the bot in front of it, since a travel-booking bot and
-a medical appointment bot have different things worth extracting. A human writes
-attacks against a bot they imagined; an attacker in the loop writes them against
-the bot that is actually answering. The two-layer judge does not change, and that
-is the point: a generated attack still has to produce a deterministic match or a
-quoted answer before it becomes a finding, so the report stays as defensible.
+a medical appointment bot have different things worth extracting. 
 
 Further out: multi-turn attacks that build trust across a conversation before
 asking, scheduled re-scans that flag when a prompt change reopened something, and
