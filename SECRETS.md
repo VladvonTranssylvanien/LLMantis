@@ -125,10 +125,9 @@ print(f"Using key: sk-***REDACTED***")
 
 ✅ **Always load secrets from environment:**
 ```python
-# GOOD
-api_key = os.getenv("MISTRAL_API_KEY")
-if not api_key:
-    raise LLMError("MISTRAL_API_KEY not set in .env")
+# GOOD - this is what backend/llm.py:206-210 actually does
+if not config.AZURE_URL or not config.AZURE_KEY:
+    raise LLMError("PROVIDER=azure but AZURE_URL or AZURE_KEY is empty in .env")
 ```
 
 ✅ **Always check .gitignore before committing:**
@@ -160,15 +159,21 @@ cat .env.example
 # Store secrets in GitHub, not in code
 Settings → Secrets and Variables → Actions → New Repository Secret
 
-MISTRAL_API_KEY=sk-xxxxx
+AZURE_URL=https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+AZURE_KEY=...
+TARGET_URL=https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+TARGET_KEY=...
 DATABASE_URL=postgresql+...
+JWT_SECRET=...
 ```
 
 ### Azure / Hetzner Environment
 
 ```bash
 # Set environment variables on server
-export MISTRAL_API_KEY=sk-xxxxx
+export AZURE_URL=https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+export AZURE_KEY=...
+export TARGET_KEY=...
 export DATABASE_URL=postgresql+...
 ```
 
@@ -179,7 +184,7 @@ export DATABASE_URL=postgresql+...
 # Use --env-file or -e flags instead
 docker run \
   --env-file .env.prod \
-  -e MISTRAL_API_KEY=${MISTRAL_API_KEY} \
+  -e AZURE_KEY=${AZURE_KEY} \
   llmantis:latest
 ```
 
