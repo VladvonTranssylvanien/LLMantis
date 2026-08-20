@@ -184,29 +184,22 @@ Optionally name a canary — a string that must never appear in an answer. That 
 
 # Where this goes next
 
-The architecture was built so the two obvious directions are additions rather
-than rewrites.
+**Built, not wired.** Registration and login (bcrypt, JWT, per-account lockout).
+Organizations with owner/admin/member ranks on fifteen endpoints. API keys,
+hashed at rest. Domain ownership verification by DNS TXT, which already gates
+active scans. White-label branding. Scan history. Attack library reload. All of it
+works over the API; none of it has a screen.
 
-**Authentication and Registration** Authentication is not finished yet and therefore not integrated on the frontend yet.
+**The gaps, honestly.** API keys and roles can only be created with curl today.
+`Target.retention` is a column, not a deletion routine.
 
-**Ownership verification.** Attacking a domain you do not own requires a DNS TXT
-record proving you do.
+**Outside the product.** `tools/voice50` judges Art. 50 disclosure for voice bots,
+8 of 8 fixtures, but places no call: the Twilio transport needs a paid account.
+`tools/art50v2` and `calibration/` run by hand.
 
-**A much larger attack library.** Attacks are data, so the library grows without
-touching the engine, and because the score deducts per finding rather than
-counting the percentage defended, adding attacks cannot flatter a bot. 
-
-**An AI in the attacker loop.** Today the library is fixed — every bot gets the
-same sentences. The next step is an attacking model that reads the target's own
-answers and decides what to try next: following up where a bot hesitated, and
-writing attacks specific to the bot in front of it, since a travel-booking bot and
-a medical appointment bot have different things worth extracting. 
-
-Further out: multi-turn attacks that build trust across a conversation before
-asking, scheduled re-scans that flag when a prompt change reopened something, and
-voice agents.
-
-**Art. 50 AI Act. Voice and Messenger Bot control** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. It is not connected to the front-end yet. In the future also bots on Whatsapp and Telegram could be checked.
+**Next.** A larger attack library, which is data rather than engine work. An
+attacking model that reads the target's own answers instead of replaying a fixed
+list. Multi-turn attacks, scheduled re-scans, WhatsApp and Telegram.
 
 ## Licence
 
