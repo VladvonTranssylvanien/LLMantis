@@ -47,8 +47,7 @@ That is the risk model in one case. An LLM placed in front of customers can:
 
 A regulatory floor arrived on top of that. Since **02.08.2026**, Art. 50(1) of
 the EU AI Act (Regulation (EU) 2024/1689) requires that a person interacting
-with an AI system be informed of it, unless that is obvious from the context.
-The Digital Omnibus delayed the high-risk obligations; it did not delay Art. 50.
+with an AI system be informed of it.
 The penalty ceiling under Art. 99 is up to €15M or 3 % of worldwide turnover.
 
 Almost nobody sells a defence: in the ECA European Cybersecurity Mapping 2025,
