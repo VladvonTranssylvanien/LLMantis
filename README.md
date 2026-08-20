@@ -198,7 +198,7 @@ Optionally name a canary — a string that must never appear in an answer. That 
 Further out: multi-turn attacks that build trust across a conversation before asking, scheduled re-scans that flag when a prompt change reopened something.
 
   
-**Art. 50 AI Act. Voice and Messenger Bot control.** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. Twilio needs a paid account. In the future also bots on Whatsapp and Telegram could be checked.
+**Art. 50 AI Act. Voice and Messenger Bot control.** We already integrated Twilio for voice recognition to also check Voice-Assistants for compliance. Twilio needs a paid account. In the future bots on Whatsapp and Telegram could be checked also.
 
 
 ## Licence
