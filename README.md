@@ -20,8 +20,8 @@
 
 3
 
-<table style="border: none;">
-  <tr style="border: none;">
+<table style="border: 0;">
+  <tr style="border: 0;">
     <td style="border: none;" valign="middle">
       <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
     </td>
