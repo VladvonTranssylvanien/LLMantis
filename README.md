@@ -241,6 +241,7 @@ git clone git@github.com:VladvonTranssylvanien/LLMantis.git
 cd LLMantis
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
+python -m playwright install chromium   # the LIBRARY comes from pip, the BROWSER does not
 cp .env.example .env        # then fill in the keys
 docker compose up -d        # Postgres
 alembic upgrade head
@@ -257,6 +258,63 @@ Today the judge is gpt-4.1 and the target gpt-4.1-mini, both on Azure.
 
 Full walkthrough in `SETUP.md`, key handling in `SECRETS.md`, contributor
 conventions and the full endpoint table in `README_old.md`.
+
+## Verify it yourself, no keys required
+
+The scan needs a provider, but the two things that decide a verdict do not. Both
+suites run offline against fixtures we ship, so anyone can check that the
+judgement logic does what this README says it does.
+
+```bash
+python -m playwright install chromium        # once
+python tools/art50v2/test_fixtures.py        # 5 local pages, 10 cases, ~110 s
+
+pip install faster-whisper                   # the voice PoC only, see below
+python tools/voice50/test_fixtures.py        # 8 recordings, ~6 s once cached
+```
+
+Both print `all fixtures behave as specified`. Measured 20.08.2026 with
+`PROVIDER`, `AZURE_URL`, `AZURE_KEY`, `ART50_AI_URL`, `ART50_AI_KEY`,
+`TARGET_URL` and `TARGET_KEY` all blanked: 10 of 10 and 8 of 8, 113 s together.
+
+`faster-whisper` is deliberately **not** in `requirements.txt`. That file is what
+`Dockerfile:20` installs, and pulling ctranslate2, onnxruntime, av and tokenizers
+into the production image for a PoC that does not ship would be paying ~200 MB
+for nothing. The first run also downloads a ~145 MB speech model, once.
+
+### Real sites it has produced a verdict on
+
+| site | verdict | what it read |
+| --- | --- | --- |
+| `otto.de` | disclosed | "OTTO KI-Assistent" on the footer button. The chat was never opened, because the disclosure was already complete |
+| `o2.de` | disclosed | "Ich bin Aura, deine KI-gestützte Assistenz" |
+| `vodafone.de` | disclosed | TOBi, with a KI notice |
+| `vattenfall.de` | disclosed | "Digitaler Assistent" |
+| `myposter.de` | disclosed | "Ich bin Ihr virtueller Assistent" |
+| `westwing.de` | disclosed | "Westwing AI (BETA)" |
+| a bot built for a workshop | **not disclosed** | "Workshop-Assistent", greeted and started the conversation without ever saying it is AI |
+
+`otto.de`, `o2.de` and the workshop bot were re-run on 20.08.2026 and reproduce
+every time, in 75 s, 39 s and 21 s. Each carries the quote above and a screenshot
+in its report. The other four were measured on earlier builds and have not been
+re-run since, which is why they are listed without timings.
+
+Only sites that reproduce are listed here. `saturn.de` is not, and the reason is
+worth stating: it returns `disclosed` in about 11 of 14 runs and
+`not_determinable` in the rest, so a reader who ran it could reasonably see
+something this table does not say. The cause is not found.
+
+The Art.-50 check itself also runs without a provider. The model that reads a
+page and finds the chat button is a helper, not a requirement:
+
+```bash
+python -c "import asyncio; from backend.art50engine import check; \
+print(asyncio.run(check('example.com', exhaustive=True)).verdict)"
+```
+
+That prints `no_widget_found` on example.com, which has no chatbot. Point it at a
+site that does and it will walk the pages, open the widget once and read what it
+says. Nothing is ever typed into it.
 
 ## Where the code is
 
