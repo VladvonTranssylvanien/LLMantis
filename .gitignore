@@ -9,6 +9,28 @@ AGENTS.md
 # putting it back. Note the file stays in history before that commit.
 GREGOR_WORKLOG.md
 
+# Internal working documents, untracked before the jury hand-in. Same mechanism
+# as the line above: `git rm --cached` did the untracking, these lines stop
+# `git add .` putting them back, and every file stays on disk and in history.
+#
+# CLAUDE-CODE-PROMPT.md          how to point an AI at this repo — invites the
+#                                wrong conversation with a reviewer
+# PITCH-PLAN.md                  the stage script next to the list of gaps
+# PROJECT_COMPLETE_OVERVIEW.md   superseded by README.md + TECHNICAL_DETAILS.md
+# docs/TASK-*.md                 work assignments for named people
+#
+# Kept on purpose, do NOT add here: PLAYBOOK.md (43 citations from code,
+# judge.py and scoring.py:251 among them), PROJECT-STATE.md (technical debt
+# #12/#14/#15 are cited by number in comments), SECRETS.md (placeholders only,
+# it documents the discipline), tools/art50check.py (736df3d: origin of the
+# 0-of-24 finding).
+CLAUDE-CODE-PROMPT.md
+PITCH-PLAN.md
+PROJECT_COMPLETE_OVERVIEW.md
+docs/TASK-GREGOR.md
+docs/TASK-KWABENA.md
+docs/TASK-VLAD.md
+
 # Never commit secrets
 #
 # `.env` and `.env.*` carry no slash, so they already match at any depth -
