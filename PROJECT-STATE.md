@@ -30,7 +30,9 @@ that don't need a registered company), **including authentication**. Remaining
 gaps are frontend UI for the newer endpoints (a deliberate choice — Bogdan owns
 that next) and the 78-attack library not being the live default. It is
 written (`attacks/attacks.yaml`, v2.0), but `config.DEFAULT_ATTACK_LIBRARY`
-points at `attacks_short.yaml` (21, v1.4) because of technical debt #12.
+points at `attacks_short.yaml` (21, v1.4) because of technical debt #15: the
+78-set dilutes the grade. The Mistral quota that used to be the reason (#12)
+stopped applying when the judge moved to Azure on 18.08.
 
 - ✅ Idea chosen and justified with market data (ECA Mapping 2025)
 - ✅ Pitch deck written → Notion page (rename from PromptGuard to LLMantis)
@@ -119,7 +121,7 @@ points at `attacks_short.yaml` (21, v1.4) because of technical debt #12.
 
 | # | What | Due | Who |
 |---|---|---|---|
-| 1 | ✅ **DONE 16.08, then MOOT 18.08** ~~Migrate the judge to Mistral~~ — `backend/llm.py` talks only to Mistral and `anthropic` is gone from `requirements.txt`, both still true. It stopped being technical debt because the rule requiring it was withdrawn, not because it was finished | ~~before the first paying customer~~ | Vlad |
+| 1 | ✅ **DONE 16.08, then MOOT 18.08** ~~Migrate the judge to Mistral~~ — `anthropic` is gone from `requirements.txt` and remains so. The other half of this line said `llm.py` "talks only to Mistral", which stopped being true in `40a1b11` (18.08): `llm.py:224-227` registers `mistral` and `azure`, and `PROVIDER` defaults to `azure` (`config.py:31`) with `JUDGE_MODEL=gpt-4.1` (`config.py:49`). Corrected 20.08. It stopped being technical debt because the rule requiring it was withdrawn, not because it was finished | ~~before the first paying customer~~ | Vlad |
 | 2 | ✅ **DONE 16.08** ~~Persistent database instead of in-memory state~~ — Postgres + Alembic, every scan/org/result survives a restart | ~~week 2~~ | Vlad |
 | 3 | ✅ **DONE 16.08** ~~Real ownership verification (DNS TXT)~~ — gates every `mode="api"` scan; 90-day re-verification | ~~week 4~~ | Vlad |
 | 4 | ✅ **DONE 16.08** ~~Organizations in the data model~~ — plus a `Membership` table (user_id, org_id, role), unused until auth exists | ~~week 3~~ | Vlad |
@@ -129,8 +131,8 @@ points at `attacks_short.yaml` (21, v1.4) because of technical debt #12.
 | 7 | ✅ **RESOLVED** (verified 16.08) ~~README §Scoring contradicts decision #8~~ — `backend/scoring.py` caps at **C** and applies `CONFIDENCE_WEIGHT` multipliers (confirmed/likely/possible), matching README and decision #8. No contradiction found; this must have been fixed during the P0 confidence-levels work | ~~with P0~~ | Vlad |
 | 9 | ✅ **DONE 16.08** ~~No authentication layer~~ — `POST/GET /api/auth/{register,login,me}` (bcrypt + JWT bearer tokens), every org-scoped endpoint now calls `require_membership()`. `mode="prompt"` scans with no `org_id` and no `X-API-Key` stay fully anonymous on purpose — that's the free demo path and it never touches a live third-party system. Anything that acts *as* an organization (creating one, minting a key, reading scan history, verifying ownership, `mode="api"` or `mode="prompt"` with an `org_id`) now requires a valid token and membership | ~~before any non-localhost deployment~~ | Vlad |
 | 10 | Frontend for organizations, API keys, branding and ownership verification — all four work today via curl only. `index.html` and `art50check.html` are the only pages with a UI | after auth (building a UI for endpoints anyone can call as anyone else is wasted work) | Frontend |
-| 11 | ✅ **WRITTEN 18.08** ~~21 → 75 attacks~~. `attacks/attacks.yaml` holds **78** attacks at v2.0. It is **not the live default**: `config.DEFAULT_ATTACK_LIBRARY` points at `attacks_short.yaml` (21, v1.4) because a full 78-attack scan exceeds the free Mistral tier: 🔴 **read #12**. What is still open is making 78 the default (needs quota) and the category balance in #16, not writing more attacks | with Gregor | Attack Engineer |
-| 12 | 🔴 **The free Mistral tier cannot carry the 78-attack library.** Measured 16.08 from Mistral's own rate-limit headers: the account allows **50 requests/minute** and **50,000 tokens/minute**. One 21-attack scan costs ~34 requests and ~11,900 tokens — already 68% of the request budget, which is why two scans back to back used to come back with no grade at all. That works out at ~1.6 requests per attack, so: **above roughly 31 attacks every single scan exceeds the per-minute request limit on its own.** At the 78 attacks now written, the same measured ratio gives ~126 requests (~250% of the limit) and ~44,200 tokens (88%), meaning a minimum of ~2.4 minutes per scan spent purely waiting on backoff, and no possibility of two scans in the same minute. Retry with backoff (added 16.08) keeps this correct rather than silently ungraded, but it cannot create quota. **Decide before the library grows past ~30 attacks**, not after: upgrade the Mistral plan (simplest), or cut judge calls per attack, or accept multi-minute scans | before the library passes ~30 attacks | team decision — Vlad has the numbers |
+| 11 | ✅ **WRITTEN 18.08** ~~21 → 75 attacks~~. `attacks/attacks.yaml` holds **78** attacks at v2.0. It is **not the live default**: `config.DEFAULT_ATTACK_LIBRARY` points at `attacks_short.yaml` (21, v1.4). The reason is 🔴 **#15**, the 78-set dilutes the grade (D/52 becomes C/80 on the same leaking bot), which is independent of provider. #12 is no longer the reason: the Mistral quota stopped governing anything on 18.08. What is still open is deciding #15 and the category balance in #16, not writing more attacks | with Gregor | Attack Engineer |
+| 12 | ⬜ **SUPERSEDED 18.08** ~~The free Mistral tier cannot carry 75 attacks.~~ The judge moved to `gpt-4.1` on Azure in `40a1b11`, so the Mistral per-minute limit no longer governs a scan. The measurements are kept verbatim as the record of why the short library became the default, and they apply again if the judge ever returns to the Mistral free tier. Measured 16.08 from Mistral's own rate-limit headers: the account allowed **50 requests/minute** and **50,000 tokens/minute**. One 21-attack scan cost ~34 requests and ~11,900 tokens, already 68% of the request budget, which is why two scans back to back used to come back with no grade at all. That worked out at ~1.6 requests per attack, so above roughly 31 attacks every single scan exceeded the per-minute request limit on its own. At 75 attacks a scan needed ~121 requests (243% of the limit) and ~42,500 tokens (85%). Retry with backoff (16.08) kept this correct rather than silently ungraded, but could not create quota | ~~before the library passes ~30 attacks~~ | closed by the Azure move |
 | 13 | **Basic-Auth on the server is unauthenticated CPU amplification.** `caddy hash-password` defaults to bcrypt cost 14, so every *wrong* password costs the box a full bcrypt — and Caddy runs it even for a username that does not exist, so an attacker has to guess nothing. Measured in the security pass: 10 sequential wrong-password requests took 20.2s against 0.20s for 10 requests with no `Authorization` header at all; 30 in parallel pinned Caddy at 1086% CPU. Caddy's hash cache only helps the *correct* password, so a random one each time defeats it, and nothing rate-limits it — `slowapi` lives inside the app, which a 401 never reaches. **Accepted, not fixed:** the worst case is an unlaunched, unadvertised site being unavailable while someone attacks it, with no data at risk and full recovery the moment it stops. Revisit if the box is ever advertised while still password-gated, or lower the cost factor when generating the hash | if the gated site is advertised | Bogdan |
 | 14 | **DNS rebinding defeats the SSRF guard on the SCAN path — hypothesis, code path confirmed.** `netguard.assert_public_host` resolves the hostname (`netguard.py:59`) and returns; the connection is then made by an independent second resolution when httpx opens it (`scanner.py:114-115`). A name the attacker controls with TTL 0 — public on the first lookup, `127.0.0.1` on the second — would pass the guard. The two-resolution path was read; **no rebinding nameserver was stood up, so the race itself is unproven.** Narrowed on 20.08: this used to name `art50check.py` as the second instance, and that file is gone — the browser-driven checker that replaced it re-checks EVERY request the page makes through a Playwright route interceptor (`art50engine.py:1080`, guard at `art50engine.py:1059-1075`), which is the shape a per-connection guard has to have. So the debt is now one caller, not two, and the fix for `scanner.py` is to do what the Art.-50 path already does. Not reachable today: the scan sits behind the site's Basic-Auth. **Fix before the password comes off** | before removing Basic-Auth | Bogdan |
 | 15 | 🔴 **A bigger library made the vulnerable bot look safer.** First run of the 78-attack set, 17.08, same demo bot and same system prompt as the 21-attack runs: **D/52 became C/80**. The bot is not safer — it still leaks the canary and `critical_failures` is 3; the grade is C only because the critical cap holds it there, the raw score of 80 is B territory. Score is passed-weight over total-weight, so 57 attacks it mostly passes dilute the result by 28 points. This is a scoring question, not a library question: a bot with three confirmed critical leaks should not score 80 in a paid Prüfbericht. **Decide before either set is used with a customer** | before the first paid report | team decision — Bogdan has the measurements |
@@ -144,7 +146,7 @@ points at `attacks_short.yaml` (21, v1.4) because of technical debt #12.
 |---|---|
 | Business registration (Gewerbe) | before the first invoice |
 | Gründungszuschuss | 🔴 **check NOW** if anyone is registered with the Agentur für Arbeit — the application goes in BEFORE Gewerbeanmeldung |
-| **Paid Mistral plan** | 🔴 **before the attack library passes ~30 attacks.** The free tier's 50 requests/minute is exceeded by a single scan beyond that point — see technical debt #12 for the measured numbers. This is a hard blocker on making the written 78-attack library the default, not a nice-to-have |
+| ~~**Paid Mistral plan**~~ | ⬜ **No longer needed.** The judge runs on `gpt-4.1` via Azure since 18.08, so the Mistral free tier's 50 requests/minute stopped being a constraint. Technical debt #12 keeps the measurements as history. It becomes a cost item again only if the judge returns to Mistral |
 | Mollie, payments | when the Gewerbe is registered — team decided 16.08 not to build even the schema until then |
 | ~~PDF export~~ | ✅ **done 16.08** — client-side print via `frontend/report.html`, no backend needed |
 | Email verification, password reset | when Brevo (or any EU email sender) is set up — same reasoning as Mollie: both need a real send-email credential that doesn't exist yet. Team decided 16.08 not to fake it with a console-logged token in the meantime |
@@ -282,8 +284,8 @@ decided to defer:
   told people to get an Anthropic key)
 
 **What's left of Vlad's plan:** frontend for organizations/API keys/branding/
-ownership (tech debt #10, Bogdan's), making the written 78-attack library the
-default (#11/#12, needs quota), then
+ownership (tech debt #10, Bogdan's), deciding whether the written 78-attack
+library becomes the default (#11, which turns on #15), then
 Mollie billing and CI/CD — both intentionally deferred until the Gewerbe is
 registered.
 
@@ -415,9 +417,9 @@ The second and third take ~45s instead of ~14s, spent waiting — the right
 trade against returning no grade at all.
 
 That investigation is where the numbers in technical debt #12 come from,
-and #12 is the item that matters most for next week: **the free Mistral
-tier cannot carry the 78-attack library, which is why the 21-attack one is
-still the default.**
+and those numbers governed the library choice until 18.08. Since the judge
+moved to Azure, #12 is history and the reason the 21-attack library is still
+the default is **#15: the 78-set dilutes the grade.**
 
 Current state against the lab: Bot A grades D (~64-69, four of its findings
 deterministic canary leaks), Bot B grades A (~98-100). The A→B contrast

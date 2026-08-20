@@ -10,7 +10,9 @@ This document explains how LLMantis handles secrets securely.
 
 | Secret | Location | Status | Who Sets It |
 |--------|----------|--------|------------|
-| `MISTRAL_API_KEY` | `.env` (not committed) | ✅ User provides | Developer / DevOps |
+| `AZURE_KEY` | `.env` (not committed) | ✅ User provides. The judge key, used because `PROVIDER` defaults to `azure` (`config.py:31`) | Developer / DevOps |
+| `TARGET_KEY` | `.env` (not committed) | ✅ User provides. The deployment under attack in `mode="model"` (`config.py:63`) | Developer / DevOps |
+| `MISTRAL_API_KEY` | `.env` (not committed) | ✅ User provides. Only needed if `PROVIDER=mistral`; kept so the superseded `mistral-small` baseline stays reproducible (`.env.example:19`) | Developer / DevOps |
 | `DATABASE_URL` | `.env` (not committed) | ✅ User provides | DevOps |
 | `JWT_SECRET` | `.env` (not committed) | ✅ Signs login tokens — see below | Developer / DevOps |
 | Postgres password | `.env` + `docker-compose.yml` | ✅ Dev-only, changes in prod | DevOps |
@@ -38,12 +40,21 @@ everyone out immediately (same idea as revoking an API key).
 
 ### 1. Get Your API Keys
 
-**Mistral (the LLM provider the code reads today):**
+**Azure (the judge and the target, because `PROVIDER` defaults to `azure`):**
+```
+1. Open the deployment in Azure AI Foundry / Azure OpenAI
+2. Copy the FULL chat-completions url into AZURE_URL, verbatim from the
+   deployment page. Do not assemble it (.env.example:6-9 explains why)
+3. Copy the deployment key into AZURE_KEY
+4. Repeat for the target deployment: TARGET_URL and TARGET_KEY
+```
+
+**Mistral, only if you set `PROVIDER=mistral`:**
 ```
 1. Go to https://console.mistral.ai
 2. Login
 3. Click "API Keys" → "Generate New Key"
-4. Copy the key (starts with sk-...)
+4. Copy the key into MISTRAL_API_KEY
 ```
 
 ### 2. Set Up .env File
@@ -56,10 +67,15 @@ cp .env.example .env
 nano .env
 ```
 
-Your `.env` should look like:
+Your `.env` should look like this, matching `.env.example`:
 ```
-PROVIDER=mistral
-MISTRAL_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxx
+PROVIDER=azure
+AZURE_URL=https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+AZURE_KEY=
+JUDGE_MODEL=gpt-4.1
+TARGET_URL=https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+TARGET_KEY=
+TARGET_MODEL=gpt-4.1-mini
 DATABASE_URL=postgresql+psycopg://llmantis:llmantis_dev_password@localhost:5432/llmantis
 ...
 ```
@@ -186,7 +202,11 @@ git check-ignore .env
 
 ## 📞 If You Accidentally Leaked a Secret
 
-1. **Immediately rotate the key** (delete old, generate new in the Mistral console)
+1. **Immediately rotate the key**, in the console that issued it:
+   `AZURE_KEY` and `TARGET_KEY` in Azure AI Foundry / Azure OpenAI,
+   `MISTRAL_API_KEY` at https://console.mistral.ai,
+   `JWT_SECRET` by generating a new one locally (every login token dies with
+   the old one), the Postgres password in `.env` and `docker-compose.yml`
 2. **Update .env** with the new key
 3. **Restart the application**
 4. **Notify the team** (in case it was pushed to GitHub)
@@ -209,6 +229,9 @@ above, which are keys **we use** to call someone else's API.
 
 ## Links
 
-- **Mistral Console:** https://console.mistral.ai
+- **Azure AI Foundry / Azure OpenAI:** the deployment pages that issue
+  `AZURE_KEY` and `TARGET_KEY`
+- **Mistral Console:** https://console.mistral.ai (only for `MISTRAL_API_KEY`)
 - **.env template:** `.env.example` (safe to commit)
-- **Gitignore rules:** `.gitignore` (line 2: `.env`)
+- **Gitignore rules:** `.gitignore` line 44, `*.env`, which covers `.env`,
+  `lab/.env` and `deploy/.env` alike
