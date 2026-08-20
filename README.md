@@ -11,7 +11,7 @@
 
 
 
-### A penetration and compliance test for AI chatbots.
+### Security and compliance testing for AI chatbots.
 
 **Your chatbot speaks for your company**. Nobody has ever checked what it says under
 pressure.
