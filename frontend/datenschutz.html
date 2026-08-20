@@ -321,13 +321,14 @@ body{font-family:var(--sans)}
 
   <h2>Art.-50-Check</h2>
   <p>Der kostenlose Art.-50-Check benötigt weder ein Konto noch eine Freigabe.
-     Die von Ihnen angegebene Adresse wird ausschließlich zur Durchführung der
-     Prüfung verarbeitet. Das Ergebnis wird nicht in unserer Datenbank
+     Die von Ihnen angegebene Bot-/Website-Adresse (URL) wird ausschließlich zur
+     Durchführung der Prüfung verarbeitet. Das Ergebnis wird nicht in unserer Datenbank
      gespeichert.</p>
 
   <h2>Prüfdaten der Kunden</h2>
   <p>Für eine Prüfung verarbeiten wir den Systemprompt Ihres Bots
-     beziehungsweise die Adresse des laufenden Bots, die Ergebnisse der einzelnen
+     beziehungsweise die Bot-/Website-Adresse (URL) des laufenden Bots, die
+     Ergebnisse der einzelnen
      Angriffe sowie die wörtlichen Zitate, die einen Befund belegen. Die
      vollständige Antwort Ihres Bots wird nicht gespeichert.</p>
   <p>Auftragsverarbeiter: Für die Angriffs- und Bewertungsanfragen wird ein
@@ -348,7 +349,7 @@ body{font-family:var(--sans)}
 
   <h2>Ihre Rechte</h2>
   <p>Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16),
-     Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18),
+     Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18) und
      Datenübertragbarkeit (Art. 20) sowie ein Widerspruchsrecht (Art. 21).
      Wenden Sie sich dazu an info@llmantis.de.
     <!-- REVIEW: Kwabena -->
@@ -361,6 +362,26 @@ body{font-family:var(--sans)}
     <!-- REVIEW: Kwabena — zuständige Behörde für Niedersachsen namentlich
          eintragen, sobald bestätigt. -->
   </p>
+
+  <h2>Prüfhinweise (offene Punkte)</h2>
+  <p>Aus der inhaltlichen Prüfung: Die folgenden Punkte sind noch offen und
+     wurden bewusst nicht mit erfundenen Angaben aufgefüllt &mdash; sie erfordern
+     eine echte Entscheidung bzw. Bestätigung, bevor die Seite veröffentlicht
+     wird.</p>
+  <ul>
+    <li>Auftragsverarbeitungsvertrag mit Hetzner (Art. 28 DSGVO) ist laut Text
+        selbst noch zu bestätigen.</li>
+    <li>Kein Hinweis auf einen möglichen Drittlandtransfer beim Azure OpenAI
+        Service: Region (EU vs. außerhalb der EU) ist zu klären; falls außerhalb
+        der EU, sind Garantien nach Art. 44 ff. DSGVO (z.&nbsp;B.
+        Standardvertragsklauseln) zu ergänzen.</li>
+    <li>Für die Verarbeitung der &bdquo;Prüfdaten der Kunden&ldquo;
+        (Systemprompt, Angriffsergebnisse, Zitate) fehlt eine ausdrückliche
+        Rechtsgrundlage nach Art. 6 DSGVO, anders als bei den Server-Logfiles.</li>
+    <li>Für die Server-Logfiles ist keine Speicherdauer bzw. kein Löschkriterium
+        angegeben (Art. 13 Abs. 2 lit. a DSGVO verlangt eine Dauer oder die
+        Kriterien für deren Festlegung).</li>
+  </ul>
 </div>
 </body>
 </html>
