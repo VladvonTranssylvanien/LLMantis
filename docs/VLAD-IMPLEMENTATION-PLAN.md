@@ -13,7 +13,9 @@ You built more in one night than most teams build in a week. Current state:
 ✅ FastAPI backend · 21 attacks in YAML across 5 OWASP LLM categories
 ✅ Two-layer judging: deterministic match + LLM judge
 ✅ Automatic secret detection · severity-weighted scoring with a critical cap
-✅ Vanilla HTML frontend with live progress · mock mode
+✅ Vanilla HTML frontend with live progress · ~~mock mode~~ (the mock provider
+was removed on 16.08 with the Anthropic code; `llm.py` registers only real
+providers and a key is required)
 
 **This is good architecture.** Two-layer judging is exactly right: the
 deterministic layer produces `confirmed` findings, the LLM layer produces

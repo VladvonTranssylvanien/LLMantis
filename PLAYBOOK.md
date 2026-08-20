@@ -94,7 +94,7 @@ engineering grounds:
 | Analytics | Plausible, self-hosted |
 | Fonts | self-hosted |
 | Errors | GlitchTip |
-| LLM judge | Mistral — the only provider `backend/llm.py` registers |
+| LLM judge | `backend/llm.py` registers `mistral` and `azure`; `PROVIDER` defaults to `azure` with `JUDGE_MODEL=gpt-4.1` |
 
 What survives, on its own merits and not as a residency argument:
 
@@ -536,7 +536,7 @@ Our equivalent: runs against **Gregor's test bots**, not unit tests.
 
 ### 🔴 A failed check cannot be invisible
 
-A scan where 4 of 75 attacks timed out is not a scan. Issuing a grade from
+A scan where 9 of 78 attacks timed out is not a scan. Issuing a grade from
 incomplete data is misleading — and if we sell a "Prüfbericht", it is also a
 legal exposure.
 

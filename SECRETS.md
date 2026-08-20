@@ -17,8 +17,10 @@ This document explains how LLMantis handles secrets securely.
 | User passwords | `users.password_hash` in Postgres | ✅ bcrypt, plaintext never stored | Each user |
 | LLMantis API keys (`llm_live_...`) | Issued via `POST /api/keys`, hash stored in Postgres | ✅ shown to the caller once, never recoverable | Whoever calls the endpoint, if a member of the org |
 
-⚠️ `MISTRAL_API_KEY` is the only model credential the code reads today. Whatever
-provider replaces or joins it, the rule that matters is the one in this file:
+⚠️ The code reads **three** model credentials today (`backend/config.py`):
+`MISTRAL_API_KEY`, `AZURE_KEY` (the judge, when `PROVIDER=azure`, which is
+the default), and `TARGET_KEY` (the deployment under attack in `mode="model"`).
+Whichever provider is in use, the rule that matters is the one in this file:
 the key lives in `.env`, never in the repository, and never in a chat message.
 
 ### `JWT_SECRET` — signs every login token

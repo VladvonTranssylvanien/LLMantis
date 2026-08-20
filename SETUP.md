@@ -30,16 +30,36 @@ before continuing. Everything below assumes it's active.
 pip install -r requirements.txt
 ```
 
+Then install the browser Playwright drives. `pip` installs the Playwright
+*library*, not the Chromium *binary*, and the Art.-50 Check
+(`backend/art50engine.py`) reads the live DOM of a real page. Without this step
+`POST /api/art50check` fails with an "executable doesn't exist" error while
+everything else works, which is a confusing way to find out.
+
+```bash
+python -m playwright install chromium
+```
+
+It downloads roughly 150 MB once, into your home directory rather than the venv.
+The Dockerfile does the same thing with `--with-deps`, which additionally pulls
+the system libraries a slim Linux image lacks; on macOS you don't need it.
+
 ## 4. Create your local config
 
 ```bash
 cp .env.example .env
 ```
 
-Keep `PROVIDER=mistral` and put a real `MISTRAL_API_KEY` next to it. Get one
-from https://console.mistral.ai — the free tier is enough for the current
-21-attack library. Mistral is the only provider `backend/llm.py` registers at
-the moment; that is what is wired up, not a rule.
+`PROVIDER` defaults to `azure` (`backend/config.py:31`) and `JUDGE_MODEL` to
+`gpt-4.1` (`config.py:49`), so set the Azure variables:
+
+- `AZURE_URL`, the full chat-completions URL taken verbatim from the
+  deployment page (`config.py:41`).
+- `AZURE_KEY`, the deployment key (`config.py:42`). `AZURE_AUTH` picks the
+  header style and defaults to `api-key` (`config.py:43`).
+
+`backend/llm.py:224-227` also registers `mistral`, which reads
+`MISTRAL_API_KEY` (`config.py:33`). It is not the default.
 
 There is no mock or offline mode. Without a key every attack comes back as
 an error and the scan is issued no grade, under an HTTP 200.
