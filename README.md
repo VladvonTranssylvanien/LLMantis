@@ -171,7 +171,13 @@ Optionally name a canary — a string that must never appear in an answer. That 
 
 <img src="Screenshots/SS_012.png" alt="8" width="400">
 
+---
 
+# Governance and Compliance
+
+[LLMantis Governance V2](governance/README.md) is an evidence-based technical governance framework for the LLMantis platform. It assesses 17 controls across the frontend and backend, each independently verified against the current codebase — implementation, configuration, and enforcement — rather than against documentation or intent alone.
+
+<img src="Screenshots/SS_016.png" alt="9" width="400">
 
 ---
 
