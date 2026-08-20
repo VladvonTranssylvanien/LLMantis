@@ -3,7 +3,7 @@
 ![LLMantis Governance V2](https://img.shields.io/badge/LLMantis-Governance%20V2-1f6feb)
 ![17 Controls](https://img.shields.io/badge/Controls-17-2ea043)
 ![5 Frontend Controls](https://img.shields.io/badge/Frontend-5%20Controls-8250df)
-![12 Backend / Platform Controls](https://img.shields.io/badge/Backend%2FPlatform-12%20Controls-8250df)
+![12 Backend / Platform Controls](https://img.shields.io/badge/Backend%2FPlatform-12%20Controls-bc4c00)
 ![Evidence-Based Assessment](https://img.shields.io/badge/Assessment-Evidence--Based-6e7781)
 
 ## Overview
