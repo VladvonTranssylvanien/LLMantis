@@ -33,6 +33,20 @@
   </tr>
 </table>
 
+4
+
+<table border="0" cellspacing="0" cellpadding="0">
+  <tr>
+    <td valign="middle">
+      <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
+    </td>
+    <td valign="middle">
+      <h1>
+        <span style="color: #008822;">LL</span>Mantis
+      </h1>
+    </td>
+  </tr>
+</table>
 
 ### A penetration and compliance test for AI chatbots.
 
