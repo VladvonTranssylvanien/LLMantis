@@ -185,7 +185,7 @@ Optionally name a canary — a string that must never appear in an answer. That 
 # Where this goes next
 
 
-**Authentication and Registration** Authentication is not finished yet and therefore not integrated on the frontend yet.
+**Authentication and Registration.** Authentication is not finished yet and therefore not integrated on the frontend yet.
 
 **Ownership verification.** Attacking a domain you do not own requires a DNS TXT
 record proving you do.
