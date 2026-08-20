@@ -197,11 +197,7 @@ Further out: multi-turn attacks that build trust across a conversation before
 asking, scheduled re-scans that flag when a prompt change reopened something, and
 voice agents.
 
-## Team and licence
-
-Bogdan — coordination, design, positioning. Vlad — engine, API, database.
-Gregor — target lab, attack library, judge calibration. Kwabena — GRC, legal
-hooks, disclaimers. Working language is English throughout.
+## Licence
 
 Licensed under **AGPL-3.0** (see `LICENSE`) rather than MIT for one reason: this
 repository is public and the product is sold as a hosted service, so a competitor
