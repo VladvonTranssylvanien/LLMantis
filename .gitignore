@@ -2,6 +2,13 @@
 CLAUDE.md
 AGENTS.md
 
+# Gregor's working log. Kept locally, deliberately not published: it is a
+# candid record of what was tried and what broke, including other people's
+# defects. An ignore rule alone would not have untracked it — it was removed
+# from the index with `git rm --cached`, and this line stops `git add .`
+# putting it back. Note the file stays in history before that commit.
+GREGOR_WORKLOG.md
+
 # Never commit secrets
 #
 # `.env` and `.env.*` carry no slash, so they already match at any depth -
