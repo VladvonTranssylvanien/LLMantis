@@ -3901,6 +3901,224 @@ claim, so it should be right in the documents a juror might follow.
 
 ---
 
+## 2026-08-20 — Session 34: the logo is in the README, and `Brand/` turns out to be unusable
+
+Gregor asked whether the logos under `Brand/` could go into `README.md`. Answer:
+yes, with GitHub's `<picture>` + `prefers-color-scheme` — but **none of the four
+files in `Brand/` was usable as it stands**, and finding out why turned up three
+defects in the folder.
+
+First `main` was fast-forwarded 2 commits to `9ef2a14`; Vlad had rewritten
+`README.md` (+61) that morning, two days after Gregor's own rewrite. Editing the
+pre-pull file would have landed on a version already replaced.
+
+### 🔴 `Brand/llmantis-lockup-dark.svg` does not render at all
+
+Line 3 is `<!-- For dark surfaces (PLAYBOOK.md §3 --bg #0A0A0B). … -->`. A double
+hyphen inside an XML comment is forbidden, so the file is **not well-formed XML**:
+
+```
+Brand/llmantis-favicon.svg              OK
+Brand/llmantis-lockup-dark.svg          FAIL  line 3, column 43
+Brand/llmantis-lockup-light.svg         OK
+Brand/llmantis-mark.svg                 OK
+frontend/assets/brand/lockup-dark.svg   FAIL  (byte-identical copy)
+```
+
+Not a pedantic complaint: rendered in headless Chrome — the same engine a GitHub
+visitor uses — it produces a **broken-image icon and the alt text, nothing else**.
+So the obvious implementation, pairing the two existing lockups, would have
+shipped a broken image to everyone on GitHub's dark theme.
+
+No page references either copy (grepped repo-wide; `PLAYBOOK.md:176-179` says the
+same), so there is **no live impact today**. It bites the moment someone uses the
+source folder for what it is for.
+
+### 🔴 Every file in `Brand/` carries a colour the PLAYBOOK has withdrawn
+
+`PLAYBOOK.md` §3 retires two greens by name — *"`#3E8F14` is **removed**"* and
+*"`#1F5C0E` is **retired**"* — and forbids a third placement: *"Never place
+`#7BE33F` on white."* Measured independently, and the figures match PLAYBOOK's own
+to the digit (4.08:1 for `#3E8F14`, 1.63:1 for `#7BE33F` on white):
+
+| file | fill | status |
+|---|---|---|
+| `Brand/llmantis-lockup-light.svg` | `#3E8F14` | **removed** by §3 |
+| `Brand/llmantis-lockup-dark.svg` | `#7BE33F` | fine on dark — but the file does not parse |
+| `Brand/llmantis-mark.svg`, `-favicon.svg` | `#7BE33F` | 1.63:1 on white, forbidden there |
+| `frontend/assets/brand/lockup.svg` | `#1F5C0E` | **retired** by §3 |
+
+### The outlined wordmark already existed, in the wrong folder
+
+`PLAYBOOK.md:236` and `PROJECT-STATE.md:227` both warn the lockups still carry a
+live `<text>` in Inter and must be outlined before facing a customer. That work is
+**done** — `frontend/assets/brand/lockup.svg` (Bogdan, `2740523`, 18.08) is the
+same lockup with the wordmark as real paths — it just never went back into the
+source folder. The two folders are a design generation apart: `Brand/` holds the
+two-tone antennae composition of 15.08, the app holds the monochrome seal-ringed
+one. Rendered side by side, they are not the same logo.
+
+### What was built
+
+Two variants generated **programmatically** from `frontend/assets/brand/lockup.svg`
+rather than retyped — the same reasoning as `set-v2`'s extraction rule, since one
+mangled coordinate deforms the mark silently:
+
+| file | root `color` | ground |
+|---|---|---|
+| `Brand/llmantis-lockup-outlined-dark.svg` | `#7BE33F` (`--accent`) | 11.63:1 on GitHub's `#0d1117` |
+| `Brand/llmantis-lockup-outlined-light.svg` | `#357C11` (`--accent-on-light`) | 5.19:1 on white |
+
+These are the **first brand assets in the repo that use a live token and an
+outlined wordmark**. The originals were left untouched: overwriting two of
+Bogdan's files the day before the pitch, when the app ships byte-identical copies
+from a second folder, is his call and not this agent's.
+
+`README.md` gained an 11-line block above the `# LLMantis` heading. The `<img>`
+fallback is the **light** variant deliberately, so any renderer without
+`<picture>` support still gets the one that is safe on white.
+
+### Verified, not assumed
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Both variants parse as XML | ✅ (unlike the file they replace) |
+| 2 | Geometry byte-identical to `lockup.svg` after reverting comment + colour | ✅ both |
+| 3 | **Mutation** — one path coordinate moved 1 unit | ✅ caught; the check is not decorative |
+| 4 | No `<text>` / `font-family` anywhere | ✅ both — no Inter dependency |
+| 5 | `<picture>` dark branch, real README markup | chose `…-outlined-dark.svg` |
+| 6 | Fallback branch (source media forced not to match) | chose `…-outlined-light.svg` |
+| 7 | Intrinsic size | was absent (inherited); added `width="224" height="46"`, matching the rest of `Brand/` |
+| 8 | Rendered on both of GitHub's grounds, plus both wrong pairings | ✅ pair is necessary, confirmed visually |
+
+### What I did NOT verify
+
+- **GitHub's own rendering.** Everything above is local Chrome. Whether
+  github.com serves the `<picture>` block and the relative SVG paths as expected
+  can only be confirmed after a push. GitHub documents `<picture>` support and
+  recommends relative links, so the mechanism is cited, not measured.
+- **The browser extension was not connected** (as in session 32), so this used
+  headless Chrome directly rather than the tooling. Same engine, no page
+  interaction needed.
+- **The light branch was proven by forcing the media query not to match**, not by
+  a browser actually reporting a light preference — headless Chrome reports
+  `prefers-color-scheme: dark = true` by default. It exercises the same fallback
+  path `<picture>` uses, but it is not a real light-theme browser.
+- **`PLAYBOOK.md` §3's asset table was not updated** to list the two new files, so
+  `Brand/` now holds two assets its own index does not mention. Bogdan's file and
+  his table; reported rather than edited.
+- **Nothing was committed.** Two contributors are working in the repository today.
+- Whether the printed Prüfbericht is affected. It uses `mark-ink.svg` and
+  `seal.svg`, neither of which was touched.
+
+### For Bogdan — three things, in cost order
+
+1. `Brand/llmantis-lockup-dark.svg` and its app copy are invalid XML and render as
+   nothing. One character fix (`--bg` → `bg`) in a comment.
+2. `Brand/llmantis-lockup-light.svg` still fills `#3E8F14`, which §3 removed.
+3. The outlined lockup he drew on 18.08 never reached `Brand/`. If the two new
+   files should simply **replace** `llmantis-lockup-{dark,light}.svg` under their
+   old names, that is a rename plus one line in the README, and it would leave the
+   folder with one generation instead of two.
+
+---
+
+## 2026-08-20 — Session 35: TECHNICAL_DETAILS.md, and set-v2 measured at last
+
+Gregor shortened `README.md`, added screenshots and took the technical detail out
+of it. Asked for `TECHNICAL_DETAILS.md` in five sections: the Art. 50 scan, the
+pentest scan, the judge (emphasis on the AI judge), the calibration, the judging
+system. Written from the code, not from this worklog — several figures in here
+describe engines that no longer exist.
+
+### ⭐ set-v2 measured on the current judge for the first time
+
+The handoff's cheapest open item, closed while gathering facts for section 4:
+
+```
+set-v1   29/29 agreement   0 false positives   0 false negatives     (reproduced)
+set-v2   42/42 agreement   0 false positives   0 false negatives     (NEW)
+layer 1  11/11 (v1) · 13/13 (v2)   0 confirmed disagreements         (no network)
+```
+
+**v1 reproduced the recorded 18.08 figure exactly**, so `PROJECT-STATE.md:160`
+still holds four days on. **v2 had never run on gpt-4.1** — it was measured at
+mean 95.3 % on the retired `mistral-small`. All 13 items covering the FAIL criteria
+added on 17.08 agree, and both sets now carry zero false positives.
+
+`cal-027` errors on both sets, as it has since 18.08: its recorded answer *is* an
+Azure content-filter error, so the payload trips the filter on the judging path
+too. Excluded rather than counted either way.
+
+⚠️ **n=1 for v2.** Session 26's lesson was that one run is a sample, not a
+distribution. The judge has been stable at n=10 on v1, so a single v2 run is
+suggestive, not settled. `--runs 5` would close it.
+
+⚠️ Session 28's limit still stands and is stated in the document: five of the six
+new criteria are probed in the refusal direction only, because no lab bot ever
+failed them. v2 shows whether the judge invents such a finding, not whether it
+catches one.
+
+### 🔴 The README describes the Art. 50 checker Vlad deleted
+
+Not introduced by Gregor's rewrite — the text predates it — but it is now the only
+description a juror reads, and three of its claims are false against `main`:
+
+| `README.md` says | Actually |
+|---|---|
+| "One GET of the public page" | `art50engine.py` drives headless Chromium (Playwright), sweeps up to 9 pages in 2 viewports, 30–150 s |
+| "nine vendor signatures: Intercom, Tidio, …" | Those 9, plus 378 borrowed Wappalyzer ones, matched **nothing** on 24 German sites — that is *why* the GET version was replaced. There are now 12 probes |
+| "Four findings: `widget_found`, `ai_disclosure`, `privacy_link`, `impressum`" | `Art50Report` emits four **verdicts** (`disclosed` / `not_disclosed` / `not_determinable` / `no_widget_found`). **`privacy_link` and `impressum` no longer exist** — they went with `art50check.py` (`736df3d`). Verified: `art50check.html` mentions Impressum only as a footer link to our own page |
+
+The README promises a compliance manager two checks the product no longer
+performs. **Reported, not edited** — Gregor has just rewritten that file by hand.
+
+One claim in it survives and is worth keeping: *"No message is ever sent to the
+bot."* Still true, and now a property of the implementation rather than a
+paragraph — `_read_greeting` is the only place a click happens and has no code path
+that can enter text.
+
+### What the document records that was not written down anywhere
+
+Read out of the code while drafting, all verified at the line:
+
+* **The `api`-mode ownership gate is real** — `is_domain_verified(db, org, domain)`
+  against a DNS TXT record — with one deliberate hole: `SCAN_UNVERIFIED_DOMAINS`
+  skips it entirely and is bound to **no** organisation, so anything listed is
+  scannable by any caller. `config.py:245-254` says so itself. The README frames
+  ownership verification as future work; it is built, and waived for the demo.
+* **Cookie banners are refused, never accepted**, and the reason is ours: accepting
+  writes consent records in someone else's compliance tooling on behalf of a
+  visitor who does not exist.
+* **The two-pass rule lives in the frontend**, not the backend
+  (`index.html:worseReport`), and compares **grade before score** — ranking on
+  score alone once published the pass that missed the critical, at 86/86, A vs B.
+* Library composition confirmed through the real loader, not by grep:
+  `attacks_short.yaml` 21 attacks v1.4 (6 critical), `attacks.yaml` 78 v2.0
+  (15 critical).
+
+### What I did NOT verify
+
+- **No scan was run this session.** Sections 2 and 5 are read from
+  `scanner.py` / `scoring.py`; the grades quoted in section 5 are the ones already
+  recorded in `scoring.py`'s own docstring, not re-measured.
+- **The Art. 50 engine was never executed.** Section 1 is `art50engine.py`,
+  `art50probes.py` and `art50opener.py` read closely — 2,500 lines whose docstrings
+  are unusually explicit — plus the probe list and `VERDICTS` extracted
+  programmatically. No site was scanned, so nothing about the 30–150 s figure or
+  the browser guards is confirmed by a run.
+- **`POST /api/scan` still never exercised.** Unchanged since session 22.
+- **Nobody has read the document but me**, and it necessarily carries "Art. 50(1)",
+  "Art. 99" and "§ 5 UWG"-adjacent reasoning. Every legal sentence is reused from
+  `README.md` or `PLAYBOOK.md` rather than newly drafted, so no new claim is
+  asserted — but `PLAYBOOK.md` §11 invariant 5 puts that wording with Kwabena.
+- **`calibrate.py`'s own USAGE block is stale** — it still tells the reader to set
+  `PROVIDER=mistral`, while `config.py:31` defaults to `azure` and the run above
+  printed "Judge: gpt-4.1 via azure". Cosmetic, in a file a juror might open.
+  Noted, not fixed.
+
+---
+
 # Start here next session
 
 > Written at the end of **18.08** and **stale in one important way**: session 33
