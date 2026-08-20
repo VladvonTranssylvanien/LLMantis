@@ -271,67 +271,95 @@ body{font-family:var(--sans)}
 <div class="wrap">
   <a class="back" href="/">&larr; <span lang="de">Startseite</span></a>
 
-  <div class="todo" lang="en">
-    <b>TODO — not legally reviewed.</b> This page is a structural placeholder.
-    Every <span class="tok">{{TOKEN}}</span> below must be filled with real
-    processing detail, and the wording must be confirmed by Kwabena before this
-    site goes public. A German site without a valid privacy notice breaches Art. 13 GDPR, and its
-    absence is <span lang="de">abmahnfähig</span>.
+  <div class="todo" lang="de">
+    <b>Projekt-Hinweis:</b> Einige Unternehmens- und rechtliche Angaben auf dieser
+    Seite werden derzeit zu Demonstrationszwecken verwendet und müssen vor einer
+    öffentlichen oder kommerziellen Veröffentlichung überprüft und durch
+    verifizierte Angaben ersetzt werden.
     <!-- REVIEW: Kwabena -->
   </div>
 
   <h1>Datenschutzerklärung</h1>
-  <p style="color:var(--muted)">
-    <span lang="en">Information under</span> Art. 13, 14 DSGVO
+  <p style="color:var(--muted)">Angaben gemäß Art. 13, 14 DSGVO
     <!-- REVIEW: Kwabena -->
   </p>
 
   <h2>Verantwortlicher</h2>
   <p>
-    <span class="tok">{{LEGAL_NAME}}</span><br>
-    <span class="tok">{{STREET}}</span><br>
-    <span class="tok">{{POSTCODE}} {{CITY}}</span><br>
-    E-Mail: <span class="tok">{{CONTACT_EMAIL}}</span>
+    LLMantis GmbH<br>
+    Kreuzstraße 5<br>
+    26121 Oldenburg<br>
+    E-Mail: info@llmantis.de
   </p>
 
   <h2>Hosting</h2>
-  <p><span class="tok">{{HOSTING_PROVIDER}}</span> &mdash; <span class="tok">{{HOSTING_LOCATION}}</span>.
-     <span class="tok">{{HOSTING_DPA_STATEMENT}}</span></p>
+  <p>Hetzner Online GmbH &mdash; Rechenzentrum Helsinki (hel1-dc2), Finnland.
+     Der Server steht damit innerhalb der EU; eine Übermittlung in ein Drittland
+     findet nicht statt. Der Abschluss eines Auftragsverarbeitungsvertrags nach
+     Art. 28 DSGVO ist noch zu bestätigen.
+    <!-- REVIEW: Kwabena — AV-Vertrag mit Hetzner prüfen -->
+  </p>
 
   <h2>Server-Logfiles</h2>
-  <p><span class="tok">{{LOGFILE_FIELDS}}</span></p>
-  <p><span lang="en">Legal basis:</span> <span class="tok">{{LOGFILE_LEGAL_BASIS}}</span>
+  <p>Beim Aufruf dieser Seiten werden IP-Adresse, Zeitpunkt der Anfrage,
+     aufgerufene Adresse, HTTP-Methode und HTTP-Statuscode protokolliert. Diese
+     Daten werden nicht mit anderen Datenquellen zusammengeführt.</p>
+  <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO &mdash; berechtigtes Interesse am
+     sicheren und störungsfreien Betrieb.
     <!-- REVIEW: Kwabena -->
   </p>
 
   <h2>Cookies</h2>
-  <p><span class="tok">{{COOKIE_STATEMENT}}</span></p>
-  <p style="color:var(--muted);font-size:14px" lang="en">
-    PLAYBOOK &sect;2 commits us to one strictly-necessary session cookie and no more,
-    which is what removes the need for a consent banner. If that ever changes,
-    this section and the banner decision change with it.
-  </p>
+  <p>Wir setzen keine Cookies und binden keine externen Dienste, Schriftarten
+     oder Analysewerkzeuge ein. Alle Schriften werden von unserem eigenen Server
+     ausgeliefert. Ein Einwilligungsbanner ist deshalb nicht erforderlich.</p>
+  <p>Die Anmeldung verwendet ein Bearer-Token im Authorization-Header, kein
+     Sitzungscookie. Zur Anzeige eines Prüfberichts wird das Ergebnis
+     vorübergehend im <code>sessionStorage</code> Ihres Browsers abgelegt und
+     beim Schließen des Tabs gelöscht &mdash; technisch erforderlich im Sinne von
+     &sect; 25 Abs. 2 Nr. 2 TTDSG.</p>
 
   <h2>Art.-50-Check</h2>
-  <p><span class="tok">{{ART50_DATA_STATEMENT}}</span></p>
+  <p>Der kostenlose Art.-50-Check benötigt weder ein Konto noch eine Freigabe.
+     Die von Ihnen angegebene Adresse wird ausschließlich zur Durchführung der
+     Prüfung verarbeitet. Das Ergebnis wird nicht in unserer Datenbank
+     gespeichert.</p>
 
   <h2>Prüfdaten der Kunden</h2>
-  <p><span class="tok">{{SCAN_DATA_STATEMENT}}</span></p>
-  <p><span lang="en">Sub-processors:</span> <span class="tok">{{SUBPROCESSORS}}</span>
-    <!-- REVIEW: Kwabena -->
+  <p>Für eine Prüfung verarbeiten wir den Systemprompt Ihres Bots
+     beziehungsweise die Adresse des laufenden Bots, die Ergebnisse der einzelnen
+     Angriffe sowie die wörtlichen Zitate, die einen Befund belegen. Die
+     vollständige Antwort Ihres Bots wird nicht gespeichert.</p>
+  <p>Auftragsverarbeiter: Für die Angriffs- und Bewertungsanfragen wird ein
+     externer Sprachmodell-Dienst eingesetzt (Azure OpenAI Service, Microsoft).
+     Die oben genannten Inhalte werden dorthin übermittelt.
+    <!-- REVIEW: Kwabena — Provider in deploy/.env bestätigen (config.py:31 und
+         docker-compose.prod.yml:65 setzen beide 'azure' als Vorgabe) -->
   </p>
 
   <h2>Speicherdauer</h2>
-  <p><span class="tok">{{RETENTION}}</span></p>
+  <p>Eine automatische Löschung ist derzeit nicht eingerichtet. Prüfdaten bleiben
+     gespeichert, bis Sie deren Löschung verlangen. Eine Anfrage an
+     info@llmantis.de genügt.
+    <!-- REVIEW: Kwabena — sobald eine Löschroutine existiert, gehört hier eine
+         konkrete Frist hin. Target.retention ist bis dahin nur ein Feld
+         (models.py:48), kein Mechanismus. -->
+  </p>
 
   <h2>Ihre Rechte</h2>
-  <p><span class="tok">{{DATA_SUBJECT_RIGHTS}}</span>
+  <p>Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16),
+     Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18),
+     Datenübertragbarkeit (Art. 20) sowie ein Widerspruchsrecht (Art. 21).
+     Wenden Sie sich dazu an info@llmantis.de.
     <!-- REVIEW: Kwabena -->
   </p>
 
   <h2>Beschwerderecht</h2>
-  <p><span class="tok">{{SUPERVISORY_AUTHORITY}}</span>
-    <!-- REVIEW: Kwabena -->
+  <p>Unabhängig davon können Sie sich bei einer Datenschutz-Aufsichtsbehörde
+     beschweren. Zuständig ist die Aufsichtsbehörde des Bundeslandes, in dem der
+     Verantwortliche seinen Sitz hat.
+    <!-- REVIEW: Kwabena — zuständige Behörde für Niedersachsen namentlich
+         eintragen, sobald bestätigt. -->
   </p>
 </div>
 </body>
