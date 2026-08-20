@@ -187,7 +187,7 @@ main{position:relative;z-index:2;padding-top:110px}
    screen. Subtracting that padding lands the heading 40px under the header
    instead. The result goes negative on a tall viewport, which is correct: the
    padding is simply scrolled past. */
-#grenzen,#preise,#team{scroll-margin-top:calc(150px - clamp(90px,13vh,170px))}
+#preise,#team{scroll-margin-top:calc(150px - clamp(90px,13vh,170px))}
 section{padding:clamp(90px,13vh,170px) var(--pad);border-bottom:1px solid var(--hairline)}
 .label{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;
   letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:38px}
@@ -195,6 +195,9 @@ section{padding:clamp(90px,13vh,170px) var(--pad);border-bottom:1px solid var(--
 .label i{font-style:normal;color:var(--faint)}
 h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
 .big{font-size:clamp(38px,7.4vw,104px);max-width:15ch}
+/* the question is a second beat, not the tail of the sentence; --accent so it
+   follows the band, where that token is re-pointed to the light ink */
+.ask{display:block;font-size:.46em;margin-top:.28em;color:var(--accent)}
 .sub{color:var(--muted);font-size:clamp(16px,1.4vw,20px);max-width:46ch;margin:30px 0 0;line-height:1.5}
 
 /* ── hero ────────────────────────────────────────────────────────────────── */
@@ -248,7 +251,15 @@ h2{font-size:clamp(32px,5.4vw,74px);max-width:17ch}
 /* ── pricing ─────────────────────────────────────────────────────────────── */
 .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);
   border:1px solid var(--hairline);margin-top:56px}
-.plan{background:var(--ground);padding:34px 28px;display:flex;flex-direction:column}
+.plan{background:var(--ground);padding:34px 28px;display:flex;flex-direction:column;
+  position:relative}
+/* A corner mark, not another <li>: it states a CONDITION on the tier, and a
+   list item would read as one more feature. --accent-warm is the only warm
+   token on the page and it is not re-pointed inside the band. */
+.stamp{position:absolute;top:16px;right:14px;transform:rotate(-7deg);
+  font-family:var(--mono);font-size:9.5px;line-height:1.4;letter-spacing:.1em;
+  text-transform:uppercase;text-align:center;color:var(--accent-warm);
+  border:2px solid var(--accent-warm);border-radius:3px;padding:5px 9px}
 .plan .n{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
   color:var(--muted)}
 .plan .p{font-size:clamp(40px,4.6vw,64px);font-weight:700;letter-spacing:-.05em;margin:16px 0 4px}
@@ -420,7 +431,7 @@ footer a:hover{color:var(--accent)}
   .rail .status{display:none}
   main{padding-top:90px}
   #signal{scroll-margin-top:90px}
-  #grenzen,#preise,#team{scroll-margin-top:calc(126px - clamp(90px,13vh,170px))}
+  #preise,#team{scroll-margin-top:calc(126px - clamp(90px,13vh,170px))}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -456,11 +467,10 @@ footer a:hover{color:var(--accent)}
     <a href="#signal"><span>01</span> Signal</a>
     <a href="#verfahren"><span>02</span> Verfahren</a>
     <a href="#problem"><span>03</span> Warum</a>
-    <a href="#grenzen"><span>04</span> Grenzen</a>
-    <a href="#preise"><span>05</span> Preise</a>
-    <a href="#team"><span>06</span> Team</a>
-    <a href="/scan"><span>07</span> Prüfung starten</a>
-    <a href="/static/art50check.html"><span>08</span> Art.-50-Check</a>
+    <a href="#preise"><span>04</span> Preise</a>
+    <a href="#team"><span>05</span> Team</a>
+    <a href="/scan"><span>06</span> Prüfung starten</a>
+    <a href="/static/art50check.html"><span>07</span> Art.-50-Check</a>
   </nav>
 </div>
 
@@ -474,7 +484,7 @@ footer a:hover{color:var(--accent)}
     <div class="hero-row">
       <div>
         <p class="label"><b>01</b> <i>/</i> Signal</p>
-        <h1 class="big">Ihr Chatbot spricht für Sie.</h1>
+        <h1 class="big">Ihr Chatbot spricht für Sie.<span class="ask">Vertrauen Sie ihm?</span></h1>
         <p class="sub">Wir greifen ihn an, lassen jede Antwort von einem separaten
           Modell bewerten und liefern einen Prüfbericht — jeder Befund mit dem
           wörtlichen Zitat, das ihn belegt. Kein Zitat, kein Befund.</p>
@@ -508,19 +518,18 @@ footer a:hover{color:var(--accent)}
           <div class="axis-rows" data-rows>
             <div class="trail" aria-hidden="true"></div>
             <article class="arow"><div class="an">Ziel</div><span class="chip mono">01</span>
-              <div class="ad"><p>Systemprompt oder Endpunkt. Bei einem Live-Bot erst nach
-                nachgewiesener Verfügungsberechtigung.</p></div></article>
+              <div class="ad"><p>Sie nennen uns den Bot — seine Anweisungen oder seine Live-Adresse.</p></div></article>
             <article class="arow"><div class="an">Angriffe</div><span class="chip mono">02</span>
-              <div class="ad"><p>Die Bibliothek läuft gegen den Bot. Jeder Angriff ist
-                dokumentiert und versioniert.</p></div></article>
+              <div class="ad"><p>Eine versionierte Angriffsbibliothek läuft gegen den Bot. Jeder
+                Angriff ist dokumentiert, mit Schweregrad und Gegenmaßnahme.</p></div></article>
             <article class="arow"><div class="an">Antworten</div><span class="chip mono">03</span>
-              <div class="ad"><p>Wir zeichnen wörtlich auf, was der Bot geantwortet hat.</p></div></article>
+              <div class="ad"><p>Jede Antwort wird gelesen und bewertet. Im Bericht bleibt das
+                wörtliche Zitat, das einen Befund beweist.</p></div></article>
             <article class="arow"><div class="an">Bewertung</div><span class="chip mono">04</span>
-              <div class="ad"><p>Ebene 1: Canary, ein Zeichenvergleich. Ebene 2: ein
-                separates Modell, immer mit Zitat.</p></div></article>
+              <div class="ad"><p>Die Bewertung macht ein separates Modell, nicht der Bot selbst.
+                Ohne Zitat kein Befund.</p></div></article>
             <article class="arow"><div class="an">Prüfbericht</div><span class="chip mono">05</span>
-              <div class="ad"><p>Note, Befunde mit Beleg und Behebung. Datiert, mit
-                Bibliotheksversion.</p></div></article>
+              <div class="ad"><p>Befunde mit Beleg und Behebung. Datiert, mit Bibliotheksversion.</p></div></article>
           </div>
         </div>
       </section>
@@ -588,43 +597,11 @@ footer a:hover{color:var(--accent)}
   </div>
 
 
-  <!-- 04 ───────────────────────────────────────────────────────────────── -->
-  <section id="grenzen">
-    <p class="label rv"><b>04</b> <i>/</i> Grenzen</p>
-    <h2 class="rv">Was wir sagen dürfen — und was nicht.</h2>
-    <p class="sub rv">Konformitätsbescheinigungen stellen nur benannte Stellen aus,
-      und nur für Hochrisiko-Systeme. Für einen Chatbot existiert diese Kategorie
-      nicht. Deshalb verkaufen wir keinen Nachweis der Konformität, sondern den
-      Nachweis, dass Sie geprüft haben.</p>
-    <div class="split">
-      <div class="col no rv">
-        <h3>Sagen wir nie</h3>
-        <ul>
-          <li>zertifiziert · Zertifikat</li>
-          <li>AI-Act-konform · DSGVO-konform</li>
-          <li>gesetzlich vorgeschrieben</li>
-          <li>garantiert · 100 % sicher</li>
-          <li>sichere Chatbots</li>
-        </ul>
-      </div>
-      <div class="col yes rv">
-        <h3>Sagen wir</h3>
-        <ul>
-          <li>Prüfbericht · Nachweis der Sorgfalt</li>
-          <li>geprüft auf bekannte LLM-Schwachstellen (OWASP LLM Top 10)</li>
-          <!-- REVIEW: Kwabena -->
-          <li>Art. 50 AI Act gilt seit dem 2. August 2026</li>
-          <li>Wir prüfen technisch — für eine rechtsverbindliche Bewertung:
-              Fachanwalt für IT-Recht</li>
-        </ul>
-      </div>
-    </div>
-  </section>
 
   <!-- 05 ───────────────────────────────────────────────────────────────── -->
   <section id="preise">
-    <p class="label rv"><b>05</b> <i>/</i> Preise</p>
-    <h2 class="rv">Drei Stufen, eine Engine.</h2>
+    <p class="label rv"><b>04</b> <i>/</i> Preise</p>
+    <h2 class="rv">Drei Stufen, ein Produkt.</h2>
     <div class="plans">
       <div class="plan rv">
         <span class="n">Art.-50-Check</span>
@@ -651,6 +628,7 @@ footer a:hover{color:var(--accent)}
       </div>
       <div class="plan rv">
         <span class="n">Starter</span>
+        <span class="stamp">DNS-Nachweis<br>erforderlich</span>
         <div class="p">29 €<small> / Prüfung</small></div>
         <!-- "Die VOLLE Angriffsbibliothek" was false on this deployment.
              ATTACK_LIBRARY is unset in deploy/.env, so DEFAULT_ATTACK_LIBRARY
@@ -671,6 +649,7 @@ footer a:hover{color:var(--accent)}
       </div>
       <div class="plan rv">
         <span class="n">Business</span>
+        <span class="stamp">DNS-Nachweis<br>erforderlich</span>
         <div class="p">199 €<small> / Monat</small></div>
         <p class="req">Setzt nachgewiesene Verfügungsberechtigung über den Bot voraus.
           Ohne diesen Nachweis führen wir keinen aktiven Test durch.</p>
@@ -701,7 +680,7 @@ footer a:hover{color:var(--accent)}
 
   <!-- 06 ───────────────────────────────────────────────────────────────── -->
   <section id="team">
-    <p class="label rv"><b>06</b> <i>/</i> Team</p>
+    <p class="label rv"><b>05</b> <i>/</i> Team</p>
     <h2 class="rv">Vier Leute, klare Zuständigkeiten.</h2>
     <p class="sub rv">Wir prüfen zuerst unseren eigenen Bot und veröffentlichen,
       was dabei herauskommt — auch dann, wenn das Ergebnis unbequem ist.</p>
