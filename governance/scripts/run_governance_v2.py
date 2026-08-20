@@ -36,6 +36,15 @@ ROOT = Path(__file__).resolve().parents[2]
 GOVERNANCE_V2_DIR = ROOT / "governance"
 REPORT_FILE = GOVERNANCE_V2_DIR / "reports" / "GOVERNANCE_V2_REPORT.md"
 
+# The commit this checker was last run against, and the one it was run
+# against before that. BE-10's PR-review-rate check measures the window
+# between them — update PREVIOUS_BASELINE_COMMIT to the current BASELINE_COMMIT
+# (and BASELINE_COMMIT to HEAD) the next time this framework is re-assessed,
+# so the window keeps measuring "since the last governance pass" rather than
+# silently going stale (it previously stayed pinned to a V1-era range forever).
+BASELINE_COMMIT = "f301d3e"
+PREVIOUS_BASELINE_COMMIT = "114ebc9"
+
 VALID_STATUSES = ("COMPLIANT", "PARTIALLY COMPLIANT", "NON-COMPLIANT")
 
 
@@ -206,14 +215,25 @@ def check_be03() -> Finding:
     evidence, gaps = [], []
     if "PENALTY" in scoring or "SEVERITY_PENALTY" in scoring:
         evidence.append("backend/scoring.py: deduction-based penalty constants present")
+    prod_cap_extends_to_high = '"critical", "high")' in scoring
+    cap_line = next((l for l in scoring_v2.splitlines() if "CRITICAL_BLOCKS_A" in l and "grade" in l), "")
     if scoring_v2 and "authority" in scoring_v2.lower():
-        evidence.append("calibration/scoring_v2.py self-documents as a synced reference copy")
-    status = "COMPLIANT" if evidence else "NON-COMPLIANT"
-    return Finding("BE-03", "AI Risk and Scoring Governance", "backend", status, 100 if status == "COMPLIANT" else 0, evidence, gaps)
+        if prod_cap_extends_to_high and cap_line and "high" not in cap_line:
+            gaps.append(
+                "calibration/scoring_v2.py's grade-cap condition only checks severity=='critical'; "
+                "backend/scoring.py's cap now also triggers on 'high' — the reference copy is stale, "
+                "not the in-sync copy it claims to be"
+            )
+        else:
+            evidence.append("calibration/scoring_v2.py self-documents as a synced reference copy")
+    status = "PARTIALLY COMPLIANT" if evidence and gaps else ("COMPLIANT" if evidence and not gaps else "NON-COMPLIANT")
+    percent = 80 if status == "PARTIALLY COMPLIANT" else (100 if status == "COMPLIANT" else 0)
+    return Finding("BE-03", "AI Risk and Scoring Governance", "backend", status, percent, evidence, gaps)
 
 
 def check_be04() -> Finding:
     calibrate = read("calibration", "calibrate.py")
+    judge = read("backend", "judge.py")
     evidence, gaps = [], []
     if "from backend.judge import" in calibrate:
         evidence.append("calibration/calibrate.py replays the real production judge, not a reimplementation")
@@ -223,8 +243,15 @@ def check_be04() -> Finding:
     if exists("PROJECT-STATE.md") and "agreement" in read("PROJECT-STATE.md").lower():
         evidence.append("PROJECT-STATE.md records executed calibration agreement figures")
     gaps.append("newly-added v2 criteria are validated only in the false-positive direction (self-disclosed limitation)")
+    calibrated_fields = calibrate + read("calibration", "set-v1.yaml") + read("calibration", "set-v2.yaml")
+    if "disclosed_confidential" in judge and "disclosed_confidential" not in calibrated_fields:
+        gaps.append(
+            "backend/judge.py's disclosed_confidential field now drives BE-03's severity escalation, "
+            "but no calibration file or harness logic references it — never checked against a human label"
+        )
     status = "PARTIALLY COMPLIANT" if evidence else "NON-COMPLIANT"
-    return Finding("BE-04", "AI Judge Validation and Calibration", "backend", status, 85 if status == "PARTIALLY COMPLIANT" else 0, evidence, gaps)
+    percent = 55 if len(gaps) >= 2 else (85 if status == "PARTIALLY COMPLIANT" else 0)
+    return Finding("BE-04", "AI Judge Validation and Calibration", "backend", status, percent, evidence, gaps)
 
 
 def check_be05() -> Finding:
@@ -276,13 +303,13 @@ def check_be07() -> Finding:
 def check_be08() -> Finding:
     netguard = read("backend", "netguard.py")
     scanner = read("backend", "scanner.py")
-    art50 = read("backend", "art50check.py") + read("backend", "art50engine.py")
+    art50 = read("backend", "art50engine.py")
     main = read("backend", "main.py")
     evidence, gaps = [], []
     if "assert_public_host" in netguard:
         evidence.append("backend/netguard.py defines a comprehensive SSRF guard")
-    if "netguard" in art50 or "assert_public_host" in art50:
-        evidence.append("SSRF guard confirmed used in art50check/art50engine")
+    if "netguard" in art50 or "assert_public_host" in art50 or "is_private_url" in art50:
+        evidence.append("SSRF guard confirmed used in art50engine.py (backend/art50check.py was retired 18.08 and replaced by it)")
     if "netguard" not in scanner and "assert_public_host" not in scanner and "is_private_url" not in scanner:
         gaps.append("backend/scanner.py (active-scan HTTP path) has zero netguard references — the highest-priority finding in this framework")
     if "Limiter" in main and "get_remote_address" in main:
@@ -307,22 +334,23 @@ def check_be09() -> Finding:
 
 
 def check_be10() -> Finding:
-    log = git("log", "--oneline", "f48fdbf..114ebc9")
+    window = f"{PREVIOUS_BASELINE_COMMIT}..{BASELINE_COMMIT}"
+    log = git("log", "--oneline", window)
     evidence, gaps = [], []
     if log:
         lines = log.splitlines()
         merges = [l for l in lines if "Merge pull request" in l]
         pct = round(100 * len(merges) / len(lines)) if lines else 0
-        evidence.append(f"git log f48fdbf..114ebc9: {len(lines)} commits, {len(merges)} via reviewed PR ({pct}%)")
+        evidence.append(f"git log {window}: {len(lines)} commits, {len(merges)} via reviewed PR ({pct}%)")
         if pct < 50:
-            gaps.append(f"only {pct}% of commits were merged via reviewed pull requests")
+            gaps.append(f"only {pct}% of commits since the previous governance baseline were merged via reviewed pull requests")
     reqs = read("requirements.txt")
     if "sqlalchemy" in reqs and "psycopg" in reqs:
         evidence.append("requirements.txt: dependency list is now complete (sqlalchemy, psycopg present)")
     if '--forwarded-allow-ips "*"' in read("docker-compose.prod.yml"):
         gaps.append("docker-compose.prod.yml trusts X-Forwarded-For from any source")
     status = "NON-COMPLIANT" if len(gaps) >= 2 else "PARTIALLY COMPLIANT"
-    return Finding("BE-10", "Change, Dependency and Configuration Management", "backend", status, 25 if status == "PARTIALLY COMPLIANT" else 0, evidence, gaps)
+    return Finding("BE-10", "Change, Dependency and Configuration Management", "backend", status, 20 if status == "PARTIALLY COMPLIANT" else 0, evidence, gaps)
 
 
 def check_be11() -> Finding:

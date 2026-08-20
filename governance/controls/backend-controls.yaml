@@ -1,14 +1,16 @@
 # =============================================================================
 # GOVERNANCE V2 — BACKEND / PLATFORM CONTROL DEFINITIONS
 # =============================================================================
-# LLMantis — assessed against commit 114ebc9.
-# See frontend-controls.yaml for the V1->V2 supersession note and the
+# LLMantis — assessed against commit f301d3e (second full re-assessment;
+# supersedes the first V2 pass, assessed against commit 114ebc9).
+# See frontend-controls.yaml for the re-verification note and the
 # reference-standard disclaimer; it applies equally here.
 # =============================================================================
 
 version: 2
 schema: "llmantis-governance-controls/v2"
-baseline_commit: "114ebc9"
+baseline_commit: "f301d3e"
+previous_baseline_commit: "114ebc9"
 domain: backend
 
 controls:

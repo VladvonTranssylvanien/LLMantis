@@ -1,52 +1,47 @@
 # LLMantis — Governance V2
 
-## Overview
+## What this is
 
-Governance V2 is the current governance framework for this repository, assessed against commit `114ebc9`. It **supersedes Governance V1** (the prior `GOV-01`..`GOV-10`/`LOG-01`/`LOG-02` framework, assessed against commit `f48fdbf`), which has been removed from the working tree per a team decision to close it out cleanly rather than carry it forward as archived clutter.
+Governance V2 is LLMantis's technical governance assessment: an evidence-based review of 17 controls across the frontend and backend, each independently verified against the current codebase — not against documentation or commit messages alone.
 
-**Governance V1 remains fully recoverable via git history** even though it no longer exists as files: `git show 474b20e:governance/reports/GOVERNANCE_REPORT.md` (and any other V1 path) will return its exact content, since `474b20e` remains a permanent ancestor commit. Nothing about V1 was lost — it was deliberately not archived in the working tree, by explicit instruction, not deleted without a recovery path.
-
-**No V1 finding was carried forward into V2.** Every one of the 17 V2 controls below was independently reassessed against the current implementation.
+**Assessment baseline:** commit `f301d3e` (this is the second full re-assessment; every control was independently re-verified against current code, not carried forward from the previous pass at `114ebc9`).
 
 ## Scope
 
-17 controls across two domains:
+**Frontend (FE-01–FE-05):** AI transparency/disclosure, marketing and legal claims, user-facing security/privacy pages, output and report integrity, accessibility.
 
-**Frontend (5):** FE-01 AI Transparency and User Disclosure · FE-02 Legal and Regulatory Information · FE-03 User-Facing Security and Privacy · FE-04 Output, Report and Claim Integrity · FE-05 Accessibility, User Understanding and Human Interaction
+**Backend / Platform (BE-01–BE-12):** AI provider governance, attack library governance, scoring, judge calibration, target authorization, authentication, secret handling, application/network security (SSRF, rate limiting), evidence/traceability, change management, regression testing, and security logging.
 
-**Backend / Platform (12):** BE-01 AI Component and Provider Governance · BE-02 AI Attack Library Governance · BE-03 AI Risk and Scoring Governance · BE-04 AI Judge Validation and Calibration · BE-05 Target Authorization and Active Testing Control · BE-06 Authentication and Access Control · BE-07 Sensitive Data and Secret Protection · BE-08 Application and Network Security · BE-09 Evidence, Traceability and Data Integrity · BE-10 Change, Dependency and Configuration Management · BE-11 Regression Testing and Operational Monitoring · BE-12 Security and Governance Logging
-
-Full definitions: `controls/frontend-controls.yaml`, `controls/backend-controls.yaml`. Full assessment: `reports/GOVERNANCE_V2_REPORT.md`. Per-control evidence: `evidence/<CONTROL-ID>/EVIDENCE.md`.
-
-## Assessment methodology
-
-Every control was assessed against the **feature + code path + enforcement** principle — a security or compliance feature existing somewhere in the repository is not, by itself, evidence that the control it relates to is compliant. The clearest example: SSRF protection (BE-08) is real and thorough on the Art. 50 Check path but absent from the active-scan path, despite shared documentation claiming both are covered — this was found by tracing actual code usage, not by confirming a guard module exists.
+Full control definitions: `controls/frontend-controls.yaml`, `controls/backend-controls.yaml`.
+Full assessment: `reports/GOVERNANCE_V2_REPORT.md` — the single official assessment of record.
+Per-control evidence: `evidence/<CONTROL-ID>/EVIDENCE.md`.
 
 ## Status vocabulary
 
-- **COMPLIANT** — every sub-requirement of the control's intent is met, with direct evidence, and no known gap remains.
-- **PARTIALLY COMPLIANT — XX%** — some but not all of the control's intent is met.
-- **NON-COMPLIANT** — the core thing the control checks for is absent or contradicted by evidence.
+- **COMPLIANT (100%)** — every sub-requirement of the control's intent is met, with direct evidence, no known gap.
+- **PARTIALLY COMPLIANT (1–99%)** — some but not all of the control's intent is met. The percentage reflects countable sub-checks where they exist, or explicit stated reasoning where the control is genuinely continuous — never a bare number with no shown work.
+- **NON-COMPLIANT (0%)** — the core thing the control checks for is absent or contradicted by evidence.
 
-## Percentage methodology
+## Regulatory reference classification
 
-Each control decomposes into 2–4 explicit sub-checks derived from its Control Explanation. Where sub-checks are cleanly countable, percentage = `(sub-checks met ÷ total) × 100`. Where a control is genuinely continuous (e.g. "how well do these legal claims hold up"), the percentage reflects explicit, stated qualitative reasoning rather than a forced ratio — every `EVIDENCE.md` in this framework shows its work rather than asserting a bare number. No percentage in this framework should be read as more precise than the reasoning behind it.
+Every control's `Regulation`/`Reference` fields are labeled as one of:
 
-## Regulatory reference discipline
+- **LEGAL REQUIREMENT** — a binding law or article, cited with its specific number.
+- **BEST-PRACTICE** — an industry convention (e.g. OWASP), not a legal obligation.
+- **INTERNAL POLICY** — an LLMantis decision, not an external requirement.
 
-Every control's regulatory/reference basis distinguishes **LEGAL REQUIREMENT** (a binding law/article, cited with its specific number) from **BEST-PRACTICE** (an industry convention, e.g. OWASP) from **INTERNAL POLICY** (an LLMantis decision, not an external requirement). Where a regulation's *direct* applicability to a specific control has not been independently verified, this framework says so explicitly rather than asserting it — see, for example, BE-01's GDPR Art. 44 note, or FE-01's note on Art. 50(1)'s applicability to LLMantis's own architecture. This framework does not perform new legal research; it records what has been verified and flags what hasn't.
+Where a regulation's direct applicability to a specific control hasn't been independently verified, the report says so explicitly rather than asserting it.
 
-## Legal and claims governance
+## How to run the checker
 
-This framework is a technical governance assessment, not legal advice, and does not establish legal compliance with any statute referenced in it. See `docs/legal/DISCLAIMERS.md`, `docs/legal/LEGAL-MAP.md`, and `docs/legal/FORBIDDEN-WORDS.md` (retained outside this migration; not part of Governance V1's retirement). LLMantis is not a certification body and this framework does not certify anything — see EU AI Act Art. 43 and FE-02/BE-... references throughout.
+```bash
+python governance/scripts/run_governance_v2.py
+```
 
-## Distribution
+This writes a read-only, pattern-matching cross-check to `reports/GOVERNANCE_V2_AUTOMATED_RERUN.md` (untracked — a local cross-check, not a second source of truth). It is a lower bound, not a guarantee: it has caught real gaps but has also taken self-descriptive comments at face value where the manual assessment dug deeper. Discrepancies between it and `GOVERNANCE_V2_REPORT.md` should be investigated, not assumed to be errors in either document.
 
-This is an **internal working baseline**. It is not to be published or pushed externally in its current form without separate review and approval.
+Run `python -m unittest governance.tests.test_governance_v2 -v` to verify the framework's own structure (all 17 control IDs present, no duplicates, report/YAML baseline consistency).
 
-## How to use this framework going forward
+## Disclaimer
 
-1. Re-run the checker (`scripts/run_governance_v2.py`) after any change to `backend/`, `frontend/`, `attacks/`, or `calibration/`, and compare its output against `reports/GOVERNANCE_V2_REPORT.md`.
-2. Treat every `PARTIALLY COMPLIANT` and `NON-COMPLIANT` control as a tracked backlog item — the Top 5 Priority Recommendations in the report are the current starting point.
-3. Update `controls/*.yaml` when a control's scope or criteria change, so the checker and its documentation don't drift apart.
-4. This framework does not self-certify its own completeness or currency — a human reviewer should periodically re-read the report against the live repository, the same discipline that made Governance V1 outdated in the first place.
+This is a technical governance assessment, not legal advice, a legal opinion, a certification, or proof of regulatory compliance. See `docs/legal/DISCLAIMERS.md`.

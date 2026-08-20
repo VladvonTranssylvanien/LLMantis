@@ -92,13 +92,14 @@ class TestControlsDefinitions(unittest.TestCase):
         for fname in ("frontend-controls.yaml", "backend-controls.yaml"):
             data = yaml.safe_load(read(V2_DIR / "controls" / fname))
             self.assertIn("controls", data)
-            self.assertEqual(data.get("baseline_commit"), "114ebc9")
+            self.assertEqual(data.get("baseline_commit"), "f301d3e")
 
 
 class TestGovernanceV2Report(unittest.TestCase):
     def test_report_references_correct_baseline(self):
         text = read(V2_DIR / "reports" / "GOVERNANCE_V2_REPORT.md")
-        self.assertIn("114ebc9", text)
+        self.assertIn("f301d3e", text)
+        self.assertIn("114ebc9", text)  # cited as the previous V2 pass, not reused as the current baseline
         self.assertIn("f48fdbf", text)  # cited as the superseded V1 baseline, not reused as current
 
     def test_report_contains_all_seventeen_controls(self):

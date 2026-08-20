@@ -2,14 +2,20 @@
 
 **Compliance Status: PARTIALLY COMPLIANT**
 
-**Compliance Percentage: 25%**
+**Compliance Percentage: 20%**
 
-## What was found
+## What was found (previous period, `f48fdbf..114ebc9`)
 
-- `git log --oneline f48fdbf..114ebc9 | grep -c "Merge pull request"` = 19; total commits in the same range = 168. Only **11%** of commits were merged via reviewed pull requests, despite this range including authentication, ownership verification, SSRF handling, and deployment configuration.
-- `requirements.txt`: now complete — `sqlalchemy==2.0.52`, `psycopg[binary]==3.3.4`, `alembic==1.13.1`, `slowapi==0.1.10`, `bcrypt==5.0.0`, `PyJWT==2.13.0`, `playwright==1.62.0` all present (a prior gap where these were missing entirely, despite being required by `backend/database.py`/`models.py`, has been resolved).
-- `docker-compose.prod.yml:52`: passes `--forwarded-allow-ips "*"` to uvicorn, trusting `X-Forwarded-For` from any source for rate-limit keying — safe only under an unenforced network-topology assumption (no port published directly), documented in an adjacent comment but not technically enforced.
+`git log --oneline f48fdbf..114ebc9 | grep -c "Merge pull request"` = 19 of 168 commits (11%) — already the weakest of the three sub-areas.
 
-## Basis for 25%
+## Re-verified at commit f301d3e — the current period is worse, not better
 
-Of three sub-areas assessed (change review, dependency completeness, deployment hardening), only one (dependency completeness) is solid. Change review is weak (11% PR rate) and deployment configuration has a real, if bounded, permissive default. 1 of 3 fully met, with the two unmet areas being significant given the security-sensitivity of what shipped.
+`git log --oneline 114ebc9..f301d3e` = 24 commits since the previous governance baseline. Of those, **zero** match "Merge pull request" (2 are local "merge remote-tracking branch" integration merges from a plain fetch, not reviewed PR merges). The reviewed-change rate fell from an already-low 11% to 0% in the period that produced this report's two most consequential findings (the BE-03 scoring divergence and the BE-04 calibration staleness) — exactly the outcome unreviewed changes to scoring/judge logic predict.
+
+- `requirements.txt`: remains complete and unusually well-documented — `sqlalchemy==2.0.52`, `psycopg[binary]==3.3.4`, `alembic==1.13.1`, `slowapi==0.1.10`, `bcrypt==5.0.0`, `PyJWT==2.13.0`, `playwright==1.62.0` all present, each with an inline comment naming its consumer.
+- `docker-compose.prod.yml`: still passes `--forwarded-allow-ips "*"` to uvicorn. This remains a documented risk-acceptance (the app service publishes no host port and is reachable only via the internal Docker network, per an adjacent code comment) rather than an unexamined default — real reasoning exists, even though the setting itself is still a wildcard.
+- No `.github/` or other CI configuration exists to enforce review going forward.
+
+## Basis for 20%
+
+Of three sub-areas, dependency completeness remains solid and the proxy-trust setting is a reasoned (if still permissive) risk-acceptance rather than an oversight — both given partial credit. Change review is the weakest leg and got measurably worse (11% → 0%) in the exact period covered by this report, with no CI to backstop it. The percentage is lowered from the previous pass's 25% to reflect that regression.

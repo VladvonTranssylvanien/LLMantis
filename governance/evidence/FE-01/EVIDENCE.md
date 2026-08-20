@@ -18,3 +18,9 @@ Per the Governance V2 principle of assessing feature + code path + enforcement: 
 ## Residual note
 
 Whether EU AI Act Art. 50(1) applies *directly* to LLMantis's own architecture (a form-based tool, not a conversational persona) has not been independently established — this affects the regulatory-relevance classification, not the technical discovery above.
+
+## Re-verified at commit f301d3e — two new additions, neither changes the status
+
+- `frontend/art50report.html` (new): a print/PDF sibling of `report.html`, populated only from `sessionStorage` data the backend already returned. No new endpoint, no new disclosure claim.
+- `tools/voice50/` (new): phone-based Art. 50 disclosure checking. Confirmed **not shipped** — zero references to it exist in `backend/`, `frontend/`, or `Dockerfile`; its own README states the shipped product is untouched by it. One of its test fixtures (`twilio_call.py`) scripts a simulated bot that impersonates a human, but only as the deliberately non-compliant *target* the checker validates itself against, dialed only with the operator's own recorded consent — not an LLMantis-owned customer-facing interface.
+- `backend/art50engine.py` itself is byte-for-byte unchanged since the previous baseline.

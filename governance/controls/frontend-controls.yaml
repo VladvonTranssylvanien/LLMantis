@@ -1,13 +1,13 @@
 # =============================================================================
 # GOVERNANCE V2 — FRONTEND CONTROL DEFINITIONS
 # =============================================================================
-# LLMantis — assessed against commit 114ebc9.
+# LLMantis — assessed against commit f301d3e (second full re-assessment;
+# supersedes the first V2 pass, assessed against commit 114ebc9).
 #
-# Governance V2 supersedes Governance V1 (the prior GOV-01..GOV-10/LOG-01/LOG-02
-# framework, assessed against commit f48fdbf). V1 is not carried forward as
-# current status; every V2 control below was independently reassessed against
-# the current implementation. V1 remains recoverable via `git show
-# 474b20e:governance/...` but no longer exists in the working tree.
+# Every control below was independently re-verified against the current
+# implementation for this pass — no finding was carried forward without
+# re-checking the actual code. See governance/reports/GOVERNANCE_V2_REPORT.md
+# for what changed since 114ebc9 and why.
 #
 # Reference standards listed here are governance vocabulary, not certification
 # claims. See docs/legal/DISCLAIMERS.md and docs/legal/LEGAL-MAP.md.
@@ -15,7 +15,8 @@
 
 version: 2
 schema: "llmantis-governance-controls/v2"
-baseline_commit: "114ebc9"
+baseline_commit: "f301d3e"
+previous_baseline_commit: "114ebc9"
 domain: frontend
 
 controls:

@@ -16,4 +16,8 @@ Three specific claims on `frontend/landing.html` remain overstated relative to t
 
 ## Basis for 50%
 
-Core, highest-stakes claim (certification avoidance) is fully correct. Three separate, identified overstatements remain live and uncorrected. Citations underlying all claims (article numbers, case name/date/jurisdiction) are factually accurate — the defect is scope/framing, not fabrication.
+Core, highest-stakes claim (certification avoidance) is fully correct. Citations underlying all claims (article numbers, case name/date/jurisdiction) are factually accurate — the defect is scope/framing, not fabrication.
+
+## Re-verified at commit f301d3e
+
+Items 1 (Air Canada) and 3 (GDPR 72h) above are confirmed unchanged, byte-for-byte, in `frontend/landing.html` — both still sit under a `<!-- REVIEW: Kwabena -->` marker, i.e. already flagged internally but not yet fixed. Item 2 ("no regulation requires testing," previously stated as flat fact) no longer appears verbatim in the current copy; the underlying risk category is now governed by `docs/legal/FORBIDDEN-WORDS.md`, which explicitly bans the phrase and tracks claim status. This is genuine process improvement, but it is infrastructure, not a fix — it has not yet been applied to correct the two claims its own sibling document, `LEGAL-MAP.md`, already marks as open. Score held at 50%, not raised, because the two highest-visibility overstatements are unchanged and the new framework's value is currently only in what it *would* catch, not in what it has fixed.
