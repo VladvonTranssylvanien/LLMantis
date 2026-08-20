@@ -1,10 +1,34 @@
+1
 <table>
   <tr>
     <td valign="middle">
       <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
     </td>
     <td valign="middle">
-      <h1 style="font-size: 60px;">LLMantis</h1>
+      <h1 style="font-size: 60px;"><span style="color: #008822;">LL</span>Mantis</h1>
+    </td>
+  </tr>
+</table>
+
+2
+<div style="display: flex; align-items: center;">
+  <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
+  <h1 style="font-size: 60px; margin-left: 20px;">
+    <span style="color: #008822;">LL</span>Mantis
+  </h1>
+</div>
+
+3
+
+<table style="border: none;">
+  <tr style="border: none;">
+    <td style="border: none;" valign="middle">
+      <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
+    </td>
+    <td style="border: none;" valign="middle">
+      <h1 style="font-size: 60px;">
+        <span style="color: #008822;">LL</span>Mantis
+      </h1>
     </td>
   </tr>
 </table>
