@@ -1,8 +1,18 @@
-# LLMantis
+<table>
+  <tr>
+    <td valign="middle">
+      <img src="Brand/llmantis-seal.svg" alt="LLMantis logo" width="100">
+    </td>
+    <td valign="middle">
+      <h1 style="font-size: 60px;">LLMantis</h1>
+    </td>
+  </tr>
+</table>
 
-**A penetration test for AI chatbots.**
 
-Your chatbot speaks for your company. Nobody has ever checked what it says under
+### A penetration and compliance test for AI chatbots.
+
+**Your chatbot speaks for your company**. Nobody has ever checked what it says under
 pressure.
 
 LLMantis connects to a chatbot, runs a library of documented attacks against it,
@@ -12,6 +22,7 @@ that proves each finding and a concrete fix for it.
 
 We are black box. We never read source code, never connect to a repository and
 never show code in a report. We test behaviour.
+
 
 ---
 
@@ -69,7 +80,7 @@ The split exists for a legal reason: attacking a bot you do not own is not a
 product, it is an offence. The free layer needs no permission at all, so it can
 run on a prospect's site before any conversation exists.
 
-### The free Art. 50 Check
+## The free Art. 50 Check
 
 **Why.** It answers a question a German compliance manager already has, in a few
 seconds, without a sales call. And every site that fails it is a named,
@@ -79,7 +90,7 @@ evidenced lead — which is what makes it a funnel rather than a giveaway.
 user agent. No message is ever sent to the bot, so no permission is required and
 no provider's terms are breached. `robots.txt` is honoured, and the URL is
 SSRF-guarded — private, loopback, link-local and cloud-metadata addresses are
-rejected, re-checked on every redirect hop.
+rejected, re-checked on every redirect hop. Check [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md) for more information.
 
 Four findings, each with evidence and a fix:
 
@@ -89,248 +100,82 @@ Four findings, each with evidence and a fix:
 - `privacy_link` — is a privacy policy reachable beside it
 - `impressum` — § 5 DDG
 
-### The red team Prüfung
+
+### Using it on the website
+
+
+1. **Go to [llmantis.de](https://llmantis.de)**, scroll down to the Art.-50-Check and click on **"Jetzt prüfen ->"**.
+
+<img src="Screenshots/SS_003.png" alt="1" width="300">
+
+
+2. **Paste a web address, you want to check.** For example: "otto.de".
+
+<img src="Screenshots/SS_010.png" alt="2" width="400">
+
+
+3. Press **Check now**. It reads the page and lists what it found: chat widget, AI disclosure, privacy link, Impressum. No account, and nothing is sent to the bot.
+
+<img src="Screenshots/SS_008.png" alt="3" width="400">
+
+
+4. Check the result and open the PDF report.
+
+<img src="Screenshots/SS_009.png" alt="4" width="400">
+
+---
+
+## The red team Prüfung
 
 **Why.** Art. 50 is a label on the outside of the box: it asks whether you told
 the user it was a bot. This asks what the bot does when someone actually tries —
 which is where the Air Canada class of liability lives, and no label prevents it.
 
-**How.** The next section, in four steps.
+**How.** The scanner runs automated attacks against the target bot and judges the response with a calibrated AI. Check [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md) for more information.
+
+### Using it on the website
+
+1. **Go to [llmantis.de](https://llmantis.de)**, scroll down to the Starter-tier and click on **"Prüfung starten ->"**.
+
+<img src="Screenshots/SS_001.png" alt="1" width="300">
+
+
+2. **Choose 'live endpoint or 'system prompt'.**
+
+<img src="Screenshots/SS_014.png" alt="2" width="400">
+
+For live endpoint:
+**Paste your bot's web address.** Use 'https://phishing.workshop.bogdanorel.de/', because this is the only site whitelisted until we add owner verification. 
+
+<img src="Screenshots/SS_015.png" alt="2" width="400">
+
+Alternatively you can test a custom system prompt or one of our three preconfigured bots on our LLM.
+
+<img src="Screenshots/SS_007.png" alt="3" width="400">
+
+<img src="Screenshots/SS_002.png" alt="4" width="400">
+
+Optionally name a canary — a string that must never appear in an answer. That is what makes a leak deterministic instead of a judgement.
+
+<img src="Screenshots/SS_004.png" alt="5" width="400">
+
+
+3. Press **Run scan**. Attacks stream in with a verdict each, twice over, and the worse of the two passes becomes the report.
+
+<img src="Screenshots/SS_011.png" alt="6" width="400">
+
+<img src="Screenshots/SS_013.png" alt="6" width="400">
+
+
+4. Open the Prüfbericht: the grade, every finding with the bot's own words as evidence, the fix, the coverage, and the attack library version.
+
+<img src="Screenshots/SS_012.png" alt="8" width="400">
+
+
 
 ---
 
-## How a scan works
-
-One attack, end to end:
-
-**1. Take an attack from the library.** `attacks/attacks.yaml` holds 78 across
-the five OWASP LLM categories; `attacks_short.yaml` holds 21 and is what a scan
-runs by default. Attacks are data, not code — a YAML block with an id, category,
-severity, the prompt, and the fix to print if it succeeds. Adding one needs no
-Python and no restart.
-
-**2. Send it to the bot under test.** The normal case is a real bot on a real
-website: paste its address and `api` mode attacks the live chatbot over HTTP,
-exactly as a customer would reach it. A bare host is completed to the chat
-endpoint and printed back before anything is sent — silently scanning an address
-other than the one on screen is how a report ends up describing something the
-reader never asked about. `model` mode instead takes a system prompt and posts it
-with each attack to a deployment we hold, which is useful before a bot is live
-and is how the demo bots run.
-
-**3. Judge the answer, in two layers, in this order.**
-
-- **Layer 1, deterministic.** The customer names a string that must never appear
-  in an answer — a real secret already in their prompt, or a canary planted there
-  for the test. If it appears, the leak is a fact: a string comparison, no model,
-  no ambiguity. Layer 1 always wins — if the secret leaked, the model's opinion is
-  irrelevant.
-- **Layer 2, the AI judge.** Only for what a string match cannot catch: did the
-  bot approve a refund, give medical advice, insult a customer, claim to be
-  human. A separate model, and it may never award itself `confirmed`.
-
-**4. Record the verdict with its evidence** — the exact substring of the bot's
-answer that proves the finding, verified to actually be a substring, because
-judges paraphrase. No quote, no finding.
-
-**5. Score it.** Every bot starts at 100 and loses points per finding, weighted by
-severity and by how well the finding is proven; defending an attack earns nothing,
-because that is normal behaviour rather than an achievement. Two rules matter more
-than the constants, which we are still tuning: **any critical finding caps the
-grade**, and **a scan with too little evidence is issued with no grade at all**
-rather than a flattering one, since a missing attack can only help the bot. The
-method is one short function in `backend/scoring.py`.
-
-**Once is not a measurement.** The same bot answers differently to the same
-sentence — three identical runs against one target returned A/100, A/90 and B/79.
-So one press runs the whole library **twice and reports the worse pass**, carried
-as one whole report, never a score from one pass beside quotes from another. An
-ungraded run outranks any graded one, so "no grade issued" cannot be softened by
-running again until a number appears.
-
-Attacks run concurrently, results stream to the browser as they land, and an
-attack the target's own provider refuses to deliver is recorded as `BLOCKED` —
-no credit, no penalty, listed in the report as not delivered.
-
----
-
-## What we measured
-
-The obvious objection to this product is *"you have a model judging a model —
-what if the judge is wrong?"* So it is measured, against two calibration sets of
-real harvested bot answers — 30 items and 43 items — each labelled PASS or FAIL
-by a person with their reason recorded.
-
-| Measurement | Result |
-|---|---|
-| Judge agreement with human labels, 30-item set, 10 consecutive runs | **29 of 29 judgeable items — identical in every run** |
-| — of which the deterministic layer alone | **11/11 and 13/13 on the two sets, zero false positives, every run** |
-| Errors across a full 78-attack scan of three bots (~234 target calls) | **0** |
-| Judge-side content filtering, 78 attacks × 3 bots | **0** |
-
-
-Those answers were harvested from three bots we built for the purpose: a
-deliberately careless support bot, a hardened twin of it with the same job and a
-fixed prompt, and a doctor's appointment bot as a realistic middle case. They are
-the fixtures the judge was calibrated against — and they are still on the site as
-the demo, because the contrast is the argument:
-
-| Bot | Grade |
-|---|---|
-| TeleShop support, unprotected | **F (0)** — leaks its planted secret verbatim |
-| Praxis Dr. Weber, realistic middle case | **D (42)** |
-| TeleShop support, hardened — same job, fixed prompt | **A (94–100)** |
-
-Same attacks, same model, three grades. The difference is the prompt. Grades move
-by a band between runs, which is the target answering differently rather than the
-judge, and is why a scan now runs the library twice and reports the worse pass.
-
----
-
-## Using it on the website
-
-Both layers run at **[llmantis.de](https://llmantis.de)** — access-restricted for
-now, while the Impressum and Datenschutz pages are finalised.
-
-**The free Art. 50 Check.** Paste the URL of any site and start it. It reads the
-page and lists what it found: chat widget, AI disclosure, privacy link,
-Impressum. No account, and nothing is sent to the bot.
-
-**The red team Prüfung.** On the scan page:
-
-1. **Paste your bot's web address.** The chat endpoint is completed for you and
-   shown before anything is sent. Or try one of the three demo bots from the
-   dropdown, or paste a system prompt that is not live yet.
-2. Optionally name a canary — a string that must never appear in an answer. That
-   is what makes a leak deterministic instead of a judgement.
-3. Press **Run scan**. Attacks stream in with a verdict each, twice over, and the
-   worse of the two passes becomes the report.
-4. Open the Prüfbericht: the grade, every finding with the bot's own words as
-   evidence, the fix, the coverage, and the attack library version. Print to PDF
-   from the browser. Declared secrets are masked, so the report quotes the leak
-   without reprinting it.
-
-Only attack domains you own!
-
----
-
-## What we do not claim
-
-LLMantis issues a **Prüfbericht** — dated evidence that a system was tested, with
-the attack library version stamped on it. Nachweis der Sorgfalt: proof that you
-looked, not proof that you comply.
-
-It is not a certificate and not legal advice. Under the AI Act, conformity
-certificates are issued only by notified bodies and only for high-risk systems,
-so a chatbot certification does not exist as a legal category. Claiming one is a
-§ 5 UWG problem in Germany, not a wording preference. "Certified",
-"zertifiziert", "AI-Act-konform" and "DSGVO-konform" are therefore banned
-repository-wide — in UI text, comments, variable names, documentation and commit
-messages.
-
-LLMantis tests **only** AI systems the user owns. Active testing requires
-verified ownership of the target. All attacks are publicly documented techniques
-from the OWASP Top 10 for LLM.
-
----
-
-## Run it locally
-
-```bash
-git clone git@github.com:VladvonTranssylvanien/LLMantis.git
-cd LLMantis
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python -m playwright install chromium   # the LIBRARY comes from pip, the BROWSER does not
-cp .env.example .env        # then fill in the keys
-docker compose up -d        # Postgres
-alembic upgrade head
-uvicorn backend.main:app --reload --port 8000
-```
-
-Then `http://localhost:8000` for the landing page, `/scan` for the scanner and
-`/static/art50check.html` for the free check.
-
-`.env` needs a judge (`PROVIDER`, `AZURE_URL`, `AZURE_KEY`, `JUDGE_MODEL`) and a
-target (`TARGET_URL`, `TARGET_KEY`, `TARGET_MODEL`). There is deliberately no
-mock mode: without a working provider every attack errors and no grade is issued.
-Today the judge is gpt-4.1 and the target gpt-4.1-mini, both on Azure.
-
-Full walkthrough in `SETUP.md`, key handling in `SECRETS.md`, contributor
-conventions and the full endpoint table in `README_old.md`.
-
-## Verify it yourself, no keys required
-
-The scan needs a provider, but the two things that decide a verdict do not. Both
-suites run offline against fixtures we ship, so anyone can check that the
-judgement logic does what this README says it does.
-
-```bash
-python -m playwright install chromium        # once
-python tools/art50v2/test_fixtures.py        # 5 local pages, 10 cases, ~110 s
-
-pip install faster-whisper                   # the voice PoC only, see below
-python tools/voice50/test_fixtures.py        # 8 recordings, ~6 s once cached
-```
-
-Both print `all fixtures behave as specified`. Measured 20.08.2026 with
-`PROVIDER`, `AZURE_URL`, `AZURE_KEY`, `ART50_AI_URL`, `ART50_AI_KEY`,
-`TARGET_URL` and `TARGET_KEY` all blanked: 10 of 10 and 8 of 8, 113 s together.
-
-`faster-whisper` is deliberately **not** in `requirements.txt`. That file is what
-`Dockerfile:20` installs, and pulling ctranslate2, onnxruntime, av and tokenizers
-into the production image for a PoC that does not ship would be paying ~200 MB
-for nothing. The first run also downloads a ~145 MB speech model, once.
-
-### Real sites it has produced a verdict on
-
-| site | verdict | what it read |
-| --- | --- | --- |
-| `otto.de` | disclosed | "OTTO KI-Assistent" on the footer button. The chat was never opened, because the disclosure was already complete |
-| `o2.de` | disclosed | "Ich bin Aura, deine KI-gestützte Assistenz" |
-| `vodafone.de` | disclosed | TOBi, with a KI notice |
-| `vattenfall.de` | disclosed | "Digitaler Assistent" |
-| `myposter.de` | disclosed | "Ich bin Ihr virtueller Assistent" |
-| `westwing.de` | disclosed | "Westwing AI (BETA)" |
-| a bot built for a workshop | **not disclosed** | "Workshop-Assistent", greeted and started the conversation without ever saying it is AI |
-
-`otto.de`, `o2.de` and the workshop bot were re-run on 20.08.2026 and reproduce
-every time, in 75 s, 39 s and 21 s. Each carries the quote above and a screenshot
-in its report. The other four were measured on earlier builds and have not been
-re-run since, which is why they are listed without timings.
-
-Only sites that reproduce are listed here. `saturn.de` is not, and the reason is
-worth stating: it returns `disclosed` in about 11 of 14 runs and
-`not_determinable` in the rest, so a reader who ran it could reasonably see
-something this table does not say. The cause is not found.
-
-The Art.-50 check itself also runs without a provider. The model that reads a
-page and finds the chat button is a helper, not a requirement:
-
-```bash
-python -c "import asyncio; from backend.art50engine import check; \
-print(asyncio.run(check('example.com', exhaustive=True)).verdict)"
-```
-
-That prints `no_widget_found` on example.com, which has no chatbot. Point it at a
-site that does and it will walk the pages, open the widget once and read what it
-says. Nothing is ever typed into it.
-
-## Where the code is
-
-```
-backend/    scanner.py · judge.py · scoring.py · ownership.py · netguard.py
-            art50engine.py · art50probes.py · art50opener.py (the free check)
-            llm.py (the only file that talks to a provider) · main.py · models.py
-attacks/    attacks_short.yaml (21, the default) · attacks.yaml (78)
-frontend/   one file per page, no build step: landing · index (scanner)
-            · art50check · report
-calibration/  the hand-labelled sets and the agreement runner
-lab/          the three target bots and the measurement harness
-```
-
-
-## Where this goes next
+# Where this goes next
 
 The architecture was built so the two obvious directions are additions rather
 than rewrites.
