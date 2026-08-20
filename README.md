@@ -184,8 +184,6 @@ Optionally name a canary — a string that must never appear in an answer. That 
 
 # Where this goes next
 
-The architecture was built so the two obvious directions are additions rather
-than rewrites.
 
 **Authentication and Registration** Authentication is not finished yet and therefore not integrated on the frontend yet.
 
@@ -206,7 +204,7 @@ Further out: multi-turn attacks that build trust across a conversation before
 asking, scheduled re-scans that flag when a prompt change reopened something, and
 voice agents.
 
-**Art. 50 AI Act. Voice and Messenger Bot control** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. It is not connected to the front-end yet. In the future also bots on Whatsapp and Telegram could be checked.
+**Art. 50 AI Act. Voice and Messenger Bot control.** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. It is not connected to the front-end yet. In the future also bots on Whatsapp and Telegram could be checked.
 
 ## Licence
 
