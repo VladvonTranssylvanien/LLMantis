@@ -2,7 +2,8 @@
 Where a server-side request is allowed to go.
 
 Two places in this codebase take a URL from a caller and fetch it from our
-server: the passive Art.-50-Check (backend/art50check.py) and the active
+server: the Art.-50 check (backend/art50engine.py, which drives a browser and
+re-checks every request the page makes, not just the first) and the active
 api-mode scan (backend/scanner.py). Both are SSRF surfaces — without a
 check, a caller can point us at http://localhost:5432, at
 http://169.254.169.254/ (the cloud metadata endpoint on AWS/GCP/Azure), or

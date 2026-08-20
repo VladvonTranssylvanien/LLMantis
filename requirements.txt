@@ -7,7 +7,10 @@ pyyaml==6.0.2
 python-dotenv==1.2.2
 httpx==0.28.1
 mistralai==2.9.3          # the judge/target provider registered in llm.py today
-beautifulsoup4==4.15.0    # tools/art50check.py and backend/art50check.py parse HTML for chat widgets
+beautifulsoup4==4.15.0    # tools/art50check.py only, the day-1 hypothesis script. The
+                          # backend user of this went away with art50check.py: the
+                          # browser-driven checker reads the live DOM through Playwright
+                          # and never parses fetched HTML. Kept because tools/ still runs.
 dnspython==2.8.0          # backend/ownership.py - DNS TXT record verification
 sqlalchemy==2.0.52        # backend/models.py, backend/database.py
 alembic==1.13.1           # database migrations

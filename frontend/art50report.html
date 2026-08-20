@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Art.-50-Prüfprotokoll — LLMantis</title>
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<style>
+/* ---- primitives lifted from assets/base.css (tokens stripped) ---- */
+/* ===========================================================================
+   LLMantis — shared foundation
+   ---------------------------------------------------------------------------
+   Fonts, tokens and primitives for every page. Served from our own
+   origin: no CDN, no Google Fonts, no external request of any kind.
+   PLAYBOOK.md §3 is the source of truth for every value here.
+   =========================================================================== */
+
+/* --------------------------------------------------------------- typefaces */
+/* Self-hosted. `font-display: swap` so text paints immediately in the
+   fallback and reflows once the file lands, rather than blocking on it. */
+@font-face {
+  font-family: 'Inter';
+  src: url('assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;          /* one variable file covers the whole ramp */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('assets/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('assets/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------- dark tokens */
+
+
+/* ------------------------------------------------- light tokens: the paper */
+/* The Prüfbericht is the one printed surface. Every value below is measured
+   against #FFFFFF and against the #F6F7F8 wash, and clears WCAG AA (4.5:1)
+   for small text — the report is read, not glanced at. */
+
+
+/* ------------------------------------------------------------- primitives */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
+.mono { font-family: var(--mono); }
+
+/* One visible focus style everywhere. Never remove it without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+[data-surface='paper'] :focus-visible { outline-color: var(--accent-on-light); }
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  /* NOT `var(--glass-shine), var(--glass-lift)`. box-shadow's grammar is
+     `none | <shadow>#` — `none` is legal only as the SOLE value, so the pair
+     failed to parse and the WHOLE declaration was dropped: .glass computed
+     box-shadow:none on every page, and nobody noticed because the hairline
+     border stayed. Measured in Chrome: shine+lift -> "none", lift alone ->
+     "rgba(18,18,16,.18) 0 8px 24px -14px". If a token can hold `none`, it
+     cannot sit in a comma list. */
+  box-shadow: var(--glass-lift);
+}
+/* Without this a browser with no backdrop-filter paints a see-through panel
+   and the text behind shows through the text on top. Opaque is safe failure. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--glass-fallback); }
+}
+
+.btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--on-accent);
+  background: var(--accent);
+  text-decoration: none;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 18px;
+  display: inline-block;
+  transition: filter .2s var(--ease), transform .2s var(--ease);
+}
+.btn:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn--ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+
+/* Screen-reader-only, for labels that must exist but not be seen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* PLAYBOOK §3 makes this mandatory on every page. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root{
+  /* This block is copied verbatim into all SEVEN pages: index, scanner, report,
+     impressum, datenschutz, art50check, art50report. That duplication is why
+     the app and the landing drifted into two palettes in the first place: a
+     colour changed in one file only. Change it in all seven, and keep them
+     byte-identical:
+       for f in index scanner report impressum datenschutz art50check art50report; do
+         awk '/^:root\{/,/^\}/' frontend/$f.html | md5; done   # one hash
+     art50check.html was the last page to join, and it joined by dropping its
+     <link> to assets/base.css — which nothing loads any more. */
+  --bg:#F2F1EB;            /* the landing's ground. The app's own was #F7F8F5,
+                              1.06 away — the swap is a hue move, not a weight
+                              move, so no AA threshold turns over on it.      */
+  --bg-2:#FFFFFF;
+  --surface:#FFFFFF;       /* 1.13 off the ground; on #F7F8F5 it was 1.07       */
+  /* Recessed track/hover, and it has two grounds: the .ring track and
+     .fhead:hover sit on --surface (#FFFFFF), while .pbar, .mini and the nav
+     hover sit on the page ground. Those two weights can no longer both be
+     held. #EEF6E9 was 1.037 off the OLD ground and 1.106 off white; the new
+     ground is itself 1.132 off white, i.e. darker than that old track — so
+     nothing that still reads as recessed against the ground can also be
+     1.106 off white. The role wins: 1.034 off the ground, and 1.171 off
+     white, where it reads slightly heavier than it used to.               */
+  --surface-2:#ECEEE6;
+  --border:#DFDED9;        /* 1.19 off the ground. #E3E6DF was 1.18 on the old
+                              ground and only 1.12 on this one — the hairline
+                              lost a fifth of its separation to the swap.       */
+  --text:#121210;          /* 16.57:1                                          */
+  --muted:#5A6660;         /*  5.30:1  AA. The landing's #706E63 measures 4.53
+                              here — 0.03 above the threshold, for no gain.    */
+
+  /* One value has to serve two roles: green text on the page, and a button
+     fill carrying a white label. #116B2E is 5.86:1 as text on --bg and 6.63:1
+     the other way round, so both clear AA and there is no second green. */
+  --accent:#116B2E;
+  --on-accent:#FFFFFF;
+  --accent-on-light:#116B2E;   /* the same green. See the paper block below.    */
+
+  --critical:#A3200F;      /*  6.70:1 */
+  --high:#B45309;          /*  4.44:1 on the ground — but it is never small
+                              text there: as a grade it is 34px, as a severity
+                              it sits on --surface (5.02:1), and its one use on
+                              the ground is a 1px border, where 3:1 applies. */
+  --medium:#7A5200;        /*  6.12:1 */
+  --low:#27548F;           /*  6.75:1 */
+  --info:#5A6660;
+
+  /* #7BE33F is 1.5:1 on white. It survives only as a large decorative shape,
+     never as text, an icon, or a border on its own — and since the warm bloom
+     went orange nothing references it. Kept as the dark theme's brand green. */
+  --brand-lite:#7BE33F;
+
+  --grid-line:rgba(18,18,16,.045);
+  /* The warm bloom was #7BE33F at .16, which blends to #DFEFCF — a cold lime
+     patch on a warm ground. It is now the landing's one warm note, #FF720D,
+     at the alpha that reproduces the old bloom's weight (1.06 off the ground). */
+  --bloom-warm:rgba(255,114,13,.067);
+  --bloom-cool:rgba(17,107,46,.05);
+
+  /* Chrome that overlays scrolling content keeps the material; on a light
+     ground the inset shine reads as a smudge, so it is dropped. */
+  --glass-bg:rgba(242,241,235,.86);
+  --glass-border:#DFDED9;
+  --glass-lift:0 8px 24px -14px rgba(18,18,16,.18);
+  --glass-fallback:#FFFFFF;
+
+  --ring:rgba(17,107,46,.30);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+  --r:12px;
+  /* The landing's two chrome values, so the header ported from it is the same
+     object here and not a lookalike: --pad is the page gutter the header and
+     the overlay both sit on, --dur the transition the overlay slides with.
+     --ease above is already the landing's --ease-expo, same curve. */
+  --pad:clamp(20px,4.4vw,64px);
+  --dur:.35s;
+  /* Header height, so body padding and scroll-padding agree with the bar.
+     It lives HERE and not in a :root of its own next to the header rules: a
+     second `:root{` at column 0 opened a second range in the awk check this
+     block documents below, and the check went from one hash to four. The
+     detector broke, not the palette. */
+  --hdr:110px;
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:var(--sans)}
+
+/* The printed sheet is its own surface. base.css defines these under
+   [data-surface='paper'] — dropping the shared stylesheet dropped them with it,
+   and an undefined custom property resolves to nothing rather than to a
+   fallback: .printbar lost its background and kept its white text. */
+[data-surface='paper']{
+  --paper:#FFFFFF;
+  --wash:#F6F7F8;
+  --ink:#121210;          /* 16.57:1 on --bg, 18.75:1 on white */
+  --ink-soft:#5A6660;     /*  5.99:1 on white */
+  --rule:#E3E6DF;
+  --accent-on-light:#116B2E;  /* 6.63:1 on white, 6.18:1 on the wash. Was
+                                 #1F5C0E at 8.09 — a second green, one hue
+                                 step off the screen one and visible when the
+                                 report opens out of the app. */
+  --critical:#A3200F;
+  --high:#B45309;
+  --medium:#7A5200;
+  --low:#27548F;
+  --on-accent:#FFFFFF;
+  --ring:rgba(17,107,46,.30);
+}
+
+/* ── STEP 1 — the dated stamp. It states that a test happened, when, and under
+   which reference. It never states a verdict: the grade lives in the grade
+   card. A seal carrying a grade would be a rating mark. ─────────────────── */
+.stamp{float:right;width:36mm;text-align:center;transform:rotate(-4deg);
+  margin:2mm 0 6mm 8mm;opacity:.9}
+.stamp img{width:27mm;display:block;margin:0 auto 2.5mm;opacity:.92}
+.stamp .ref{font-family:var(--mono);font-size:6.5pt;line-height:1.55;
+  color:var(--accent-on-light);letter-spacing:.01em}
+@media print{ .stamp{opacity:1} }
+@media (max-width:900px){ .stamp{float:none;transform:none;margin:0 auto 8mm} }
+
+/* STEP 9 — neither page carried this. The prompt named only report.html;
+   index.html was missing it too. */
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+<style>
+/* ===========================================================================
+   LLMantis — Art.-50-Prüfprotokoll
+   ---------------------------------------------------------------------------
+   The Art. 50 check's printed surface, and a sibling of report.html rather
+   than a variant of it: that one carries a grade, findings and a scoring
+   explanation, none of which exist here. What this sheet carries is a single
+   verdict and the list of what was tried to reach it — which art50engine.py:22
+   calls the deliverable outright: "the value of no widget found is entirely in
+   the list of things that were tried."
+
+   It is a separate page for the same reason report.html is: the scan UI and
+   the document are different objects, and the customer gets the document in
+   its own tab. Everything it renders comes from ONE object, the report the
+   backend already returns (probe_log included, art50engine.py:157), handed
+   over in sessionStorage exactly as index.html hands its own report across.
+
+   German throughout, because the sheet goes into a German company's file. The
+   only English left is each probe's `description`, which arrives from the
+   backend that way (backend/art50probes.py:341).
+   =========================================================================== */
+body { background: var(--wash); color: var(--ink); font-size: 10.5pt; line-height: 1.55; }
+.sheet { max-width: 210mm; margin: 0 auto; background: var(--paper);
+  box-shadow: 0 1px 3px rgba(0,0,0,.09); padding: 16mm 16mm 14mm; }
+
+.masthead { display: flex; align-items: center; gap: 10px;
+  border-bottom: 2px solid var(--ink); padding-bottom: 9px; }
+.masthead .name { font-size: 15pt; font-weight: 700; letter-spacing: -.03em; }
+.masthead .name .ll { color: var(--accent-on-light); }
+.masthead .kind { margin-left: auto; font-family: var(--mono); font-size: 8.5pt;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); }
+
+h1.doctitle { font-size: 21pt; margin: 12mm 0 5mm; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 20px;
+  font-size: 9.5pt; margin: 0 0 10mm; }
+.meta dt { color: var(--ink-soft); }
+.meta dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+
+/* The verdict, and only ever one of them. No score, no grade: this check
+   answers a yes/no question and a rating mark would overstate it. */
+.verdict { border: 1px solid var(--rule); border-left-width: 4px; padding: 7mm 7mm 6mm;
+  margin-bottom: 8mm; background: var(--wash); }
+.verdict.bad { border-left-color: var(--critical); }
+.verdict.ok { border-left-color: var(--accent-on-light); }
+.verdict.warn { border-left-color: var(--high); }
+.verdict.none { border-left-color: var(--ink-soft); }
+.v-badge { display: inline-block; font-family: var(--mono); font-size: 8pt; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; padding: 3px 9px; color: #fff;
+  background: var(--ink-soft); }
+.verdict.bad .v-badge { background: var(--critical); }
+.verdict.ok .v-badge { background: var(--accent-on-light); }
+.verdict.warn .v-badge { background: var(--high); }
+.v-reason { margin: 4mm 0 0; font-size: 11pt; }
+
+.q-label { font-family: var(--mono); font-size: 8pt; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-soft); margin: 7mm 0 2mm; }
+.quote { font-family: var(--mono); font-size: 9.5pt; line-height: 1.6;
+  border-left: 2px solid var(--accent-on-light); padding: 4mm 5mm; background: var(--wash);
+  white-space: pre-wrap; }
+
+h2.sec { font-size: 12pt; margin: 10mm 0 4mm; padding-bottom: 2mm;
+  border-bottom: 1px solid var(--rule); }
+
+.shot { display: block; width: 100%; max-height: 105mm; object-fit: contain;
+  object-position: top; border: 1px solid var(--rule); break-inside: avoid; }
+.shot-cap { font-size: 8.5pt; color: var(--ink-soft); margin: 2mm 0 0; }
+
+/* One row per probe, fired or not. A row that found nothing is not noise here:
+   it is half the argument. */
+.probe { display: grid; grid-template-columns: 6mm 1fr 62mm; gap: 3mm;
+  padding: 2.2mm 0; border-bottom: 1px solid var(--rule); font-size: 9.5pt;
+  break-inside: avoid; align-items: baseline; }
+.probe .mark { font-family: var(--mono); color: var(--ink-soft); }
+.probe.hit .mark { color: var(--accent-on-light); font-weight: 500; }
+.probe.hit .what { font-weight: 600; }
+.probe.miss { color: var(--ink-soft); }
+.probe .found { font-family: var(--mono); font-size: 8.5pt; color: var(--ink-soft);
+  word-break: break-word; }
+.probe .desc { color: var(--ink-soft); font-weight: 400; }
+
+.legal { margin-top: 10mm; border-top: 1px solid var(--rule); padding-top: 4mm;
+  font-size: 8.5pt; line-height: 1.5; color: var(--ink-soft); break-inside: avoid; }
+.legal h3 { font-size: 9.5pt; color: var(--ink); margin: 0 0 2mm; }
+.legal p { margin: 0 0 2mm; }
+.legal .mark { font-family: var(--mono); }
+
+/* --------------------------------------------------------------- controls */
+.printbar { position: sticky; top: 0; z-index: 10; background: var(--ink); color: #fff;
+  padding: 11px 16px; display: flex; align-items: center; gap: 14px; font-size: 10pt; }
+.printbar .btn { margin-left: auto; background: var(--accent-on-light); color: #fff;
+  border: 0; padding: 8px 15px; font: inherit; cursor: pointer; }
+.printbar a.back { color: #fff; opacity: .75; text-decoration: none; font-size: 9.5pt; }
+.printbar a.back:hover { opacity: 1; }
+
+/* Loud on purpose, and copied in spirit from report.html: a fabricated sheet
+   that looks live is the one thing this product may not produce. */
+.mocknote { display: none; margin: 0 0 8mm; padding: 12px 15px;
+  border: 1px solid var(--high); background: #FFF8E5; font-size: 9pt; }
+.mocknote.on { display: block; }
+.mocknote b { color: var(--high); }
+
+@media print {
+  body { background: #fff; }
+  .sheet { box-shadow: none; max-width: none; margin: 0; padding: 0; }
+  .printbar, .mocknote { display: none !important; }
+  a { text-decoration: none; color: inherit; }
+  button, nav, canvas, video { display: none !important; }
+  @page { margin: 16mm 15mm; }
+}
+</style>
+</head>
+<body data-surface="paper">
+
+<div class="printbar">
+  <a class="back" href="/static/art50check.html">&larr; Zurück zur Prüfung</a>
+  <span>A4 — „Hintergrundgrafiken“ aktivieren, damit der Befundblock druckt.</span>
+  <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="sheet" id="sheet"></div>
+
+<script>
+'use strict';
+
+/* index.html hands report.html its scan under 'llmantis:lastReport'. This is
+   the same mechanism with its own key, so opening one document never
+   overwrites the other. art50check.html writes it; see the note there on
+   rel="opener", without which the new tab gets no sessionStorage at all. */
+const REPORT_KEY = 'llmantis:lastArt50';
+
+const SAMPLE = {
+  url: 'https://beispiel-gmbh.de',
+  checked_at: '',
+  verdict: 'not_disclosed',
+  reason: 'Der Assistent begrüßt mit einem Satz, der weder KI noch Bot noch ein automatisiertes System nennt.',
+  evidence: 'Hallo! Schön, dass Sie da sind — wie kann ich Ihnen heute weiterhelfen?',
+  robots: 'allows /', opened_widget: true, duration_s: 74.2,
+  pages_tried: [{viewport:'desktop'},{viewport:'desktop'},{viewport:'mobile'}],
+  click_path: ['Startseite', 'ai: Hilfe & Kontakt', 'chat launcher'],
+  probes_attempted: 2,
+  probe_log: [
+    {name:'websocket', description:'A live chat connection was opened (WebSocket)',
+     fired:true, findings:['wss://chat.example.de/socket'], note:''},
+    {name:'iframe_src', description:'An embedded frame is served from a chat host',
+     fired:false, findings:[], note:''},
+  ],
+};
+
+let REPORT = SAMPLE, IS_SAMPLE = true;
+try {
+  const stored = sessionStorage.getItem(REPORT_KEY);
+  if (stored) { REPORT = JSON.parse(stored); IS_SAMPLE = false; }
+} catch (e) { /* private mode, or a payload we cannot parse: stay on the sample */ }
+
+const VERDICT = {
+  disclosed:        ['ok',   'Kennzeichnung vorhanden'],
+  not_disclosed:    ['bad',  'Keine Kennzeichnung'],
+  not_determinable: ['warn', 'Nicht feststellbar'],
+  no_widget_found:  ['none', 'Kein Widget gefunden'],
+};
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+/* The check has no wall clock of its own -- art50engine.py returns duration_s
+   and nothing else about time -- so art50check.html stamps one when the
+   verdict lands and sends it along. Falling back to "now" would date the sheet
+   to whenever it was REOPENED, which is how a record turns into a false
+   certificate. Say so instead. */
+function whenText(iso) {
+  if (!iso) return 'nicht aufgezeichnet';
+  const d = new Date(iso);
+  if (isNaN(d)) return 'nicht aufgezeichnet';
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ', ' + d.toLocaleTimeString('de-DE',
+        { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) + ' Uhr';
+}
+
+function render(r) {
+  const [cls, label] = VERDICT[r.verdict] || ['none', r.verdict || '—'];
+  const probes = r.probe_log || [];
+  const fired = probes.filter(p => p.fired && p.name !== 'consent_gate');
+  const views = [...new Set((r.pages_tried || []).map(p => p.viewport).filter(Boolean))];
+
+  let h = '';
+
+  h += '<div class="masthead">' +
+       '<span class="name"><span class="ll">LL</span>Mantis</span>' +
+       '<span class="kind">Prüfprotokoll</span></div>';
+
+  h += '<div class="mocknote' + (IS_SAMPLE ? ' on' : '') + '">' +
+       '<b>Beispieldokument.</b> Diese Seite wurde ohne Prüfergebnis geöffnet und ' +
+       'zeigt Platzhalter. Starten Sie eine Prüfung und öffnen Sie das Protokoll ' +
+       'von dort aus.</div>';
+
+  h += '<h1 class="doctitle">Art.-50-Prüfprotokoll</h1>';
+
+  h += '<dl class="meta">' +
+    '<dt>Geprüfte Adresse</dt><dd>' + esc(r.url) + '</dd>' +
+    '<dt>Geprüft am</dt><dd>' + esc(whenText(r.checked_at)) + '</dd>' +
+    '<dt>Dauer</dt><dd>' + esc(r.duration_s ?? '—') + ' s</dd>' +
+    '<dt>Nachweismethoden</dt><dd>' + probes.length + ' ausgeführt, ' +
+      fired.length + ' mit Fund</dd>' +
+    '<dt>Seiten geprüft</dt><dd>' + (r.pages_tried || []).length +
+      (views.length ? ' (' + esc(views.join(', ')) + ')' : '') + '</dd>' +
+    '</dl>';
+
+  h += '<div class="verdict ' + cls + '">' +
+       '<span class="v-badge">' + esc(label) + '</span>' +
+       '<p class="v-reason">' + esc(r.reason) + '</p></div>';
+
+  /* The quote is the whole case, so it is the only thing on this sheet that is
+     never summarised, shortened or paraphrased. */
+  if (r.evidence) {
+    h += '<p class="q-label">Der Wortlaut, über den geurteilt wurde</p>' +
+         '<div class="quote">' + esc(r.evidence) + '</div>';
+  } else if (r.launcher_label) {
+    h += '<p class="q-label">Beschriftung der Chat-Schaltfläche</p>' +
+         '<div class="quote">' + esc(r.launcher_label) + '</div>';
+  }
+
+  h += '<h2 class="sec">Wie wir vorgegangen sind</h2>';
+  h += '<dl class="meta">' +
+    '<dt>Chat</dt><dd>' + (r.opened_widget
+      ? 'einmal geöffnet und gelesen — nichts eingegeben'
+      : 'nicht geöffnet') + '</dd>' +
+    '<dt>robots.txt</dt><dd>' + esc(r.robots || '—') +
+      ' — aufgezeichnet, nicht durchgesetzt</dd>' +
+    ((r.click_path || []).length
+      ? '<dt>Weg dorthin</dt><dd>' + r.click_path.map(function (s, i) {
+          const ai = String(s).indexOf('ai: ') === 0;
+          return (i ? ' → ' : '') + esc(ai ? s.slice(4) : s) + (ai ? ' (KI)' : '');
+        }).join('') + '</dd>'
+      : '') +
+    '</dl>';
+
+  const shot = r.widget_shot_b64 || r.screenshot_b64;
+  if (shot) {
+    h += '<h2 class="sec">Was zu sehen war</h2>' +
+         '<img class="shot" alt="Bildschirmfoto von ' + esc(r.url) + '" ' +
+         'src="data:image/png;base64,' + esc(shot) + '">' +
+         '<p class="shot-cap">' + (r.widget_shot_b64
+           ? 'Aufgenommen bei geöffnetem Chat — das Bild zeigt den Satz, den das Protokoll zitiert.'
+           : 'Bildschirmfoto der geprüften Seite.') + '</p>';
+  }
+
+  h += '<h2 class="sec">Alle Nachweismethoden</h2>';
+  if (!probes.length) {
+    h += '<p>Keine Methode konnte ausgeführt werden.</p>';
+  } else {
+    h += probes.map(function (p) {
+      const ctx = p.name === 'consent_gate';
+      const mark = ctx ? (p.fired ? 'i' : '·') : (p.fired ? '✓' : '·');
+      const found = (p.findings || []).join(' · ') || p.note || '';
+      return '<div class="probe ' + (ctx ? 'ctx' : (p.fired ? 'hit' : 'miss')) + '">' +
+        '<span class="mark">' + mark + '</span>' +
+        '<span class="what">' + esc(p.name) +
+          '<span class="desc"> — ' + esc(p.description) + '</span></span>' +
+        '<span class="found">' + esc(found) + '</span></div>';
+    }).join('');
+  }
+
+  h += '<div class="legal">' +
+    '<h3>Was dieses Protokoll ist — und was nicht</h3>' +
+    '<p>Es hält fest, was zum oben genannten Zeitpunkt auf den oben aufgeführten ' +
+      'Seiten technisch beobachtet wurde: welche Nachweismethoden liefen, was sie ' +
+      'gefunden haben, und — falls ein Chat geöffnet wurde — den Wortlaut der ' +
+      'Begrüßung. Wir haben nichts eingegeben und dem Bot keine Nachricht gesendet.</p>' +
+    '<p>Es ist <b>keine Bescheinigung und keine Rechtsberatung</b>. Wir prüfen ' +
+      'technisch — für eine rechtsverbindliche Bewertung: Fachanwalt für IT-Recht. ' +
+      'Die Aussage gilt für die geprüften Seiten zum genannten Zeitpunkt, nicht für ' +
+      'die gesamte Website und nicht für später. Erstellt von der Person, die die ' +
+      'Prüfung gestartet hat.</p>' +
+    '<p class="mark">llmantis.de</p></div>';
+
+  return h;
+}
+
+document.getElementById('sheet').innerHTML = render(REPORT);
+document.title = 'Art.-50-Prüfprotokoll — ' + (REPORT.url || 'LLMantis');
+</script>
+</body>
+</html>

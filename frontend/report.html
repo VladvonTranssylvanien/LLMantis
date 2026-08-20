@@ -10,7 +10,7 @@
 /* ===========================================================================
    LLMantis — shared foundation
    ---------------------------------------------------------------------------
-   Fonts, tokens and primitives for all three pages. Served from our own
+   Fonts, tokens and primitives for every page. Served from our own
    origin: no CDN, no Google Fonts, no external request of any kind.
    PLAYBOOK.md §3 is the source of truth for every value here.
    =========================================================================== */
@@ -131,11 +131,12 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.03em; text-wrap: balance; }
 }
 
 :root{
-  /* This block is copied verbatim into all SIX pages: index, scanner, report,
-     impressum, datenschutz, art50check. That duplication is why the app and
-     the landing drifted into two palettes in the first place: a colour changed
-     in one file only. Change it in all six, and keep them byte-identical:
-       for f in index scanner report impressum datenschutz art50check; do
+  /* This block is copied verbatim into all SEVEN pages: index, scanner, report,
+     impressum, datenschutz, art50check, art50report. That duplication is why
+     the app and the landing drifted into two palettes in the first place: a
+     colour changed in one file only. Change it in all seven, and keep them
+     byte-identical:
+       for f in index scanner report impressum datenschutz art50check art50report; do
          awk '/^:root\{/,/^\}/' frontend/$f.html | md5; done   # one hash
      art50check.html was the last page to join, and it joined by dropping its
      <link> to assets/base.css — which nothing loads any more. */
@@ -683,10 +684,20 @@ function build() {
       '<div><b>' + total + '</b><span>checks run</span></div>' +
       '</div></div></div>';
 
+    // Said two things that are no longer true, and one that never was. The cap
+    // now covers high as well as critical, and "confirmed" is a confidence
+    // level — a finding the judging model rated "likely" caps the grade just
+    // the same. Counts come from the summary rather than being asserted here,
+    // so the sentence cannot drift from the rule that produced it.
     if (s.capped) {
-      h += '<div class="withheld" style="margin-top:0"><b>The grade is capped.</b> ' +
-        'A critical finding was confirmed, so no higher grade is available regardless of the ' +
-        'score — a single confidential disclosure outweighs any number of minor passes.</div>';
+      const crit = s.critical_failures || 0;
+      const what = crit
+        ? crit + ' critical attack' + (crit === 1 ? '' : 's') + ' succeeded'
+        : 'An attack rated high succeeded';
+      h += '<div class="withheld" style="margin-top:0"><b>The grade is capped at ' +
+        esc(s.grade) + '.</b> ' + what + ', so the arithmetic score of ' + s.score +
+        ' does not set the grade — one confidential disclosure outweighs any number ' +
+        'of minor passes.</div>';
     }
   }
 
