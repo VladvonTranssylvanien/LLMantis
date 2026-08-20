@@ -185,26 +185,22 @@ Optionally name a canary — a string that must never appear in an answer. That 
 # Where this goes next
 
 
-**Authentication and Registration.** Authentication is not finished yet and therefore not integrated on the frontend yet.
+**Authentication and Registration.** Built, not wired. Registration and login with JWT, owner/admin/member role. Not implemented in the frontend yet.
 
-**Ownership verification.** Attacking a domain you do not own requires a DNS TXT
-record proving you do.
 
-**A much larger attack library.** Attacks are data, so the library grows without
-touching the engine, and because the score deducts per finding rather than
-counting the percentage defended, adding attacks cannot flatter a bot. 
+**Ownership verification.** Attacking a domain requires a DNS TXT record proving you own it.
 
-**An AI in the attacker loop.** Today the library is fixed — every bot gets the
-same sentences. The next step is an attacking model that reads the target's own
-answers and decides what to try next: following up where a bot hesitated, and
-writing attacks specific to the bot in front of it, since a travel-booking bot and
-a medical appointment bot have different things worth extracting. 
 
-Further out: multi-turn attacks that build trust across a conversation before
-asking, scheduled re-scans that flag when a prompt change reopened something, and
-voice agents.
+**A much larger attack library.** Attacks are data, so the library grows without touching the engine. Add more attacks and different variations per attack (wording and language).
 
-**Art. 50 AI Act. Voice and Messenger Bot control.** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. It is not connected to the front-end yet. In the future also bots on Whatsapp and Telegram could be checked.
+
+**An AI in the attacker loop.** Today the library is fixed, every bot gets the same sentences. The next step is an attacking model that reads the target's own answers and decides what to try next: following up where a bot hesitated, and writing attacks specific to the bot in front of it, since a travel-booking bot and a medical appointment bot have different things worth extracting.
+
+Further out: multi-turn attacks that build trust across a conversation before asking, scheduled re-scans that flag when a prompt change reopened something.
+
+  
+**Art. 50 AI Act. Voice and Messenger Bot control.** We already integrated Twillio for voice recognition to also check Voice-Assistants for compliance. Twilio needs a paid account. In the future also bots on Whatsapp and Telegram could be checked.
+
 
 ## Licence
 
